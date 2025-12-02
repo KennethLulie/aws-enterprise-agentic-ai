@@ -30,14 +30,7 @@ This repository contains the complete project plan and architecture documentatio
 
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
 - **[PLAN_SUMMARY.md](./PLAN_SUMMARY.md)** - Quick reference summary of key decisions
-- **[DOCUMENTATION_STATUS.md](./DOCUMENTATION_STATUS.md)** - Documentation status tracking
-
-### Review Documents (Historical)
-- `FINAL_REVIEW.md` - Initial comprehensive review
-- `FINAL_COMPREHENSIVE_REVIEW.md` - Phase 1 scope review
-- `EXPERT_REVIEW.md` - Expert architecture review
-- `ARCHITECTURE_REVIEW.md` - Architecture-specific review
-- `PLAN_REVIEW.md` - Plan review
+- **[GITHUB_SETUP.md](./GITHUB_SETUP.md)** - GitHub repository setup guide
 
 ## 🏗️ Architecture
 
