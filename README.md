@@ -30,7 +30,6 @@ This repository contains the complete project plan and architecture documentatio
 
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
 - **[PLAN_SUMMARY.md](./PLAN_SUMMARY.md)** - Quick reference summary of key decisions
-- **[GITHUB_SETUP.md](./GITHUB_SETUP.md)** - GitHub repository setup guide
 
 ## 🏗️ Architecture
 
