@@ -3,7 +3,7 @@
 ## Executive Summary
 
 This project builds an enterprise-grade agentic AI system on AWS demonstrating:
-- Multi-tool agent orchestration (Search, SQL, RAG)
+- Multi-tool agent orchestration (Web Search, SQL, RAG, Weather API)
 - Input/output verification with SLMs
 - Streaming thought process visualization
 - Inference caching for cost optimization
@@ -46,11 +46,11 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │  ┌─────────────────────  TOOLS  ───────────────────────────────────┐   │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐                 │   │
-│  │  │   Tavily   │  │    SQL     │  │    RAG     │                 │   │
-│  │  │   Search   │  │   Query    │  │  Retrieval │                 │   │
-│  │  │            │  │  (Aurora)  │  │ (Pinecone) │                 │   │
-│  │  └────────────┘  └────────────┘  └────────────┘                 │   │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │   │
+│  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Weather  │ │   │
+│  │  │   Search   │  │   Query    │  │  Retrieval │  │    API    │ │   │
+│  │  │            │  │  (Aurora)  │  │ (Pinecone) │  │(OpenWeather│ │   │
+│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -316,6 +316,12 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
    - Free tier: 1,000 searches/month (sufficient for demo)
    - Copy API key to `.env`
 
+3. **OpenWeatherMap (free tier - optional for Phase 2):**
+   - Create account at https://openweathermap.org/api
+   - Get API key from dashboard (free tier: 60 calls/minute, 1M calls/month)
+   - Copy API key to `.env` as `OPENWEATHER_API_KEY`
+   - Note: Can use without API key for basic demo (limited functionality)
+
 **Setup Process:**
 ```bash
 # One-command setup (pre-pulls images, validates)
@@ -364,6 +370,7 @@ docker-compose up
 | `docker-compose up` fails with permissions error | Docker Desktop not running or user not in docker group | Start Docker Desktop / run `sudo usermod -aG docker $USER` then re-login |
 | Pinecone 401 on startup | Missing API key in `.env` | Add `PINECONE_API_KEY` and restart backend |
 | Tavily tool fails immediately | Free-tier rate limit hit | Wait 60s, set `TAVILY_API_KEY` correctly, or upgrade plan |
+| Weather API returns 401 | Missing or invalid API key | Set `OPENWEATHER_API_KEY` in `.env` or use free tier without key (limited) |
 | Terraform state lock message | Previous `terraform apply` exited abruptly | Delete lock entry from DynamoDB table `terraform-state-lock` using AWS Console |
 
 ---
@@ -695,6 +702,20 @@ If something isn't working, follow this systematic debugging process:
 - Metadata filtering support (document_type, date_range, etc.)
 - **Fallback mechanisms:** Graceful degradation if Pinecone unavailable
 
+**2d. Weather API Tool**
+- OpenWeatherMap API integration (free tier: 60 calls/minute, 1M calls/month)
+- Tool definition in LangGraph (using built-in tool binding)
+- Result formatting with temperature, conditions, humidity, wind speed
+- **Comprehensive error handling** with retry logic and exponential backoff
+- **Fallback mechanisms:** Graceful degradation if API unavailable
+- **Circuit breaker pattern:** Stop trying after 5 failures, recover after 60s
+- Rate limiting (respect API limits - 60 calls/minute free tier)
+- **Structured logging** of weather queries and results
+- Input validation (city name, coordinates, or ZIP code)
+- Unit conversion (Celsius/Fahrenheit, metric/imperial)
+- **Error handling:** User-friendly messages for invalid locations
+- **No infrastructure required:** Uses existing App Runner backend, no new AWS services
+
 **Infrastructure Additions:**
 - Aurora Serverless v2 cluster (0.5 ACU minimum)
 - **Connection Pooling Strategy (Cost-Conscious):**
@@ -751,6 +772,7 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Agent can search the web and cite sources
 - Agent can query SQL database with natural language
 - Agent can retrieve relevant documents from vector store
+- Agent can retrieve current weather information by location
 - Documents uploaded to S3 are automatically indexed
 - Tool selection is intelligent and contextual
 
@@ -980,7 +1002,8 @@ aws-enterprise-agentic-ai/
 │   │   │       ├── __init__.py
 │   │   │       ├── search.py     # Tavily search (with fallback, circuit breaker)
 │   │   │       ├── sql.py        # Aurora query (SQL injection prevention)
-│   │   │       └── rag.py        # Pinecone retrieval (query expansion, RRF, compression)
+│   │   │       ├── rag.py        # Pinecone retrieval (query expansion, RRF, compression)
+│   │   │       └── weather.py    # Weather API (OpenWeatherMap, circuit breaker)
 │   │   ├── cache/
 │   │   │   ├── __init__.py
 │   │   │   └── inference_cache.py
@@ -1242,14 +1265,14 @@ aws-enterprise-agentic-ai/
 
 ### Unit Tests (Core Logic):
 - Agent nodes (chat, tools, verification) - Critical paths only
-- Individual tools (search, SQL, RAG) - Main functionality
+- Individual tools (search, SQL, RAG, weather) - Main functionality
 - Cache logic - Core caching behavior
 - Utility functions - Reusable helpers
 
 **Testing Tools:**
 - Python: pytest with pytest-cov (aim for 70%+ coverage on critical paths)
 - TypeScript: Jest for frontend components
-- Mock external services (Bedrock, Tavily, Pinecone) for unit tests
+- Mock external services (Bedrock, Tavily, Pinecone, OpenWeatherMap) for unit tests
 
 ### Integration Tests (Key Flows):
 - Tool interactions - Verify tools work together
@@ -1391,7 +1414,7 @@ aws-enterprise-agentic-ai/
 2. **Service Failures:**
    - **Health checks** (`/health` endpoint with dependency checks)
    - **Graceful error handling** with user-friendly messages
-   - **Fallback mechanisms** for each tool (search, SQL, RAG)
+   - **Fallback mechanisms** for each tool (search, SQL, RAG, weather)
    - **Circuit breakers** to prevent cascade failures
    - **Retry logic** with exponential backoff
    - **Auto-restart** via App Runner health checks
@@ -1462,12 +1485,13 @@ aws-enterprise-agentic-ai/
 - [ ] Bedrock model access approved (check in console)
 - [ ] Pinecone account created, index created, API key copied
 - [ ] Tavily account created, API key copied
+- [ ] OpenWeatherMap account created, API key copied (optional for Phase 2)
 - [ ] Git installed
 
 1. **Set up local development environment:**
    - Clone/initialize repository
    - Copy `.env.example` to `.env`
-   - Fill in API keys (Tavily, Pinecone, AWS)
+   - Fill in API keys (Tavily, Pinecone, OpenWeatherMap, AWS)
    - Run `./scripts/setup.sh` to validate prerequisites
    - Run `docker-compose up` to start services
 
@@ -1523,6 +1547,7 @@ aws dynamodb create-table \
 - `TAVILY_API_KEY` - For web search tool (Phase 2)
 - `PINECONE_API_KEY` - For vector store (Phase 2)
 - `PINECONE_INDEX_NAME` - demo-index (Phase 2)
+- `OPENWEATHER_API_KEY` - For weather API tool (Phase 2, optional)
 - **Note:** `DEMO_PASSWORD` is stored in Secrets Manager, not GitHub (Lambda reads from Secrets Manager)
 
 **Phase 1a Deployment Order (Minimal MVP):**

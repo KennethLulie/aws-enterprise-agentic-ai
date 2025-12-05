@@ -5,7 +5,7 @@ An enterprise-grade agentic AI system on AWS demonstrating multi-tool orchestrat
 ## 🎯 Project Overview
 
 This project showcases a production-ready AI agent system with:
-- **Multi-tool orchestration** (Web Search, SQL Query, RAG Retrieval)
+- **Multi-tool orchestration** (Web Search, SQL Query, RAG Retrieval, Weather API)
 - **Input/Output verification** with SLMs
 - **Streaming thought process** visualization
 - **Inference caching** for cost optimization
@@ -40,10 +40,10 @@ Frontend (Next.js Static) → CloudFront → S3
                               ↓
 Backend (AWS App Runner) → LangGraph Agent
                               ↓
-        ┌──────────┬──────────┴──────────┬──────────┐
-        ↓          ↓                      ↓          ↓
-    Bedrock    Tavily Search          Aurora SQL   Pinecone RAG
-    (Nova)     (Web Search)           (PostgreSQL) (Vector Store)
+        ┌──────────┬──────────┴──────────┬──────────┬──────────┐
+        ↓          ↓                      ↓          ↓          ↓
+    Bedrock    Tavily Search          Aurora SQL   Pinecone RAG  Weather API
+    (Nova)     (Web Search)           (PostgreSQL) (Vector Store) (OpenWeather)
 ```
 
 ## 🚀 Quick Start (Coming Soon)
@@ -53,7 +53,7 @@ This project is currently in planning phase. Implementation will follow this str
 - **Phase 0:** Local development environment
 - **Phase 1a:** Minimal MVP (basic chat interface)
 - **Phase 1b:** Production hardening (persistent state, CI/CD)
-- **Phase 2:** Core agent tools (Search, SQL, RAG)
+- **Phase 2:** Core agent tools (Search, SQL, RAG, Weather API)
 - **Phase 3+:** Advanced features (verification, caching, observability, evaluation)
 
 See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for complete details.
