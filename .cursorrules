@@ -1,0 +1,1329 @@
+# Cursor Rules for Enterprise Agentic AI Project
+
+## Project Overview
+
+This is an enterprise-grade agentic AI system on AWS demonstrating multi-tool orchestration, RAG, real-time streaming, and cost-optimized architecture. The system uses LangGraph for agent orchestration, AWS Bedrock for LLM inference, and follows a Docker-first development approach.
+
+**Current Phase:** Phase 0 (Local Development Environment)
+**Architecture:** Multi-tool agent with web search, SQL queries, RAG retrieval, and weather API
+**Target Cost:** $20-50/month for low-use demo.  However, when there are design choices to make the project more expensive, but simplify development and operations provide that information and choice to the user so they can decide.  We want to save hours of development time and reduce complexity if the cost savings is relatively de minimis.  
+**AWS Region:** us-east-1 (N. Virginia) - ALWAYS use this region unless explicitly stated otherwise
+
+## Technology Stack
+
+**Note:** For specific package versions, see DEVELOPMENT_REFERENCE.md "Technology Version Reference" section. This is the single source of truth for versions.
+
+### Backend
+- **Language:** Python 3.11+ (type hints REQUIRED on all functions)
+- **Framework:** FastAPI with async/await patterns
+- **Agent Framework:** LangGraph for agent orchestration
+- **LLM:** AWS Bedrock (Nova Pro primary, Claude 3.5 Sonnet fallback)
+- **Database:** PostgreSQL 15 (Aurora Serverless v2 in production)
+- **Vector Store:** Pinecone Serverless (ChromaDB locally)
+- **Logging:** structlog (Phase 1b+), basic logging (Phase 0)
+- **Testing:** pytest with pytest-asyncio for async tests
+
+### Frontend
+- **Framework:** Next.js 14.x LTS (App Router)
+- **Language:** TypeScript (strict mode enabled)
+- **UI Library:** shadcn/ui components
+- **SSE:** Native EventSource API (no Vercel AI SDK)
+- **Build:** Static export (`output: 'export'` in next.config.js)
+- **Styling:** Tailwind CSS
+
+### Infrastructure
+- **IaC:** Terraform (modular structure)
+- **Containerization:** Docker Compose for local development
+- **CI/CD:** GitHub Actions
+- **AWS Services:** App Runner, Aurora, S3, CloudFront, Secrets Manager, ECR
+
+## Development Workflow
+
+### Docker-First Approach
+- **ALWAYS use Docker Compose for development** - Never run services directly on host
+- Volume mounts enable hot reload: `./backend:/app` and `./frontend:/app`
+- Startup time target: 5-10 seconds (optimized)
+- Hot reload time: ~2-3 seconds (acceptable trade-off for consistency)
+
+### Development Commands
+```bash
+# Start all services
+docker-compose up
+
+# View logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+
+# Run tests
+./scripts/dev.sh test
+
+# Open shell
+./scripts/dev.sh shell
+```
+
+### Phase-Based Implementation
+- Follow phase order strictly: Phase 0 → Phase 1a → Phase 1b → Phase 2+
+- Complete all Phase 0 deliverables before moving to Phase 1a
+- Test locally before any AWS deployment
+- Reference DEVELOPMENT_REFERENCE.md for phase-specific requirements
+
+## Code Quality Standards
+
+### Python Code Standards
+- **Type Hints:** REQUIRED on all functions, methods, and class attributes
+- **Docstrings:** REQUIRED for all classes, functions, and modules (Google style)
+- **Formatting:** Black (line length 88, no trailing commas)
+- **Linting:** Ruff (import sorting, unused imports, style checks)
+- **Type Checking:** mypy (strict mode, check on commit)
+- **Imports:** Absolute imports from `backend/src/`, no relative imports
+
+**Example:**
+```python
+from typing import Optional, List
+from pydantic import BaseModel
+
+def process_message(
+    message: str,
+    conversation_id: Optional[str] = None
+) -> dict[str, Any]:
+    """
+    Process a user message through the agent.
+    
+    Args:
+        message: The user's message text
+        conversation_id: Optional conversation identifier
+        
+    Returns:
+        Dictionary containing agent response and metadata
+    """
+    ...
+```
+
+### TypeScript Code Standards
+- **Strict Mode:** Always enabled in tsconfig.json
+- **Types:** Explicit types preferred, avoid `any`
+- **Components:** Use functional components with TypeScript interfaces
+- **API Client:** Type-safe API calls with proper error handling
+- **Formatting:** Prettier (consistent with ESLint)
+
+### Error Handling Patterns
+- **Circuit Breakers:** Implement for all external service calls (tools)
+- **Retry Logic:** Exponential backoff with tenacity library
+- **Graceful Degradation:** System continues operating when tools fail
+- **User-Friendly Messages:** Map technical errors to friendly messages
+- **Structured Logging:** Log errors with context (conversation_id, tool, etc.)
+
+**Example:**
+```python
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10)
+)
+def call_external_api(query: str) -> dict:
+    try:
+        result = api_client.search(query)
+        logger.info("api_call_success", query=query, tool="search")
+        return result
+    except APIError as e:
+        logger.error("api_call_failed", query=query, error=str(e))
+        if circuit_breaker.is_open():
+            raise ToolUnavailableError("Search service temporarily unavailable")
+        raise
+```
+
+### Logging Patterns
+- **Phase 0:** Basic Python logging with appropriate levels
+- **Phase 1b+:** structlog with JSON output for CloudWatch
+- **Structured Fields:** Include conversation_id, tool, latency_ms, cost_usd, cache_hit
+- **Log Levels:** DEBUG (detailed), INFO (general), WARN (non-critical), ERROR (failures)
+
+**Example (Phase 1b+):**
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+logger.info(
+    "tool_executed",
+    tool="search",
+    query=query,
+    results_count=len(results),
+    latency_ms=latency,
+    conversation_id=conversation_id
+)
+```
+
+## Architecture Patterns
+
+### LangGraph Agent Structure
+- **State Schema:** TypedDict or Pydantic model in `backend/src/agent/state.py`
+- **Graph Definition:** `backend/src/agent/graph.py` with StateGraph
+- **Nodes:** Separate files in `backend/src/agent/nodes/` (chat.py, tools.py, error_recovery.py)
+- **Checkpointing:** MemorySaver (Phase 0), PostgresSaver (Phase 1b+)
+- **Streaming:** Native LangGraph streaming with SSE
+
+**State Schema Example:**
+```python
+from typing import TypedDict, List, Optional
+from langchain_core.messages import BaseMessage
+
+class AgentState(TypedDict):
+    messages: List[BaseMessage]
+    conversation_id: Optional[str]
+    tools_used: List[str]
+    last_error: Optional[str]
+    metadata: dict[str, Any]
+```
+
+### Tool Implementation Pattern
+- **Base Class:** Common interface in `backend/src/agent/tools/__init__.py`
+- **Tool Files:** One file per tool (search.py, sql.py, rag.py, weather.py)
+- **LangGraph Integration:** Use `@tool` decorator or Tool class
+- **Error Handling:** Circuit breaker, retry logic, structured logging
+- **Result Formatting:** Consistent format with citations
+
+**Tool Example:**
+```python
+from langchain_core.tools import tool
+from typing import Dict, Any
+
+@tool
+def tavily_search(query: str) -> Dict[str, Any]:
+    """
+    Search the web for current information using Tavily API.
+    
+    Args:
+        query: Search query string
+        
+    Returns:
+        Dictionary with results, sources, and metadata
+    """
+    try:
+        # Implementation with circuit breaker and retry
+        ...
+    except Exception as e:
+        logger.error("search_failed", query=query, error=str(e))
+        raise ToolExecutionError(f"Search failed: {str(e)}")
+```
+
+### API Design Patterns
+- **Versioning:** `/api/v1/` prefix for all API endpoints (Phase 1b+)
+- **Routes:** Separate route files in `backend/src/api/routes/v1/`
+- **Middleware:** Auth, rate limiting, logging, error handling
+- **Response Format:** Consistent JSON structure with status, data, errors
+- **SSE Streaming:** Proper event formatting for frontend consumption
+
+**API Route Example:**
+```python
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+
+router = APIRouter(prefix="/api/v1", tags=["chat"])
+
+class ChatRequest(BaseModel):
+    message: str
+    conversation_id: Optional[str] = None
+
+@router.post("/chat")
+async def chat_endpoint(
+    request: ChatRequest,
+    auth: str = Depends(verify_auth)
+) -> StreamingResponse:
+    """Chat endpoint with SSE streaming."""
+    ...
+```
+
+### Database Patterns
+- **ORM:** SQLAlchemy 2.0+ with async support
+- **Migrations:** Alembic for schema versioning
+- **Connection Pooling:** SQLAlchemy built-in (5 connections, max overflow 10)
+- **Queries:** ALWAYS use parameterized queries, NEVER string formatting
+- **Table Whitelisting:** ALLOWED_TABLES constant for SQL tool security
+
+**SQL Safety Example:**
+```python
+from sqlalchemy import text
+
+ALLOWED_TABLES = {"customers", "accounts", "transactions", "portfolios", "trades"}
+
+def execute_safe_query(query: str, params: dict) -> List[dict]:
+    # Validate table names
+    if not is_query_safe(query, ALLOWED_TABLES):
+        raise SecurityError("Query contains unauthorized table access")
+    
+    # Use parameterized query
+    result = db.execute(text(query), params)
+    return [dict(row) for row in result]
+```
+
+## Security Best Practices
+
+### Input Validation
+- **Pydantic Models:** Use for all API request/response validation
+- **Message Length Limits:** Enforce maximum message length
+- **Content Sanitization:** Remove potentially harmful content
+- **SQL Injection Prevention:** Parameterized queries + table whitelisting
+
+### Authentication & Authorization
+- **Password Auth:** Simple password via Secrets Manager (Phase 0-1a)
+- **Abstracted Auth:** AuthProvider interface for future Cognito migration
+- **Rate Limiting:** slowapi middleware (10 req/min per IP, configurable)
+- **CORS:** Specific origins only (CloudFront domain + localhost:3000)
+
+### Data Protection
+- **Secrets:** Never commit secrets, use Secrets Manager (AWS) or .env (local)
+- **PII Redaction:** Remove PII from logs (Phase 3+)
+- **Encryption:** AWS default encryption at rest, HTTPS in transit
+- **Error Messages:** Don't expose internal errors to users
+
+## Testing Requirements
+
+### Unit Tests
+- **Coverage Target:** 70%+ on critical paths
+- **Tool Tests:** Mock external APIs (Bedrock, Tavily, Pinecone)
+- **Agent Tests:** Mock Bedrock calls, test graph execution
+- **Test Structure:** Arrange-Act-Assert pattern
+
+**Test Example:**
+```python
+import pytest
+from unittest.mock import patch, MagicMock
+
+@pytest.mark.asyncio
+async def test_search_tool_success():
+    # Arrange
+    tool = SearchTool()
+    query = "test query"
+    
+    with patch("tool.api_client.search") as mock_search:
+        mock_search.return_value = {"results": [...]}
+        
+        # Act
+        result = await tool.execute(query)
+        
+        # Assert
+        assert result["results"] is not None
+        assert "sources" in result
+        mock_search.assert_called_once_with(query)
+```
+
+### Integration Tests
+- **Agent Flow:** Test complete conversation flow
+- **Tool Interactions:** Verify tools work together
+- **Database:** Use test database (local Postgres)
+- **Mock External APIs:** For consistency and speed
+
+### Test Organization
+- **Location:** `backend/tests/` for Python, `frontend/__tests__/` for TypeScript
+- **Naming:** `test_*.py` for Python, `*.test.tsx` for TypeScript
+- **Fixtures:** Use pytest fixtures for common setup
+- **Async Tests:** Use `pytest-asyncio` for async test functions
+
+## AWS-Specific Guidelines
+
+### Region Consistency
+- **ALWAYS use us-east-1** unless explicitly stated otherwise
+- **Pinecone:** Use us-east-1 region (AWS region, not Pinecone region)
+- **All Terraform:** Default to us-east-1 in variables
+- **All AWS CLI:** Specify `--region us-east-1` if needed
+
+### Cost Optimization
+- **Public Subnets:** Use for demo (saves $20-30/month vs VPC endpoints)
+- **SQLAlchemy Pooling:** Use instead of RDS Proxy (saves $15-20/month)
+- **App Runner:** Scales to 0 (minimum instances: 0)
+- **Aurora:** Scales to 0.5 ACU minimum
+- **DynamoDB:** On-demand pricing with TTL for auto-cleanup
+- **S3:** Intelligent-Tiering for document storage
+
+### Infrastructure as Code
+- **Terraform Modules:** Modular structure in `terraform/modules/`
+- **State Management:** S3 backend with DynamoDB locking
+- **Environment Separation:** `terraform/environments/dev/` and `prod/`
+- **Resource Naming:** Consistent naming convention with environment prefix
+
+### Serverless-First Approach
+- **App Runner:** Preferred over ECS/Fargate for simplicity
+- **Lambda:** Use for scheduled tasks (warmup, evaluation)
+- **Aurora Serverless:** Preferred over provisioned RDS
+- **DynamoDB:** On-demand pricing for flexibility
+
+## File Organization
+
+### Directory Structure
+```
+backend/
+  src/
+    agent/          # LangGraph agent code
+      nodes/        # Agent nodes (chat, tools, error_recovery)
+      tools/        # Tool implementations
+    api/            # FastAPI application
+      routes/       # API route handlers
+        v1/         # Versioned endpoints (Phase 1b+)
+      middleware/   # Auth, logging, rate limiting
+    config/         # Configuration and settings
+    cache/          # Inference caching (Phase 4+)
+    ingestion/      # Document processing (Phase 2+)
+    utils/          # Utility functions
+  tests/            # Test files
+  alembic/          # Database migrations (Phase 1b+)
+
+frontend/
+  src/
+    app/            # Next.js App Router pages
+    components/     # React components
+      ui/           # shadcn/ui components
+    lib/            # Utility functions and API client
+    styles/         # Global styles
+
+terraform/
+  modules/          # Reusable Terraform modules
+  environments/    # Environment-specific configs
+    dev/
+    prod/
+```
+
+### Naming Conventions
+- **Python:** snake_case for files, functions, variables; PascalCase for classes
+- **TypeScript:** camelCase for files/functions; PascalCase for components
+- **Terraform:** snake_case for files and resources
+- **Docker:** kebab-case for service names
+
+### Import Organization
+- **Python:** Standard library → Third-party → Local imports (separated by blank lines)
+- **TypeScript:** External → Internal, grouped by type
+
+## Pre-commit Hooks
+
+### Required Checks
+- **Black:** Python code formatting
+- **Ruff:** Python linting (check only, don't auto-fix)
+- **mypy:** Type checking (on `src/` only)
+- **pytest:** Run tests (fast tests only)
+- **Prettier:** TypeScript/JSON formatting (optional)
+
+### Configuration
+- File: `.pre-commit-config.yaml`
+- Run on: All commits
+- Exclude: Migrations, generated files
+
+## Documentation Standards
+
+### Code Documentation
+- **Docstrings:** Google style for all functions/classes
+- **Type Hints:** Required for all Python code
+- **Comments:** Explain "why", not "what" (code should be self-documenting)
+- **API Docs:** FastAPI auto-generates OpenAPI/Swagger
+
+### Architecture Documentation
+- **Update:** Architecture diagrams when making significant changes
+- **ADRs:** Create Architecture Decision Records for major decisions
+- **README:** Keep updated with current phase status
+
+## Common Patterns to Follow
+
+### Environment Detection
+```python
+from src.config.settings import Settings
+
+settings = Settings()
+
+if settings.environment == "local":
+    # Local development logic
+else:
+    # AWS production logic
+```
+
+### Configuration Management
+```python
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    aws_region: str = "us-east-1"
+    bedrock_model_id: str = "amazon.nova-pro-v1:0"
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+```
+
+### Error Recovery
+```python
+def error_recovery_node(state: AgentState) -> AgentState:
+    """Handle errors gracefully with user-friendly messages."""
+    if state.get("last_error"):
+        error_msg = map_error_to_user_message(state["last_error"])
+        state["messages"].append(HumanMessage(content=error_msg))
+        state["last_error"] = None
+    return state
+```
+
+## Phase-Specific Guidelines
+
+### Phase 0 (Current)
+- **Checkpointing:** MemorySaver (in-memory)
+- **Logging:** Basic Python logging
+- **Tools:** Stub implementations with mock data
+- **API:** `/api/chat` (no versioning yet)
+- **Health:** Simple `/health` endpoint
+
+### Phase 1a
+- **Checkpointing:** Still MemorySaver
+- **Deployment:** Manual Terraform apply + S3 upload
+- **Infrastructure:** Minimal (no Aurora yet)
+
+### Phase 1b
+- **Checkpointing:** Migrate to PostgresSaver
+- **Logging:** Migrate to structlog
+- **API:** Version to `/api/v1/chat`
+- **CI/CD:** GitHub Actions automation
+- **Health:** Enhanced with dependency checks
+
+### Phase 2+
+- **Tools:** Real implementations (no stubs)
+- **RAG:** Hybrid search with query expansion
+- **Security:** Input/output verification
+- **Caching:** Inference cache with DynamoDB
+
+## Change Management and Consistency
+
+### Cross-Cutting Change Requirements
+
+**CRITICAL:** When making changes to core components or infrastructure, you MUST perform comprehensive impact analysis and update ALL affected areas.
+
+#### When Changing Core Components
+
+If you change any of the following, perform a full consistency check:
+
+**Core Components Requiring Full Updates:**
+- **Vector Store** (Pinecone → ChromaDB or vice versa, or different vector store)
+- **Database** (PostgreSQL version, Aurora configuration, connection pooling)
+- **LLM Provider** (Bedrock model changes, fallback models, embedding models)
+- **Tool Implementations** (Search, SQL, RAG, Weather APIs)
+- **Authentication** (Password → Cognito, auth middleware changes)
+- **Caching Strategy** (Inference cache, DynamoDB → Redis, etc.)
+- **Logging Framework** (Basic logging → structlog)
+- **Checkpointing** (MemorySaver → PostgresSaver)
+
+#### Required Steps for Cross-Cutting Changes
+
+1. **Search for All References**
+   ```bash
+   # Search codebase for component name/imports
+   grep -r "pinecone" backend/ frontend/ terraform/
+   grep -r "Pinecone" backend/ frontend/ terraform/
+   grep -r "vector_store" backend/
+   # Check configuration files
+   grep -r "PINECONE" .env.example backend/src/config/
+   ```
+
+2. **Update All Affected Files**
+   - **Backend Code:** Tool implementations, configuration, utilities
+   - **Frontend Code:** API client, types, error handling (if API changes)
+   - **Configuration:** `.env.example`, `backend/src/config/settings.py`
+   - **Infrastructure:** Terraform modules, Docker Compose, environment variables
+   - **Documentation:** README.md, PROJECT_PLAN.md, DEVELOPMENT_REFERENCE.md, ADRs
+   - **Tests:** Unit tests, integration tests, mocks
+   - **Scripts:** Setup scripts, validation scripts, deployment scripts
+
+3. **Review Related Issues from Scratch**
+   - **Security:** Does the change introduce new security concerns?
+   - **Performance:** Does the change affect latency, throughput, or costs?
+   - **Error Handling:** Are error paths still valid? Update circuit breakers if needed
+   - **Logging:** Update log messages and structured fields
+   - **Monitoring:** Update metrics, alarms, dashboards
+   - **Testing:** Update test mocks, fixtures, and assertions
+   - **Migration:** Plan data migration if needed (e.g., vector store change)
+
+4. **Check Consistency Across Phases**
+   - **Phase 0:** Local development setup (Docker Compose, .env)
+   - **Phase 1a:** AWS deployment (Terraform, environment variables)
+   - **Phase 1b+:** Production features (logging, checkpointing, etc.)
+   - Ensure changes work in both local and AWS environments
+
+5. **Update Documentation**
+   - Update architecture diagrams if structure changes
+   - Update API documentation if interfaces change
+   - Update setup guides if configuration changes
+   - Create/update ADR if architectural decision changes
+
+#### Example: Changing Vector Store
+
+If changing from Pinecone to ChromaDB (or vice versa):
+
+**Files to Update:**
+- `backend/src/agent/tools/rag.py` - Tool implementation
+- `backend/src/config/settings.py` - Configuration variables
+- `backend/src/utils/embeddings.py` - Embedding utilities
+- `backend/src/ingestion/document_processor.py` - Document ingestion
+- `.env.example` - Environment variable template
+- `docker-compose.yml` - Local service configuration
+- `terraform/modules/` - Infrastructure code (if applicable)
+- `backend/tests/test_tools.py` - Test mocks and assertions
+- `PROJECT_PLAN.md` - Architecture documentation
+- `DEVELOPMENT_REFERENCE.md` - Implementation reference
+- `README.md` - Project overview
+- Update the 'files to review and/or update' section if any new files are added to the project created.
+
+**Issues to Review:**
+- Connection pooling and error handling
+- Rate limiting and circuit breakers
+- Cost implications (free tier limits, pricing)
+- Performance characteristics (latency, throughput)
+- Security (API keys, network access)
+- Migration path for existing data
+- Smooth demo experience, external user should be able to receive URL, be able to access the URL with no further authentication, and then use the password to access the system.
+
+#### Consistency Checklist
+
+Before completing a cross-cutting change, verify:
+
+- [ ] All code references updated (grep confirms no old references)
+- [ ] Configuration files updated (.env.example, settings.py)
+- [ ] Infrastructure code updated (Terraform, Docker Compose)
+- [ ] Tests updated (mocks, fixtures, assertions)
+- [ ] Documentation updated (README, PROJECT_PLAN, DEVELOPMENT_REFERENCE)
+- [ ] Error handling reviewed and updated
+- [ ] Logging messages updated
+- [ ] Security implications reviewed
+- [ ] Performance implications reviewed
+- [ ] Cost implications reviewed
+- [ ] Migration path documented (if needed)
+- [ ] Works in both local and AWS environments
+- [ ] Pre-commit hooks pass
+- [ ] All tests pass
+
+## Documentation Consistency Rules
+
+### Single Source of Truth Principle
+
+To prevent version drift and inconsistencies across documentation:
+
+| Information | Single Source | Other Files Should |
+|-------------|---------------|-------------------|
+| Package versions | DEVELOPMENT_REFERENCE.md "Technology Version Reference" | Reference, not duplicate |
+| Port assignments | docker-compose.yml | Reference the file |
+| Environment variables | .env.example | Reference the file |
+| Phase requirements | DEVELOPMENT_REFERENCE.md | Link to specific sections |
+
+### File Naming Conventions
+
+**Use `.example` suffix ONLY for files containing secret/credential placeholders:**
+- ✅ `.env.example` - Contains API key placeholders (safe to commit)
+- ❌ `docker-compose.example.yml` - No secrets, use `docker-compose.yml`
+- ❌ `Dockerfile.dev.example` - No secrets, use `Dockerfile.dev`
+
+**Rationale:** The `.example` pattern signals "copy and fill in secrets". Docker/config files without secrets should be committed directly.
+
+### Version Pinning Philosophy
+
+- **Python:** Use `~=` (compatible release) for patch updates: `fastapi~=0.115.0`
+- **Node.js:** Use `^` (caret) for semver-compatible: `"next": "^14.2.0"`
+- **Update frequency:** Review quarterly; update for security issues or needed features
+- **Stability principle:** Use versions 2-3 months old (time for bug fixes)
+
+### When Updating Package Versions
+
+1. **Update DEVELOPMENT_REFERENCE.md FIRST** (single source of truth)
+2. Search for hardcoded versions: `grep -r "packagename==" *.md`
+3. Update PHASE_0_HOW_TO_GUIDE.md if it contains version prompts
+4. Update .cursorrules if Technology Stack mentions specific versions
+5. Verify: `grep -r "==0\." *.md` to find potentially outdated pins
+
+### Cross-Reference Verification
+
+Before adding a link to another file:
+1. Verify target file exists
+2. Verify section/anchor exists (if linking to specific section)
+3. Use relative paths: `[text](./path/to/file.md)`
+
+**Common broken reference patterns to avoid:**
+- Referencing planned-but-not-yet-created files
+- Referencing files that were renamed
+- Linking to sections that were moved or renamed
+
+### Periodic Consistency Checks
+
+Run monthly or before releases:
+```bash
+# Find files referenced in docs
+grep -roh '\./[^)]*\.md' *.md | sort -u
+
+# Find hardcoded versions
+grep -r "==0\." *.md
+
+# Check port consistency
+grep -r "port.*800[0-9]" *.md docker-compose.yml
+```
+
+## When Writing Code
+
+### Before Starting
+1. Check current phase requirements in DEVELOPMENT_REFERENCE.md
+2. Review existing code patterns in similar files
+3. Ensure Docker Compose is running for local testing
+4. **If changing core components:** Perform impact analysis first (see Change Management section)
+
+### While Coding
+1. Write type hints first, then implementation
+2. Add docstrings as you write functions
+3. Consider error handling and edge cases
+4. Log important events with structured fields
+5. Write tests alongside implementation
+6. **If changing core components:** Update all references as you go
+
+### Before Committing
+1. **If changing core components:** Run consistency checklist (see Change Management section)
+2. Run pre-commit hooks: `pre-commit run --all-files`
+3. Ensure all tests pass: `pytest`
+4. Check type hints: `mypy src/`
+5. Verify formatting: `black --check src/`
+6. Review changes for security issues
+7. **If changing core components:** Verify all affected files are updated
+
+## Anti-Patterns to Avoid
+
+❌ **Don't:**
+- Run services directly on host (always use Docker)
+- Use relative imports in Python
+- Hardcode AWS region (use settings)
+- Commit secrets or .env files
+- Use string formatting for SQL queries
+- Skip type hints or docstrings
+- Ignore pre-commit hook failures
+- Deploy without testing locally first
+- Mix Phase 0 and Phase 1b patterns
+- **Make cross-cutting changes without impact analysis** (e.g., change vector store but forget to update config, tests, docs)
+- **Update only one file when changing core components** (must update all references)
+- **Skip consistency checks** when changing infrastructure or core services
+- **Hardcode package versions in multiple files** (use DEVELOPMENT_REFERENCE.md as single source)
+- **Use `.example` suffix for non-secret config files** (only .env.example needs this pattern)
+- **Reference files in docs without verifying they exist**
+- **Duplicate port assignments** across multiple documentation files
+- **Copy-paste version lists** instead of linking to DEVELOPMENT_REFERENCE.md
+
+✅ **Do:**
+- Use Docker Compose for all development
+- Use absolute imports from `backend/src/`
+- Load region from environment/settings
+- Use Secrets Manager or .env (gitignored)
+- Use parameterized queries with SQLAlchemy
+- Add type hints and docstrings
+- Fix pre-commit issues before committing
+- Test thoroughly in Phase 0 before AWS
+- Follow phase-specific patterns consistently
+- **Perform full impact analysis** when changing core components (vector store, database, LLM, etc.)
+- **Search codebase for all references** before making cross-cutting changes
+- **Update all affected files** (code, config, tests, docs, infrastructure)
+- **Review related issues from scratch** (security, performance, error handling)
+- **Verify consistency** across local and AWS environments
+- **Define versions once** in DEVELOPMENT_REFERENCE.md, reference from other docs
+- **Use `.example` only for credential templates** (.env.example)
+- **Verify file links exist** before adding to documentation
+- **Define ports in docker-compose.yml** and reference from documentation
+
+## Debugging and Troubleshooting
+
+### Systematic Debugging Workflow
+
+When encountering issues, follow this order:
+
+1. **Check Logs First**
+   ```bash
+   # Backend logs
+   docker-compose logs -f backend | tail -100
+   
+   # Frontend logs
+   docker-compose logs -f frontend | tail -100
+   
+   # All services
+   docker-compose logs --tail=50
+   ```
+
+2. **Verify Service Health**
+   ```bash
+   # Health check
+   curl http://localhost:8000/health
+   
+   # Check if services are running
+   docker-compose ps
+   ```
+
+3. **Check Environment Variables**
+   ```bash
+   # Verify .env file exists and has required variables
+   cat .env | grep -v "^#" | grep "="
+   
+   # Validate setup
+   python scripts/validate_setup.py
+   ```
+
+4. **Test Individual Components**
+   ```bash
+   # Test backend import
+   docker-compose exec backend python -c "from src.api.main import app; print('OK')"
+   
+   # Test database connection
+   docker-compose exec backend python -c "from src.config.settings import Settings; print(Settings().database_url)"
+   ```
+
+5. **Check for Common Issues** (see Common Issues section below)
+
+### Common Issues and Solutions
+
+#### Docker Issues
+
+**Problem:** `docker-compose up` fails with port already in use
+```bash
+# Solution: Check what's using the port
+lsof -i :8000  # or netstat -an | grep 8000
+# Stop conflicting service or change port in docker-compose.yml
+```
+
+**Problem:** Hot reload not working
+```bash
+# Solution: Verify volume mounts
+docker-compose config | grep volumes
+# Check file permissions (Docker needs read access)
+# Restart Docker Desktop if on Windows/Mac
+```
+
+**Problem:** Container keeps restarting
+```bash
+# Solution: Check logs for errors
+docker-compose logs backend
+# Check health check configuration
+docker-compose ps
+```
+
+#### Import Errors
+
+**Problem:** `ModuleNotFoundError` in Python
+```bash
+# Solution: Verify PYTHONPATH
+docker-compose exec backend python -c "import sys; print(sys.path)"
+# Check __init__.py files exist in all packages
+# Verify absolute imports from backend/src/
+```
+
+**Problem:** TypeScript import errors
+```bash
+# Solution: Check tsconfig.json paths
+# Verify import paths match file structure
+# Run: npm run build to see all errors
+```
+
+#### Connection Issues
+
+**Problem:** Backend can't connect to database
+```bash
+# Solution: Check database is running
+docker-compose ps postgres
+# Verify DATABASE_URL in .env
+# Check network connectivity: docker-compose exec backend ping postgres
+```
+
+**Problem:** Frontend can't connect to backend (CORS)
+```bash
+# Solution: Check CORS configuration in backend/src/api/main.py
+# Verify NEXT_PUBLIC_API_URL in frontend
+# Check browser console for specific CORS error
+```
+
+#### AWS/Bedrock Issues
+
+**Problem:** `AccessDeniedException` from Bedrock
+```bash
+# Solution: Verify model access in AWS Console
+aws bedrock list-foundation-models --region us-east-1
+# Check AWS credentials: aws sts get-caller-identity
+# Verify region is us-east-1
+```
+
+**Problem:** API keys not working
+```bash
+# Solution: Verify keys in .env file
+# Test API key directly (curl Tavily/Pinecone API)
+# Check for typos or extra spaces
+```
+
+### Debugging Tools
+
+**Python Debugging:**
+```python
+# Use breakpoint() for debugging
+def my_function():
+    breakpoint()  # Python 3.7+
+    # Or use pdb.set_trace()
+```
+
+**Docker Debugging:**
+```bash
+# Open shell in running container
+docker-compose exec backend bash
+
+# Run Python interactively
+docker-compose exec backend python
+
+# Check container environment
+docker-compose exec backend env
+```
+
+**Network Debugging:**
+```bash
+# Test connectivity between services
+docker-compose exec backend curl http://postgres:5432
+docker-compose exec frontend curl http://backend:8000/health
+```
+
+## Dependency Management
+
+### Python Dependencies
+
+**Adding Dependencies:**
+1. Add to `backend/requirements.txt` with pinned version
+2. Install in Docker: `docker-compose exec backend pip install <package>`
+3. Test locally, then commit requirements.txt
+4. **Never** install packages directly on host
+
+**Updating Dependencies:**
+1. Check for security updates: `pip list --outdated`
+2. Update one package at a time
+3. Test thoroughly after each update
+4. Update all related code if API changes
+5. Run full test suite
+
+**Version Pinning:**
+- **Always pin versions** in requirements.txt (use `==`)
+- Use `~=` for compatible releases (e.g., `~=0.2.0` allows 0.2.x)
+- Document major version changes in commit message
+
+**Security Updates:**
+- Review security advisories regularly
+- Update vulnerable packages immediately
+- Test after security updates
+- Document security fixes in commit messages
+
+### Node.js Dependencies
+
+**Adding Dependencies:**
+1. Add to `frontend/package.json`
+2. Install: `docker-compose exec frontend npm install <package>`
+3. Commit both `package.json` and `package-lock.json`
+
+**Updating Dependencies:**
+1. Use `npm outdated` to check for updates
+2. Update with `npm update` or `npm install <package>@latest`
+3. Test thoroughly, especially for breaking changes
+4. Commit lock file changes
+
+## Git Workflow
+
+### Branch Naming
+
+**Conventions:**
+- `feature/<description>` - New features
+- `fix/<description>` - Bug fixes
+- `refactor/<description>` - Code refactoring
+- `docs/<description>` - Documentation updates
+- `chore/<description>` - Maintenance tasks
+
+**Examples:**
+- `feature/add-weather-tool`
+- `fix/cors-configuration`
+- `refactor/agent-state-management`
+
+### Commit Messages
+
+**Format:**
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation
+- `style`: Formatting (no code change)
+- `refactor`: Code restructuring
+- `test`: Adding/updating tests
+- `chore`: Maintenance tasks
+
+**Examples:**
+```
+feat(rag): Add query expansion to RAG tool
+
+Implements query expansion using LLM to generate alternative
+phrasings, improving retrieval recall by 20-30%.
+
+Closes #123
+```
+
+```
+fix(api): Correct CORS configuration for CloudFront
+
+Allow CloudFront origin in CORS middleware to fix frontend
+connection issues.
+```
+
+### Pull Request Practices
+
+**Before Creating PR:**
+- [ ] All tests pass locally
+- [ ] Pre-commit hooks pass
+- [ ] Code follows style guidelines
+- [ ] Documentation updated if needed
+- [ ] No secrets committed
+- [ ] Changes tested in Docker environment
+
+**PR Description Should Include:**
+- What changed and why
+- How to test the changes
+- Screenshots (for UI changes)
+- Related issues/PRs
+- Breaking changes (if any)
+
+**Code Review Checklist:**
+- [ ] Code follows project patterns
+- [ ] Error handling is appropriate
+- [ ] Tests cover new functionality
+- [ ] Security implications reviewed
+- [ ] Performance impact considered
+- [ ] Documentation updated
+- [ ] No hardcoded values
+- [ ] Type hints present (Python)
+
+## Environment Variable Management
+
+### Best Practices
+
+**Never Commit:**
+- `.env` files (already in .gitignore)
+- Actual API keys or secrets
+- Production credentials
+
+**Always Update:**
+- `.env.example` when adding new variables
+- `backend/src/config/settings.py` when adding config
+- Documentation if variable is user-facing
+
+**Environment Detection:**
+```python
+# Always check environment before using AWS services
+if settings.environment == "local":
+    # Use local substitutes
+else:
+    # Use AWS services
+```
+
+**Validation:**
+- Use Pydantic Settings for validation
+- Provide clear error messages for missing variables
+- Use `validate_setup.py` script before starting
+
+### Secrets Management
+
+**Local Development:**
+- Store in `.env` file (gitignored)
+- Never commit actual secrets
+- Use placeholder values in `.env.example`
+
+**AWS Production:**
+- Store in Secrets Manager
+- Access via IAM roles (not hardcoded)
+- Rotate secrets regularly
+- Use separate secrets for dev/prod
+
+## Resource Cleanup
+
+### Docker Cleanup
+
+**Regular Cleanup:**
+```bash
+# Remove stopped containers
+docker-compose down
+
+# Remove volumes (WARNING: deletes data)
+docker-compose down -v
+
+# Remove unused images
+docker image prune
+
+# Full cleanup (WARNING: removes all unused Docker resources)
+docker system prune -a
+```
+
+**When to Clean Up:**
+- After major dependency updates
+- When Docker disk usage is high
+- Before switching branches with different Dockerfiles
+- After fixing Docker configuration issues
+
+### AWS Resource Cleanup
+
+**Development Environment:**
+```bash
+# Destroy all Terraform resources
+cd terraform/environments/dev/
+terraform destroy
+
+# Verify resources are deleted
+aws resourcegroupstaggingapi get-resources --region us-east-1
+```
+
+**Cost Monitoring:**
+- Set up CloudWatch billing alarms ($50/month threshold)
+- Review AWS Cost Explorer weekly
+- Clean up unused resources promptly
+- Tag resources for cost tracking
+
+## Performance Considerations
+
+### When to Optimize
+
+**Don't Prematurely Optimize:**
+- Focus on correctness first
+- Profile before optimizing
+- Measure actual performance impact
+
+**Do Optimize When:**
+- Performance is a requirement (e.g., <10s response time)
+- Profiling shows bottlenecks
+- Cost is impacted by inefficiency
+- User experience is degraded
+
+### Profiling Tools
+
+**Python Profiling:**
+```python
+# Use cProfile for performance profiling
+import cProfile
+cProfile.run('my_function()')
+
+# Use line_profiler for line-by-line analysis
+# Install: pip install line_profiler
+```
+
+**Docker Performance:**
+```bash
+# Check container resource usage
+docker stats
+
+# Check image sizes
+docker images
+```
+
+### Performance Checklist
+
+- [ ] Database queries are optimized (indexes, query plans)
+- [ ] External API calls use connection pooling
+- [ ] Caching is implemented where appropriate
+- [ ] Async operations are used for I/O-bound tasks
+- [ ] Large payloads are streamed, not loaded into memory
+- [ ] Unnecessary database queries are avoided
+
+## API Contract Management
+
+### Versioning Strategy
+
+**Breaking Changes:**
+- Increment API version (`/api/v1/` → `/api/v2/`)
+- Maintain backward compatibility during transition
+- Document migration path
+- Deprecate old versions with timeline
+
+**Non-Breaking Changes:**
+- Add new optional fields
+- Add new endpoints
+- Enhance existing endpoints (add optional params)
+
+**Versioning Rules:**
+- Phase 0-1a: No versioning (use `/api/chat`)
+- Phase 1b+: Use `/api/v1/` for all endpoints
+- Future: Add `/api/v2/` when breaking changes needed
+
+### API Documentation
+
+**Keep Updated:**
+- FastAPI auto-generates OpenAPI/Swagger docs
+- Update endpoint docstrings when changing behavior
+- Document request/response examples
+- Include error response formats
+
+## Local Development Gotchas
+
+### Common Pitfalls
+
+**1. Forgetting Docker Compose**
+- ❌ Running `python` or `npm` directly on host
+- ✅ Always use `docker-compose exec` or work inside containers
+
+**2. Environment Variable Mismatch**
+- ❌ Using different values in .env vs .env.example
+- ✅ Keep .env.example updated and validate before starting
+
+**3. Port Conflicts**
+- ❌ Ports 3000, 8000, 5432 already in use
+- ✅ Check with `lsof -i :PORT` and stop conflicting services
+
+**4. Import Path Errors**
+- ❌ Using relative imports in Python
+- ✅ Always use absolute imports from `backend/src/`
+
+**5. Hot Reload Not Working**
+- ❌ Making changes but not seeing updates
+- ✅ Check volume mounts, restart containers if needed
+
+**6. Database State Issues**
+- ❌ Old data causing test failures
+- ✅ Use `docker-compose down -v` to reset database
+
+**7. Dependency Version Conflicts**
+- ❌ Installing packages on host instead of in Docker
+- ✅ Always install in Docker containers
+
+## Rollback Procedures
+
+### Code Rollback
+
+**Git Rollback:**
+```bash
+# Undo last commit (keep changes)
+git reset --soft HEAD~1
+
+# Undo last commit (discard changes)
+git reset --hard HEAD~1
+
+# Revert specific commit
+git revert <commit-hash>
+```
+
+### Docker Rollback
+
+**Rollback Container:**
+```bash
+# Stop current containers
+docker-compose down
+
+# Checkout previous version
+git checkout <previous-commit>
+
+# Restart containers
+docker-compose up
+```
+
+### AWS Rollback
+
+**Terraform Rollback:**
+```bash
+# Revert to previous Terraform state
+cd terraform/environments/dev/
+terraform state pull > current-state.json
+# Restore previous state from backup
+terraform state push previous-state.json
+
+# Or destroy and recreate
+terraform destroy
+git checkout <previous-commit>
+terraform apply
+```
+
+**App Runner Rollback:**
+```bash
+# Revert to previous Docker image
+aws apprunner update-service \
+  --service-arn <arn> \
+  --source-configuration imageRepository={imageIdentifier=<previous-image>}
+```
+
+## Cost Monitoring
+
+### Cost Tracking
+
+**Set Up Alarms:**
+```bash
+# Create CloudWatch billing alarm
+aws cloudwatch put-metric-alarm \
+  --alarm-name monthly-cost-alarm \
+  --alarm-description "Alert when monthly cost exceeds $50" \
+  --metric-name EstimatedCharges \
+  --namespace AWS/Billing \
+  --statistic Maximum \
+  --period 86400 \
+  --evaluation-periods 1 \
+  --threshold 50 \
+  --comparison-operator GreaterThanThreshold
+```
+
+**Monitor Costs:**
+- Check AWS Cost Explorer weekly
+- Review CloudWatch billing metrics
+- Set up cost anomaly detection
+- Tag resources for cost allocation
+
+**Cost Optimization:**
+- Review unused resources monthly
+- Use cost optimization recommendations
+- Scale down resources during low usage
+- Use reserved capacity for predictable workloads (if applicable)
+
+## Quick Reference
+
+### Key Files
+- `PHASE_0_HOW_TO_GUIDE.md` - Phase 0 implementation guide
+- `PROJECT_PLAN.md` - Complete project plan and architecture
+- `DEVELOPMENT_REFERENCE.md` - Phase-specific implementation details
+- `README.md` - Project overview
+
+### Key Commands
+```bash
+# Start development
+docker-compose up
+
+# Run tests
+./scripts/dev.sh test
+
+# Format code
+black backend/src/
+ruff check backend/src/
+
+# Type check
+mypy backend/src/
+
+# Validate setup
+python scripts/validate_setup.py
+
+# Debugging
+docker-compose logs -f backend
+docker-compose exec backend bash
+docker-compose ps
+
+# Cleanup
+docker-compose down -v
+docker system prune
+```
+
+### Key URLs (Local Development)
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+- Health Check: http://localhost:8000/health
+
+### Emergency Contacts
+
+**If Stuck:**
+1. Check logs: `docker-compose logs -f`
+2. Review troubleshooting section above
+3. Check PROJECT_PLAN.md for architecture details
+4. Review DEVELOPMENT_REFERENCE.md for phase-specific guidance
+5. Search codebase for similar patterns
+
+---
+
+**Remember:** This is an enterprise-grade system. Code quality, security, and maintainability are priorities. When in doubt, refer to the comprehensive documentation in PROJECT_PLAN.md and DEVELOPMENT_REFERENCE.md.
+

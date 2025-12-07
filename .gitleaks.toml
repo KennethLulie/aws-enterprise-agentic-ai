@@ -1,0 +1,86 @@
+# Gitleaks configuration for secret detection
+# https://github.com/gitleaks/gitleaks
+#
+# Run manually: gitleaks detect --source . -v
+# Run in CI: gitleaks detect --source . --baseline-path .gitleaks-baseline.json
+
+title = "Enterprise Agentic AI - Secret Detection Rules"
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+
+[extend]
+# Use the default gitleaks rules as a base
+useDefault = true
+
+# =============================================================================
+# Files/Paths to Ignore
+# =============================================================================
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+    '''\.env\.example$''',
+    '''\.gitleaks\.toml$''',
+    '''\.secrets\.baseline$''',
+    '''package-lock\.json$''',
+    '''yarn\.lock$''',
+    '''\.git/''',
+]
+
+# =============================================================================
+# Custom Rules for Project-Specific Secrets
+# =============================================================================
+
+[[rules]]
+id = "tavily-api-key"
+description = "Tavily API Key"
+regex = '''tvly-[a-zA-Z0-9]{32,}'''
+tags = ["api-key", "tavily"]
+
+[[rules]]
+id = "pinecone-api-key"
+description = "Pinecone API Key"
+regex = '''[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'''
+tags = ["api-key", "pinecone"]
+# Note: This is a UUID pattern which may have false positives
+# Pinecone keys follow UUID format
+
+[[rules]]
+id = "openweathermap-api-key"
+description = "OpenWeatherMap API Key"
+regex = '''[a-f0-9]{32}'''
+tags = ["api-key", "openweathermap"]
+# Note: May have false positives with other hex strings
+# Consider using entropy checks
+
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS Access Key ID"
+regex = '''(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+tags = ["aws", "access-key"]
+
+[[rules]]
+id = "aws-secret-access-key"
+description = "AWS Secret Access Key"
+regex = '''(?i)aws_secret_access_key\s*=\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?'''
+tags = ["aws", "secret-key"]
+
+# =============================================================================
+# Allowlist Specific False Positives
+# =============================================================================
+
+[[rules.allowlist]]
+description = "Example/placeholder values in documentation"
+regexTarget = "match"
+regexes = [
+    '''AKIAIOSFODNN7EXAMPLE''',  # AWS example key from docs
+    '''wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY''',  # AWS example secret from docs
+    '''tvly-XXXX''',
+    '''xxxxxxxx-xxxx-xxxx''',
+    '''your-.*-here''',
+    '''REPLACE_ME''',
+    '''change-this''',
+]
+

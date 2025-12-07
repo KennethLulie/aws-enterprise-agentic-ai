@@ -1,0 +1,100 @@
+# Pre-commit hooks for code quality and security
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # =============================================================================
+  # Security - Secret Detection
+  # =============================================================================
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            \.env\.example|
+            .*\.lock|
+            package-lock\.json
+          )$
+
+  # =============================================================================
+  # Python Code Quality
+  # =============================================================================
+  - repo: https://github.com/psf/black
+    rev: 23.11.0
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: ['--line-length=88']
+        files: ^backend/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.6
+    hooks:
+      - id: ruff
+        args: ['--fix', '--exit-non-zero-on-fix']
+        files: ^backend/
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.7.1
+    hooks:
+      - id: mypy
+        args: ['--ignore-missing-imports', '--no-strict-optional']
+        files: ^backend/src/
+        additional_dependencies:
+          - pydantic>=2.0
+          - types-requests
+
+  # =============================================================================
+  # General Quality
+  # =============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            .*\.md
+          )$
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ['--unsafe']  # Allow custom tags
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # =============================================================================
+  # TypeScript/JavaScript (Optional - uncomment when frontend is set up)
+  # =============================================================================
+  # - repo: https://github.com/pre-commit/mirrors-prettier
+  #   rev: v3.1.0
+  #   hooks:
+  #     - id: prettier
+  #       files: ^frontend/
+  #       types_or: [javascript, typescript, tsx, json, css]
+
+# =============================================================================
+# Configuration
+# =============================================================================
+default_language_version:
+  python: python3.11
+
+# Files to exclude from all hooks
+exclude: |
+  (?x)^(
+    \.git/|
+    \.venv/|
+    venv/|
+    node_modules/|
+    __pycache__/|
+    \.pytest_cache/|
+    \.mypy_cache/|
+    build/|
+    dist/|
+    \.next/|
+    out/
+  )$
+

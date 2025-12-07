@@ -16,7 +16,7 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
 
 **Target Cost:** Under $50/month for low-use portfolio demo
 **Architecture:** Scalable, enterprise-ready, cost-optimized
-**AWS Region:** us-east-2 (Ohio - Central US)
+**AWS Region:** us-east-1 (N. Virginia - closest to Austin, TX)
 **Domain:** App Runner generated URL (no custom domain)
 
 ---
@@ -24,6 +24,18 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
 ## Architecture Overview
 
 ```
+┌───────────────────────────────────────────────────────────────────────┐
+│                    DEVOPS & DEPLOYMENT                                │
+│  ┌──────────────────────┐         ┌──────────────────────┐            │
+│  │   GitHub Actions     │────▶    │      Terraform       │            │
+│  │   (CI/CD Pipeline)   │         │   (Infrastructure)   │            │
+│  │  • Build & Test      │         │  • AWS Resources     │            │
+│  │  • Deploy            │         │  • State Management  │            │
+│  │  • RAGAS Evaluation  │         │                      │            │
+│  └──────────────────────┘         └──────────────────────┘            │
+│           │                                                           │
+│           └────────────────── Deploys ────────────────────────────────┘
+│
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    FRONTEND (Next.js Static Export)                     │
 │         CloudFront → S3 Static Hosting (no Next.js server)              │
@@ -36,28 +48,28 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      BACKEND (AWS App Runner)                           │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    LangGraph Agent Orchestrator                  │   │
-│  │    ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐      │   │
-│  │    │ Bedrock  │  │  Input/  │  │ Inference│  │  Arize   │      │   │
-│  │    │   Nova   │  │  Output  │  │   Cache  │  │ Tracing  │      │   │
-│  │    │  (Main)  │  │  Verify  │  │(DynamoDB)│  │          │      │   │
-│  │    └──────────┘  └──────────┘  └──────────┘  └──────────┘      │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                    LangGraph Agent Orchestrator                 │    │
+│  │    ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐       │    │
+│  │    │ Bedrock  │  │  Input/  │  │ Inference│  │  Arize   │       │    │
+│  │    │   Nova   │  │  Output  │  │   Cache  │  │ Tracing  │       │    │
+│  │    │  (Main)  │  │  Verify  │  │(DynamoDB)│  │          │       │    │
+│  │    └──────────┘  └──────────┘  └──────────┘  └──────────┘       │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
-│  ┌─────────────────────  TOOLS  ───────────────────────────────────┐   │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │   │
-│  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Weather  │ │   │
-│  │  │   Search   │  │   Query    │  │  Retrieval │  │    API    │ │   │
-│  │  │            │  │  (Aurora)  │  │ (Pinecone) │  │(OpenWeather│ │   │
-│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────  TOOLS  ───────────────────────────────────┐    │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │    │
+│  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Weather   │ │    │
+│  │  │   Search   │  │   Query    │  │  Retrieval │  │    API     │ │    │
+│  │  │            │  │  (Aurora)  │  │ (Pinecone) │  │   (MCP)    │ │    │
+│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
           ┌─────────────────────────┼─────────────────────────┐
           ▼                         ▼                         ▼
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│  Aurora Serverless│    │     Pinecone     │    │   S3 Document    │
+│ Aurora Serverless│    │     Pinecone     │    │   S3 Document    │
 │   v2 PostgreSQL  │    │    Serverless    │    │     Bucket       │
 │   (SQL Data)     │    │  (Vector Store)  │    │  (File Upload)   │
 └──────────────────┘    └──────────────────┘    └──────────────────┘
@@ -67,6 +79,24 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
                                                │  Lambda Trigger  │
                                                │  (Auto-Ingest)   │
                                                └──────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    EVALUATION & MONITORING                              │
+│  ┌──────────────────────┐         ┌──────────────────────┐            │
+│  │       RAGAS          │────────▶│   Arize Phoenix     │            │
+│  │  (RAG Evaluation)    │         │   (Observability)    │            │
+│  │  • Lambda Scheduled  │         │  • Trace Analysis    │            │
+│  │  • GitHub Actions    │         │  • Metrics Dashboard │            │
+│  │  • Quality Metrics   │         │  • Cost Tracking     │            │
+│  └──────────────────────┘         └──────────────────────┘            │
+│           │                                    │                        │
+│           │                                    │                        │
+│           ▼                                    ▼                        │
+│  ┌──────────────────┐              ┌──────────────────┐                │
+│  │  S3 Eval Dataset  │              │  CloudWatch      │                │
+│  │  (Test Cases)     │              │  (Metrics/Logs) │                │
+│  └──────────────────┘              └──────────────────┘                │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -304,22 +334,25 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
    - Or custom policy with: AppRunner, RDS, S3, CloudFront, ECR, Lambda, DynamoDB, SecretsManager, CloudWatch, IAM
 
 **External Service Setup (Before Phase 0):**
+
+**Security Note:** All API keys should be stored in your local `.env` file (gitignored, never committed). See [`.env.example`](.env.example) for the template and [`docs/SECURITY.md`](docs/SECURITY.md) for the complete secrets management approach.
+
 1. **Pinecone (free tier):**
    - Create account at https://pinecone.io
    - Create index: name=`demo-index`, dimensions=1536, metric=cosine
-   - Region: **AWS us-east-2** (same as rest of stack). If us-east-2 temporarily unavailable, use us-east-1 and expect +10‑20 ms latency plus minimal data-transfer charges.
-   - Copy API key to `.env`
+   - Region: **AWS us-east-1** (same as rest of stack). If us-east-1 temporarily unavailable, use us-west-2 and expect +20‑30 ms latency plus minimal data-transfer charges.
+   - Copy API key to your `.env` file (see `.env.example` for the variable name)
 
 2. **Tavily (free tier):**
    - Create account at https://tavily.com
    - Get API key from dashboard
    - Free tier: 1,000 searches/month (sufficient for demo)
-   - Copy API key to `.env`
+   - Copy API key to your `.env` file
 
 3. **OpenWeatherMap (free tier - optional for Phase 2):**
    - Create account at https://openweathermap.org/api
    - Get API key from dashboard (free tier: 60 calls/minute, 1M calls/month)
-   - Copy API key to `.env` as `OPENWEATHER_API_KEY`
+   - Copy API key to your `.env` file
    - Note: Can use without API key for basic demo (limited functionality)
 
 **Setup Process:**
@@ -393,7 +426,7 @@ docker-compose up
   - Upgrade to PostgresSaver in Phase 1b
 - **LangGraph native streaming** with proper event handling
 - Bedrock Nova integration with fallback:
-  - Primary: `amazon.nova-pro-v1:0` (verify availability in us-east-2)
+  - Primary: `amazon.nova-pro-v1:0` (verify availability in us-east-1 - N. Virginia)
   - Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0` (more stable, proven)
 - Server-Sent Events (SSE) streaming from FastAPI to frontend
 - **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate)
@@ -486,12 +519,12 @@ docker-compose up
     - Cost: ~$0.50/month (free tier covers it)
     - Reduces cold starts by warming instance periodically
   - **Request timeout:** Set `instance_configuration.connection_drain_timeout` to 900 seconds so SSE streams are not dropped during long toolchains.
-- S3 bucket for frontend static files (us-east-2)
+- S3 bucket for frontend static files (us-east-1)
 - CloudFront distribution with HTTPS
-- Secrets Manager for password (us-east-2)
+- Secrets Manager for password (us-east-1)
 - IAM roles and policies (least privilege)
-- ECR repository for container images (us-east-2)
-- CloudWatch Logs for monitoring (us-east-2)
+- ECR repository for container images (us-east-1)
+- CloudWatch Logs for monitoring (us-east-1)
 
 **Keep-alive Lambda Details:**
 - Purpose: hit the `/health/warmup` endpoint every 5 minutes to keep App Runner container warm.
@@ -525,7 +558,7 @@ docker-compose up
 **Deliverables:**
 - Working chat interface at CloudFront URL (e.g., `https://xxxxx.cloudfront.net`)
   - Frontend: S3 + CloudFront (static Next.js export)
-  - Backend API: App Runner URL (e.g., `https://xxxxx.us-east-2.awsapprunner.com`)
+  - Backend API: App Runner URL (e.g., `https://xxxxx.us-east-1.awsapprunner.com`)
   - Frontend calls backend API via CORS
 - Streaming responses visible in real-time (SSE from FastAPI)
 - Cold start loading indicator ("Warming up...")
@@ -717,7 +750,7 @@ If something isn't working, follow this systematic debugging process:
 - **No infrastructure required:** Uses existing App Runner backend, no new AWS services
 
 **Infrastructure Additions:**
-- Aurora Serverless v2 cluster (0.5 ACU minimum)
+- **Note:** Uses existing Aurora Serverless v2 from Phase 1b (no new provisioning needed)
 - **Connection Pooling Strategy (Cost-Conscious):**
   - **Skip RDS Proxy** ($15-20/month) - too expensive for demo
   - Use SQLAlchemy connection pooling instead (free, built-in)
@@ -833,6 +866,11 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Cache invalidation on document updates
 - Cost savings dashboard (tokens saved, $ saved)
 
+**Infrastructure Additions:**
+- DynamoDB table for inference cache (on-demand pricing, TTL enabled)
+- IAM policies for App Runner to read/write DynamoDB cache table
+- CloudWatch metrics for cache hit/miss rates
+
 **Deliverables:**
 - Repeated queries return instantly from cache
 - Cache hit rate > 30% for typical usage
@@ -897,10 +935,16 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 
 **Implementation:**
 - Lambda function for scheduled evaluations
-- S3 storage for evaluation datasets
+- S3 bucket for evaluation datasets (separate from document storage bucket for better organization)
 - CloudWatch metrics and alarms
 - Integration with GitHub Actions for PR checks (optional)
 - Evaluation report generation
+
+**Infrastructure Additions:**
+- S3 bucket for RAGAS evaluation datasets (separate from Phase 2 document storage bucket)
+- Lambda function for scheduled RAGAS evaluations (EventBridge trigger)
+- IAM policies for Lambda to access S3 evaluation datasets and Phoenix
+- CloudWatch alarms for quality regression detection
 
 **Deliverables:**
 - Automated RAG quality evaluation
@@ -1044,7 +1088,7 @@ aws-enterprise-agentic-ai/
 │   │   └── test_api.py
 │   ├── Dockerfile              # Production multi-stage
 │   ├── Dockerfile.dev          # Development (with hot reload)
-│   ├── requirements.txt        # Pinned versions (langgraph==0.2.0, etc.)
+│   ├── requirements.txt        # Pinned versions (langgraph~=0.2.50, etc.)
 │   ├── alembic/                # Database migrations
 │   │   ├── versions/
 │   │   │   └── 001_initial_schema.py
@@ -1458,7 +1502,7 @@ aws-enterprise-agentic-ai/
 ## Next Steps
 
 **All Configuration Decisions Confirmed:**
-- ✅ AWS Region: us-east-2 (Ohio)
+- ✅ AWS Region: us-east-1 (N. Virginia - closest to Austin, TX)
 - ✅ Domain: CloudFront URL (frontend) + App Runner URL (backend API)
 - ✅ Testing: Balanced approach
 - ✅ Sample Data: Financial dataset
@@ -1527,7 +1571,7 @@ aws-enterprise-agentic-ai/
 **Terraform State Setup (One-Time, Before First Deploy):**
 ```bash
 # Create S3 bucket for Terraform state
-aws s3 mb s3://your-project-terraform-state --region us-east-2
+aws s3 mb s3://your-project-terraform-state --region us-east-1
 
 # Create DynamoDB table for state locking
 aws dynamodb create-table \
@@ -1535,7 +1579,7 @@ aws dynamodb create-table \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
   --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
-  --region us-east-2
+  --region us-east-1
 
 # Update terraform/environments/dev/backend.tf with bucket name
 ```
@@ -1543,7 +1587,7 @@ aws dynamodb create-table \
 **GitHub Actions Secrets (Required for Phase 1b CI/CD):**
 - `AWS_ACCESS_KEY_ID` - IAM user access key
 - `AWS_SECRET_ACCESS_KEY` - IAM user secret key
-- `AWS_REGION` - us-east-2
+- `AWS_REGION` - us-east-1
 - `TAVILY_API_KEY` - For web search tool (Phase 2)
 - `PINECONE_API_KEY` - For vector store (Phase 2)
 - `PINECONE_INDEX_NAME` - demo-index (Phase 2)
@@ -1575,7 +1619,7 @@ python scripts/validate_setup.py --env=aws
 1. **Terraform State Setup (One-Time):**
    ```bash
    # Create S3 bucket for state
-   aws s3 mb s3://your-project-terraform-state --region us-east-2
+   aws s3 mb s3://your-project-terraform-state --region us-east-1
    
    # Create DynamoDB table for locking
    aws dynamodb create-table \
@@ -1583,7 +1627,7 @@ python scripts/validate_setup.py --env=aws
      --attribute-definitions AttributeName=LockID,AttributeType=S \
      --key-schema AttributeName=LockID,KeyType=HASH \
      --billing-mode PAY_PER_REQUEST \
-     --region us-east-2
+     --region us-east-1
    
    # Update terraform/environments/dev/backend.tf with bucket name
    ```
@@ -1614,16 +1658,16 @@ python scripts/validate_setup.py --env=aws
 5. **Build & Push Docker Image:**
    ```bash
    # Get ECR login token
-   aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-2.amazonaws.com
+   aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
    
    # Build image
    docker build -t backend:latest -f backend/Dockerfile .
    
    # Tag for ECR
-   docker tag backend:latest <account-id>.dkr.ecr.us-east-2.amazonaws.com/backend:latest
+   docker tag backend:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/backend:latest
    
    # Push to ECR
-   docker push <account-id>.dkr.ecr.us-east-2.amazonaws.com/backend:latest
+   docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/backend:latest
    ```
    ✅ **Verify:** 
    - Image appears in ECR console
@@ -1720,13 +1764,13 @@ terraform destroy  # Destroys all resources
 ## Configuration Decisions
 
 **Confirmed Settings:**
-1. **AWS Region:** us-east-2 (Ohio - Central US)
+1. **AWS Region:** us-east-1 (N. Virginia - closest to Austin, TX)
    - Good service availability
-   - Central US location
+   - East Coast location (closest to Austin, TX)
    - Cost-effective
 
 2. **Domain:** App Runner generated URL
-   - Format: `https://xxxxx.us-east-2.awsapprunner.com`
+   - Format: `https://xxxxx.us-east-1.awsapprunner.com`
    - No custom domain setup required
    - HTTPS included automatically
 

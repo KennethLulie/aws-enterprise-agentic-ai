@@ -36,11 +36,23 @@ out/
 dist/
 build/
 
-# Environment variables
+# =============================================================================
+# SECURITY: Environment variables and secrets
+# =============================================================================
+# CRITICAL: These patterns prevent accidental commit of API keys and secrets.
+# If you need to modify these patterns, review docs/SECURITY.md first.
+#
+# Safe to commit: .env.example (template with placeholder values)
+# Never commit: .env, .env.local, or any file with real API keys
+# =============================================================================
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env.*.local
-*.env
+# Don't ignore .env.example - it's our safe template
+!.env.example
 
 # IDE
 .vscode/
@@ -86,11 +98,32 @@ temp/
 Thumbs.db
 .DS_Store
 
-# Secrets (never commit these!)
+# =============================================================================
+# SECURITY: Secret files and credentials
+# =============================================================================
+# These patterns catch common secret file types that should never be committed.
+# See docs/SECURITY.md for the complete security guide.
+# =============================================================================
 secrets/
 *.pem
 *.key
 *.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+*_rsa
+*_ecdsa
+*_ed25519
+id_rsa*
+id_ecdsa*
+id_ed25519*
+*.secret
+*.secrets
+credentials.json
+service-account*.json
+*-credentials.json
+.gitleaks-report.json
 
 # Local development
 uploads/
