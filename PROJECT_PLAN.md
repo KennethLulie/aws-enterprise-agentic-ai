@@ -1918,4 +1918,3 @@ The architecture is designed to be:
 | Streaming stops | SSE timeout | Refresh page, explain timeout handling |
 
 Ready to begin Phase 0 when you are!
-

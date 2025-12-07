@@ -28,7 +28,7 @@
 ### AWS Region
 - **Region:** `us-east-1` (N. Virginia - closest to Austin, TX)
 - **All AWS resources:** Must use `us-east-1` unless explicitly stated otherwise
-- **Pinecone:** Use `us-east-1` region (AWS region, not Pinecone region - Pinecone uses AWS us-east-1)
+- **Pinecone:** Use `us-east-1` region. Fallback: `us-west-2` (the only other US region Pinecone Serverless supports)
 
 ### Environment Variables & Secrets Management
 
