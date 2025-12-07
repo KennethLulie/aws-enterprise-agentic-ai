@@ -21,8 +21,10 @@ repos:
   # =============================================================================
   # Python Code Quality
   # =============================================================================
+  # Version alignment: These versions MUST match DEVELOPMENT_REFERENCE.md
+  # "Technology Version Reference" section. Update that file first, then here.
   - repo: https://github.com/psf/black
-    rev: 23.11.0
+    rev: 24.10.0
     hooks:
       - id: black
         language_version: python3.11
@@ -30,14 +32,14 @@ repos:
         files: ^backend/
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.6
+    rev: v0.7.0
     hooks:
       - id: ruff
         args: ['--fix', '--exit-non-zero-on-fix']
         files: ^backend/
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.7.1
+    rev: v1.13.0
     hooks:
       - id: mypy
         args: ['--ignore-missing-imports', '--no-strict-optional']

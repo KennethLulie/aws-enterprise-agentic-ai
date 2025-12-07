@@ -1,7 +1,7 @@
 # Docker Compose Configuration for Local Development
 # This ensures your local environment matches production exactly
-
-version: '3.8'
+#
+# Note: version key removed (deprecated in Docker Compose V2+)
 
 services:
   postgres:
@@ -44,12 +44,15 @@ services:
     volumes:
       - ./backend:/app
       - backend_venv:/app/venv  # Preserve venv between restarts
+    env_file:
+      - .env  # Load API keys and secrets from .env file
     environment:
+      # Override/supplement .env with docker-specific values
       - DATABASE_URL=postgresql://demo:demo@postgres:5432/demo
       - VECTOR_STORE_TYPE=chroma
       - CHROMA_URL=http://chroma:8000
-      - ENV=local
-      - DEBUG=true
+      - ENVIRONMENT=${ENVIRONMENT:-local}  # Use ENVIRONMENT, not ENV
+      - DEBUG=${DEBUG:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,6 +64,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s  # Give time for initial startup
 
   frontend:
     build:
@@ -79,10 +83,11 @@ services:
       - backend
     command: npm run dev
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s  # Give time for Next.js to compile
 
 volumes:
   postgres_data:

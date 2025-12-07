@@ -72,7 +72,7 @@ For production, secrets are stored in AWS Secrets Manager and loaded automatical
 
 3. **Backend Configuration:**
    - When `ENVIRONMENT=aws`, the application automatically loads from Secrets Manager
-   - See `backend/src/config/settings.py` for implementation details
+   - See `backend/src/config/settings.py` for implementation details (created during Phase 0)
 
 ### Terraform Integration
 

@@ -1,0 +1,188 @@
+---
+description: Core project rules - Docker-first development, cost/complexity tradeoffs, demo optimization
+globs: 
+alwaysApply: true
+---
+
+# Enterprise Agentic AI Project
+
+Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestration, RAG, streaming.
+
+**Current Phase:** Phase 0 (Local Development)  
+**AWS Region:** us-east-1 (ALWAYS - never hardcode, use from settings)  
+**Cost Target:** $20-50/month for demo workloads  
+**Last Updated:** December 2025
+
+## Single Sources of Truth
+
+| Information | Source |
+|-------------|--------|
+| Package versions | DEVELOPMENT_REFERENCE.md |
+| Ports/services | docker-compose.yml |
+| Environment vars | .env.example |
+| File existence | REPO_STATE.md |
+
+## Docker-First Development
+
+- **ALWAYS** use Docker Compose - never run services on host
+- Commands: `docker-compose up`, `docker-compose exec backend bash`
+- Hot reload via volume mounts: `./backend:/app`, `./frontend:/app`
+
+**Common Commands:**
+```bash
+docker-compose up                    # Start all services
+docker-compose exec backend bash     # Backend shell
+docker-compose exec frontend sh      # Frontend shell
+docker-compose exec backend pytest   # Run tests
+docker-compose exec backend mypy src/ # Type check
+docker-compose logs -f backend       # View logs
+docker-compose down                  # Stop services
+```
+
+## Cost vs Complexity Tradeoffs
+
+**When making decisions that affect cost or complexity, ALWAYS consult user with:**
+- Cost impact: Monthly cost change, one-time costs, cost per request
+- Complexity impact: Code complexity, maintenance burden, setup time, learning curve
+- Tradeoff analysis: Pros/cons of each option
+- Recommendation: Preferred option with clear rationale
+- Alternative options: What was considered and why rejected
+
+**Examples requiring consultation:**
+- Caching strategies (DynamoDB vs Redis vs in-memory)
+- Infrastructure choices (VPC endpoints vs public subnets, RDS Proxy vs SQLAlchemy pooling)
+- Tool implementations (circuit breakers, retry logic, fallback mechanisms)
+- Observability (self-hosted vs managed, logging verbosity)
+- Model selection (Nova Pro vs Lite, when to use fallback)
+- Database scaling (Aurora Serverless v2 ACU settings)
+- Vector store choice (Pinecone Serverless vs ChromaDB)
+
+**Cost optimization principles:**
+- Acceptable cold starts: Up to 30s (show loading indicator)
+- Scale to zero when idle (App Runner, DynamoDB on-demand, Aurora min 0.5 ACU)
+- Target: $20-50/month for demo workloads
+- Monitor token usage and cache aggressively (Phase 4+)
+- Use smaller models (Nova Lite) for verification/guards when possible
+- Reference: PROJECT_PLAN.md "Cost Optimization Strategies"
+
+## Demo Experience Optimization
+
+**Critical:** Demo must be smooth and snappy once warmed up.
+
+**Acceptable tradeoffs:**
+- Cold start: 30s acceptable (show "Warming up..." indicator)
+- Setup time: Minor setup OK if demo experience is impressive
+- Cost: Prefer cost efficiency over 24/7 uptime (scale to zero OK)
+
+**Demo requirements:**
+- Smooth, responsive UI during active demo
+- Real-time streaming visible and impressive
+- Thought process visualization (if implemented)
+- Professional, polished appearance
+- Reference: PROJECT_PLAN.md "Demo Presentation Guide"
+
+## Test User Access Requirements
+
+**Critical:** The demo must impress test users with minimal friction.
+
+**Must be accessible via:**
+- Website URL (CloudFront distribution) - single URL, no subdomains
+- Simple password authentication (no complex auth flows, no OAuth, no email verification)
+- Password stored in Secrets Manager (AWS) or .env (local)
+- Professional login page (shadcn/ui components, polished design)
+
+**Access flow:**
+1. Test user visits CloudFront URL
+2. Simple password prompt (one field, clear instructions)
+3. Access to chat interface immediately after password entry
+4. No additional setup, configuration, or account creation required
+5. Demo should work immediately - no "getting started" tutorial needed
+
+**Demo Quality Requirements:**
+- First impression matters: Fast initial load, professional UI
+- Smooth interactions: No lag, responsive feedback
+- Impressive features: Real-time streaming, multi-tool orchestration visible
+- Clear value proposition: Agent capabilities should be obvious from first use
+- Error handling: Graceful failures with helpful messages (never show stack traces)
+
+## Technology Stack
+
+**Versions:** See DEVELOPMENT_REFERENCE.md "Technology Version Reference" section.  
+**IMPORTANT:** Always check DEVELOPMENT_REFERENCE.md before adding/updating dependencies.
+
+**Backend:**
+- Python 3.11+ (see DEVELOPMENT_REFERENCE.md for exact version)
+- FastAPI ~=0.115.0, Uvicorn ~=0.32.0
+- LangGraph ~=0.2.50, LangChain ~=0.3.0, LangChain-AWS ~=0.2.0
+- AWS Bedrock (Nova Pro/Lite, Titan Embeddings, Claude fallback)
+- PostgreSQL 15 (Docker local, Aurora Serverless v2 in AWS)
+- Vector Store: Pinecone Serverless (production) or ChromaDB (local)
+- Structured logging: structlog ~=24.4.0 (Phase 1b+)
+
+**Frontend:**
+- Next.js 14.2.x (App Router, static export)
+- TypeScript strict mode, React 18.3+
+- shadcn/ui components, Tailwind CSS 3.4+
+- Native EventSource API for SSE (no Vercel AI SDK)
+
+**Infrastructure:**
+- Terraform >=1.5.0, AWS provider ~>5.0
+- Docker Compose V2+ (no version key)
+- GitHub Actions (CI/CD)
+- AWS: App Runner, Aurora Serverless v2, CloudFront, S3, Secrets Manager
+
+## Phase-Specific Patterns
+
+| Phase | Checkpointing | API | Tools |
+|-------|--------------|-----|-------|
+| 0 (Current) | MemorySaver | `/api/chat` | Stubs |
+| 1b+ | PostgresSaver | `/api/v1/` | Real |
+
+## Workflow Guidelines
+
+**Before Making Changes:**
+- Check REPO_STATE.md to verify files exist before referencing them
+- Verify versions in DEVELOPMENT_REFERENCE.md before updating dependencies
+- If unsure on destructive steps (infra, DB, secrets), ask user first
+- Keep changes small and reversible
+
+**When to Consult User:**
+- Design decisions affecting cost or complexity (see Cost vs Complexity section)
+- Breaking changes to APIs or data models
+- Adding new dependencies or major version updates
+- Infrastructure changes (new AWS services, scaling changes)
+- Security-related changes (auth flows, secrets handling)
+- Changes affecting test user demo experience
+
+**Code Review Checklist:**
+- All versions match DEVELOPMENT_REFERENCE.md
+- All file references exist (check REPO_STATE.md)
+- No hardcoded secrets, regions, or versions
+- Proper error handling and logging
+- Tests updated/added for new functionality
+
+## Anti-Patterns
+
+**Never:**
+- Run Python/npm directly on host instead of Docker
+- Hardcode region/secrets/versions (use settings/config)
+- Update config versions without updating DEVELOPMENT_REFERENCE.md first
+- Link to non-existent files in docs (check REPO_STATE.md first)
+- Skip error handling or user-friendly error messages
+- Expose internal errors/details to end users
+- Commit .env files or real API keys
+- Use `any` type in TypeScript (use proper types)
+- Skip type hints in Python (required on all functions)
+- Skip docstrings (required for all functions/classes)
+
+## Key Files
+
+- PHASE_0_HOW_TO_GUIDE.md - Implementation steps
+- DEVELOPMENT_REFERENCE.md - Specs and versions
+- REPO_STATE.md - What files exist
+
+## Local URLs
+
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- API Docs: http://localhost:8000/docs

@@ -1,0 +1,101 @@
+---
+description: Documentation rules - file references, version updates, markdown conventions
+globs:
+  - docs/**
+  - "*.md"
+alwaysApply: false
+---
+
+# Documentation Rules
+
+## File References
+
+- Verify file exists before linking: check REPO_STATE.md
+- Non-existent files: use backticks `filename.ext` with note "(created in Phase X)"
+- Never use markdown links `[text](path)` to non-existent files
+
+## When Creating Files
+
+1. Add to "Currently Existing Files" in REPO_STATE.md
+2. Remove from "Planned Files" if listed
+3. Update any documentation that referenced it as planned
+
+## When Deleting Files
+
+1. Remove from REPO_STATE.md
+2. Search docs for references: `grep -r "filename" *.md docs/`
+3. Update or remove all references
+
+## Version Updates
+
+1. Update DEVELOPMENT_REFERENCE.md first (single source of truth)
+2. Update .pre-commit-config.yaml (if tool versions changed)
+3. Update backend/requirements.txt (if Python packages changed)
+4. Update frontend/package.json (if Node packages changed)
+5. Run `pre-commit run --all-files` to verify
+6. Update REPO_STATE.md if files added/removed
+
+## Documenting Agentic AI Patterns
+
+**When documenting agentic AI features:**
+
+**Agent Architecture:**
+- Document state schema (fields, types, purpose)
+- Document graph structure (nodes, edges, flow)
+- Document tool definitions (inputs, outputs, purpose)
+- Include flow diagrams when helpful
+
+**Tool Documentation:**
+- Document each tool's purpose and use cases
+- Document tool inputs/outputs (Pydantic schemas)
+- Document error handling for each tool
+- Document cost implications (API costs, token usage)
+- Include examples of tool usage
+
+**Multi-Tool Scenarios:**
+- Document business use cases requiring multiple tools
+- Document tool coordination patterns
+- Document expected agent behavior
+- Include example conversations showing multi-tool flow
+
+**Example Documentation Pattern:**
+```markdown
+## Search Tool
+
+**Purpose:** Search the web for current information using Tavily API.
+
+**Input:** 
+- `query` (str): Search query string
+
+**Output:**
+- `results` (str): Formatted search results
+
+**Use Cases:**
+- Finding current information not in knowledge base
+- Researching topics for analysis
+- Getting real-time data
+
+**Error Handling:**
+- API failure: Returns error message, agent continues
+- Rate limit: Returns helpful message, suggests retry
+- Timeout: Returns partial results if available
+
+**Cost:** ~$0.001 per search (Tavily free tier: 1,000/month)
+```
+
+## Code Documentation Standards
+
+**Function Docstrings:**
+- Google style docstrings for all functions
+- Include: Purpose, Args, Returns, Raises, Examples
+- Document agent-specific behavior (tool calls, state updates)
+
+**Class Docstrings:**
+- Document class purpose and usage
+- Document state management if applicable
+- Include usage examples for complex classes
+
+**Module Docstrings:**
+- Document module purpose
+- List main exports
+- Include usage examples if helpful

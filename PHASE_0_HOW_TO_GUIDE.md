@@ -8,26 +8,30 @@
 
 **⚠️ Important:** This guide follows a Docker-first approach. Dependencies are installed via Docker builds, not locally. Some verification commands in early sections require Docker to be set up first (Section 7). See "Important Notes About Execution Order" section for details.
 
+**🖥️ Development Environment:** This guide is written for **Windows with WSL 2** (Windows Subsystem for Linux). All terminal commands should be run in your WSL terminal (Ubuntu), not PowerShell or Command Prompt. Docker Desktop should be configured to use the WSL 2 backend.
+
 ---
 
 ## Table of Contents
 
 1. [Quick Start Workflow Summary](#quick-start-workflow-summary)
-2. [Prerequisites and Setup](#1-prerequisites-and-setup)
-3. [Initial Project Structure](#2-initial-project-structure)
-4. [Backend Foundation](#3-backend-foundation)
-5. [LangGraph Agent Core](#4-langgraph-agent-core)
-6. [Basic Tools (Stubs)](#5-basic-tools-stubs)
-7. [Frontend Foundation](#6-frontend-foundation)
-8. [Docker Compose Setup](#7-docker-compose-setup)
-9. [Development Scripts](#8-development-scripts)
-10. [Testing Foundation](#9-testing-foundation)
-11. [Pre-commit Hooks](#10-pre-commit-hooks)
-12. [Verification and Testing](#11-verification-and-testing)
-13. [Important Notes About Execution Order](#important-notes-about-execution-order)
-14. [Phase 0 Completion Checklist](#phase-0-completion-checklist)
-15. [Common Issues and Solutions](#common-issues-and-solutions)
-16. [File Inventory](#12-file-inventory)
+2. [Windows/WSL Development Setup](#windowswsl-development-setup)
+3. [Prerequisites and Setup](#1-prerequisites-and-setup)
+4. [Initial Project Structure](#2-initial-project-structure)
+5. [Backend Foundation](#3-backend-foundation)
+6. [LangGraph Agent Core](#4-langgraph-agent-core)
+7. [Basic Tools (Stubs)](#5-basic-tools-stubs)
+8. [Frontend Foundation](#6-frontend-foundation)
+9. [Docker Compose Setup](#7-docker-compose-setup)
+10. [Development Scripts](#8-development-scripts)
+11. [Testing Foundation](#9-testing-foundation)
+12. [Pre-commit Hooks](#10-pre-commit-hooks)
+13. [Verification and Testing](#11-verification-and-testing)
+14. [Important Notes About Execution Order](#important-notes-about-execution-order)
+15. [Phase 0 Completion Checklist](#phase-0-completion-checklist)
+16. [Common Issues and Solutions](#common-issues-and-solutions)
+17. [File Inventory](#12-file-inventory)
+18. [Branch Management and Next Steps](#branch-management-and-next-steps)
 
 ---
 
@@ -57,6 +61,77 @@
 
 ---
 
+## Windows/WSL Development Setup
+
+This project is developed on **Windows with WSL 2** (Windows Subsystem for Linux). Follow these guidelines for the best experience.
+
+### WSL 2 Requirements
+
+1. **Windows 10 version 2004+** or **Windows 11**
+2. **WSL 2** with Ubuntu 24.04 (or 22.04)
+3. **Docker Desktop** with WSL 2 backend enabled
+
+### Initial WSL Setup
+
+**If WSL is not installed:**
+```powershell
+# Run in PowerShell as Administrator
+wsl --install -d Ubuntu-24.04
+```
+
+**Verify WSL 2 is being used:**
+```powershell
+# Run in PowerShell
+wsl -l -v
+# Should show Ubuntu with VERSION 2
+```
+
+### Docker Desktop Configuration
+
+1. Open Docker Desktop → Settings → General
+2. ✅ Enable "Use the WSL 2 based engine"
+3. Go to Settings → Resources → WSL Integration
+4. ✅ Enable integration with your Ubuntu distro
+5. Click "Apply & Restart"
+
+### Where to Run Commands
+
+| Command Type | Where to Run |
+|-------------|--------------|
+| All development commands | WSL terminal (Ubuntu) |
+| Docker commands | WSL terminal (Ubuntu) |
+| Git commands | WSL terminal (Ubuntu) |
+| `chmod +x` scripts | WSL terminal (Ubuntu) |
+| Opening Cursor/VS Code | Windows (with WSL extension) |
+
+### Opening Project in Cursor/VS Code
+
+**From WSL terminal:**
+```bash
+# Navigate to project directory in WSL
+cd ~/Projects/aws-enterprise-agentic-ai
+
+# Open in Cursor (or VS Code)
+cursor .
+# or: code .
+```
+
+**Important:** Always open the project from WSL to ensure file watchers and Docker volume mounts work correctly.
+
+### File System Performance
+
+For best performance, keep your project files in the WSL filesystem (e.g., `~/Projects/`), NOT in `/mnt/c/` (Windows filesystem). Docker volume mounts are significantly faster with native WSL paths.
+
+### Path Format Reference
+
+| Context | Path Format | Example |
+|---------|-------------|---------|
+| WSL terminal | Linux paths | `~/Projects/aws-enterprise-agentic-ai` |
+| Docker volumes | Linux paths | `./backend:/app` |
+| Windows Explorer | `\\wsl$\Ubuntu\...` | `\\wsl$\Ubuntu\home\user\Projects` |
+
+---
+
 ## 1. Prerequisites and Setup
 
 ### What We're Doing
@@ -78,11 +153,14 @@ Before writing any code, we need to ensure all required tools, services, and acc
 
 #### 1.1 Verify Local Tools
 
-**Command:**
+**Command (run in WSL terminal):**
 ```bash
-# Check Docker
+# Verify you're in WSL (should show "Linux")
+uname -a
+
+# Check Docker (requires Docker Desktop running with WSL integration)
 docker --version
-docker-compose --version
+docker compose version  # Note: 'docker compose' (no hyphen) is the modern syntax
 
 # Check Python
 python3 --version  # Should be 3.11+
@@ -96,6 +174,8 @@ aws --version  # Should be v2
 # Check Git
 git --version
 ```
+
+**Note:** If Docker commands fail, ensure Docker Desktop is running and WSL integration is enabled (Settings → Resources → WSL Integration).
 
 **Expected Output:**
 - Docker: 24.0+ or 20.10+
@@ -154,16 +234,20 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?m
 
 **Action:** 
 1. Go to https://pinecone.io
-2. Create free account
-3. Create index with these settings:
+2. Create free account (Starter tier is free)
+3. Create a **Serverless** index with these settings:
    - **Name:** `demo-index`
    - **Dimensions:** `1536` (Bedrock Titan embedding size)
    - **Metric:** `cosine`
-   - **Region:** `us-east-1` (AWS region)
+   - **Cloud:** AWS
+   - **Region:** `us-east-1` (must match AWS region)
 
 **Get API Key:**
-- Copy API key from Pinecone dashboard
-- Save for `.env` file (Step 2.3)
+- Go to API Keys in Pinecone dashboard
+- Copy your API key
+- Save for `.env` file (Step 2.5)
+
+**Note:** Pinecone Serverless uses "environment" terminology (e.g., `us-east-1`). The `.env.example` uses `PINECONE_ENVIRONMENT` for this value.
 
 #### 1.5 Create Tavily Account
 
@@ -209,19 +293,21 @@ Creating the complete directory structure and initial configuration files. This 
 
 #### 2.1 Create Directory Structure
 
-**Command:**
+**Command (run in WSL terminal):**
 ```bash
 # Create main directories
 mkdir -p backend/src/{agent/{nodes,tools},api/{routes/v1,middleware},config,cache,ingestion,utils}
 mkdir -p backend/tests
 mkdir -p backend/alembic/versions
-mkdir -p frontend/src/{app/{login,components/cold-start},components/{chat,thought-process,ui},lib,styles}
+mkdir -p frontend/src/{app/login,components/{chat,cold-start,thought-process,ui},lib,styles}
 mkdir -p scripts
 mkdir -p docs
 mkdir -p lambda/document-ingestion
 mkdir -p .github/workflows
 mkdir -p terraform/{environments/{dev,prod},modules/{networking,app-runner,aurora,s3-cloudfront,lambda,observability}}
 ```
+
+**Note:** The `frontend/src/app/` directory is for Next.js App Router pages only. Component directories go under `frontend/src/components/`.
 
 **Verification:**
 ```bash
@@ -265,23 +351,29 @@ find backend/src backend/tests -name "__init__.py" | wc -l
 
 #### 2.2 Initialize Git Repository
 
-**Command:**
+**Command (run in WSL terminal):**
 ```bash
+# Configure Git for WSL (important for Windows/Linux compatibility)
+git config --global core.autocrlf input  # Prevents Windows line ending issues
+git config --global init.defaultBranch main
+
 # Initialize git (if not already done)
 git init
 
 # Create initial commit with project plan and cursor rules
-git add README.md PROJECT_PLAN.md DEVELOPMENT_REFERENCE.md .cursorrules
+git add README.md PROJECT_PLAN.md DEVELOPMENT_REFERENCE.md .cursor/
 git commit -m "Initial commit: Project plan, documentation, and cursor rules"
 ```
 
-**Note:** The `.cursorrules` file provides AI-assisted development guidelines. It should be committed to help maintain consistency.
+**Note:** The `.cursor/rules/` directory contains AI-assisted development guidelines in `.mdc` files. It should be committed to help maintain consistency.
+
+**WSL Git Tip:** Always run Git commands from WSL terminal, not from Windows. This ensures consistent line endings and file permissions.
 
 #### 2.3 Create .gitignore
 
 **Agent Prompt:**
 ```
-Create a comprehensive .gitignore file for this Python/Next.js/AWS project. Include:
+Create file .gitignore in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. Include patterns for:
 - Python: __pycache__, *.pyc, .venv, venv, *.egg-info, .pytest_cache, .mypy_cache
 - Node.js: node_modules, .next, out, .turbo, *.log
 - Environment: .env, .env.local, .env.*.local
@@ -292,6 +384,8 @@ Create a comprehensive .gitignore file for this Python/Next.js/AWS project. Incl
 - Docker: *.log (container logs)
 - Testing: .coverage, htmlcov, .pytest_cache
 - Build artifacts: dist, build, *.egg
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification:**
@@ -368,36 +462,52 @@ Setting up the core FastAPI application, configuration management, and dependenc
 
 **Agent Prompt:**
 ```
-Create backend/requirements.txt with pinned versions for Phase 0. Include:
+Create file backend/requirements.txt in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. Include pinned versions for Phase 0:
 - Core Framework: fastapi~=0.115.0, uvicorn[standard]~=0.32.0, pydantic~=2.9.0, pydantic-settings~=2.6.0
 - Agent Framework: langgraph~=0.2.50, langchain~=0.3.0, langchain-aws~=0.2.0
 - AWS SDK: boto3~=1.35.0, botocore~=1.35.0
 - Database: sqlalchemy~=2.0.35, alembic~=1.13.0, psycopg2-binary~=2.9.9 (for Phase 1b, but include now)
 - Vector Store: pinecone-client~=5.0.0, chromadb~=0.5.15
+- Logging: structlog~=24.4.0 (used in Phase 1b+, include now for consistency)
 - HTTP Clients: httpx~=0.27.0, requests~=2.32.0
 - Utilities: python-dotenv~=1.0.0, tenacity~=9.0.0
+- Rate Limiting: slowapi~=0.1.9 (used in Phase 1b+, include now for consistency)
 - Testing: pytest~=8.3.0, pytest-asyncio~=0.24.0, pytest-cov~=5.0.0, pytest-mock~=3.14.0
 - Code Quality: black~=24.10.0, ruff~=0.7.0, mypy~=1.13.0
+- Type Stubs: types-requests~=2.32.0
 - Add comments grouping by phase/functionality
 - Use ~= for compatible release pinning (allows patch updates)
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification:**
 ```bash
 # Check requirements.txt exists and has pinned versions
-grep -c "==" backend/requirements.txt  # Should be 20+ packages
+# Note: Uses ~= (compatible release) not == (exact version)
+grep -c "~=" backend/requirements.txt  # Should be 20+ packages
+# Or count all lines with version specifiers:
+grep -E "(~=|==|>=|<=)" backend/requirements.txt | wc -l
 ```
+
+**Version Reference:** All versions in `backend/requirements.txt` must match the "Technology Version Reference" section in `DEVELOPMENT_REFERENCE.md`. That document is the single source of truth for all dependency versions.
 
 #### 3.2 Create Backend Configuration Module
 
 **Agent Prompt:**
 ```
-Create backend/src/config/__init__.py (empty file) and backend/src/config/settings.py.
+Create file backend/src/config/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should be empty or expose the Settings class.
 
-The settings.py file should:
+Review the new file for errors, inconsistencies, version issues, latest documentation.
+```
+
+**Agent Prompt:**
+```
+Create file backend/src/config/settings.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Use Pydantic Settings (BaseSettings from pydantic_settings)
 2. Load from .env file using python-dotenv
-3. Auto-detect environment (local vs aws) based on ENVIRONMENT variable or AWS availability
+3. Auto-detect environment (local vs aws) based on ENVIRONMENT variable (not ENV) or AWS availability
+   - **Important:** Use `ENVIRONMENT` variable name, not `ENV`, to avoid conflicts with other tools
 4. Include all environment variables from .env.example with proper types
 5. Add validation for required variables
 6. Provide sensible defaults where possible
@@ -412,6 +522,8 @@ Structure:
 - Fields for: AWS, Bedrock models, External APIs, Database, Application settings
 - validate_config() function that checks all required settings
 - get_environment() function that detects local vs AWS
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification Command (After Docker Setup):**
@@ -439,9 +551,14 @@ docker-compose exec backend python -c "from src.config.settings import Settings;
 
 **Agent Prompt:**
 ```
-Create backend/src/api/__init__.py (empty) and backend/src/api/main.py.
+Create file backend/src/api/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
 
-The main.py file should:
+Review the new file for errors, inconsistencies, version issues, latest documentation.
+```
+
+**Agent Prompt:**
+```
+Create file backend/src/api/main.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create FastAPI app instance with title, description, version
 2. Configure CORS middleware to allow localhost:3000 (frontend)
 3. Add basic error handling middleware
@@ -456,6 +573,8 @@ The health endpoint should:
 - Return simple JSON: {"status": "ok", "environment": "local"}
 - Be accessible without authentication (for Phase 0)
 - Use GET method
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification Command (After Docker Setup):**
@@ -477,23 +596,32 @@ docker-compose exec backend python -c "from src.api.main import app; print('Fast
 
 **Agent Prompt:**
 ```
-Create backend/src/api/routes/__init__.py (empty) and backend/src/api/routes/health.py.
+Create file backend/src/api/routes/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
 
-The health.py file should:
+Review the new file for errors, inconsistencies, version issues, latest documentation.
+```
+
+**Agent Prompt:**
+```
+Create file backend/src/api/routes/health.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create a FastAPI router
 2. Define GET /health endpoint
 3. Return {"status": "ok", "environment": <from settings>}
 4. Use proper type hints
 5. Add docstring
 6. Keep it simple for Phase 0 (no dependency checks yet - that's Phase 1b)
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Update main.py:**
 ```
-Update backend/src/api/main.py to:
+Update file backend/src/api/main.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
 1. Import the health router
 2. Include the router with prefix "/" (so /health works)
 3. Add the import at the top
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification Command (After Docker Setup):**
@@ -547,9 +675,14 @@ Implementing the core LangGraph agent with state management, graph definition, a
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/__init__.py (empty) and backend/src/agent/state.py.
+Create file backend/src/agent/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
 
-The state.py file should:
+Review the new file for errors, inconsistencies, version issues, latest documentation.
+```
+
+**Agent Prompt:**
+```
+Create file backend/src/agent/state.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Define TypedDict for agent state (or use Pydantic BaseModel)
 2. Include fields:
    - messages: List[BaseMessage] (from langchain)
@@ -562,6 +695,8 @@ The state.py file should:
 5. Import necessary types from langchain_core.messages
 
 Reference: LangGraph state should be a TypedDict that matches LangChain message format.
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -581,9 +716,14 @@ docker-compose exec backend python -c "from src.agent.state import AgentState; p
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/nodes/__init__.py (empty) and backend/src/agent/nodes/chat.py.
+Create file backend/src/agent/nodes/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
 
-The chat.py file should:
+Review the new file for errors, inconsistencies, version issues, latest documentation.
+```
+
+**Agent Prompt:**
+```
+Create file backend/src/agent/nodes/chat.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Import Bedrock client from langchain_aws
 2. Create chat node function that:
    - Takes state (AgentState) as input
@@ -606,6 +746,8 @@ Configuration:
 
 The function signature should be:
 def chat_node(state: AgentState) -> AgentState:
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification Command (After Docker Setup):**
@@ -625,9 +767,7 @@ docker-compose exec backend python -c "from src.agent.nodes.chat import chat_nod
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/nodes/tools.py.
-
-The tools.py file should:
+Create file backend/src/agent/nodes/tools.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create tool_execution_node function
 2. Take state as input
 3. Check if last message has tool calls
@@ -641,6 +781,8 @@ For Phase 0:
 - Tools will be stubs returning mock data
 - Focus on the execution flow, not actual tool implementation
 - Log which tools are being called
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -660,9 +802,7 @@ docker-compose exec backend python -c "from src.agent.nodes.tools import tool_ex
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/nodes/error_recovery.py.
-
-The error_recovery.py should:
+Create file backend/src/agent/nodes/error_recovery.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create error_recovery_node function
 2. Check state.last_error for errors
 3. Generate user-friendly error message
@@ -675,6 +815,8 @@ Error messages should be:
 - User-friendly (not technical)
 - Actionable (suggest what user can do)
 - Logged with full technical details
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -694,9 +836,7 @@ docker-compose exec backend python -c "from src.agent.nodes.error_recovery impor
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/graph.py.
-
-The graph.py file should:
+Create file backend/src/agent/graph.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Import all nodes (chat, tools, error_recovery)
 2. Import state schema
 3. Create LangGraph graph using StateGraph
@@ -720,6 +860,8 @@ Graph flow:
 Checkpointing:
 - Use MemorySaver() for Phase 0 (in-memory, no DB)
 - Configure with proper state schema
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification Command (After Docker Setup):**
@@ -761,26 +903,26 @@ Creating stub implementations of all four tools (search, SQL, RAG, weather) that
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/tools/__init__.py that:
-1. Exports a base Tool class or interface
-2. Defines common tool interface
-3. Includes error handling base
-4. Defines tool result format
+Create file backend/src/agent/tools/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
+1. Export a base Tool class or interface
+2. Define common tool interface
+3. Include error handling base
+4. Define tool result format
 
 The base should include:
 - execute() method signature
 - error handling pattern
 - result formatting
 - logging pattern
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 #### 5.2 Create Search Tool Stub
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/tools/search.py.
-
-The search.py file should:
+Create file backend/src/agent/tools/search.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create a SearchTool class
 2. Implement LangGraph tool format (using @tool decorator or Tool class)
 3. For Phase 0: Return mock search results
@@ -804,6 +946,8 @@ Mock result format:
     ],
     "query": "<user_query>"
 }
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -823,9 +967,7 @@ docker-compose exec backend python -c "from src.agent.tools.search import Search
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/tools/sql.py.
-
-The sql.py file should:
+Create file backend/src/agent/tools/sql.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create SQLTool class
 2. Implement LangGraph tool format
 3. For Phase 0: Return mock SQL query results
@@ -847,6 +989,8 @@ Mock result format:
     ],
     "row_count": 2
 }
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -866,9 +1010,7 @@ docker-compose exec backend python -c "from src.agent.tools.sql import SQLTool; 
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/tools/rag.py.
-
-The rag.py file should:
+Create file backend/src/agent/tools/rag.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create RAGTool class
 2. Implement LangGraph tool format
 3. For Phase 0: Return mock document retrieval results
@@ -893,6 +1035,8 @@ Mock result format:
     ],
     "count": 1
 }
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -912,9 +1056,7 @@ docker-compose exec backend python -c "from src.agent.tools.rag import RAGTool; 
 
 **Agent Prompt:**
 ```
-Create backend/src/agent/tools/weather.py.
-
-The weather.py file should:
+Create file backend/src/agent/tools/weather.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create WeatherTool class
 2. Implement LangGraph tool format
 3. For Phase 0: Return mock weather data
@@ -936,6 +1078,8 @@ Mock result format:
     "wind_speed": 10,
     "wind_unit": "mph"
 }
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -1002,20 +1146,27 @@ Setting up the Next.js frontend with TypeScript, shadcn/ui, and basic chat inter
 
 #### 6.1 Initialize Next.js Project
 
-**Note:** This initial setup step runs on your host machine (not in Docker) because it creates the initial project structure. All subsequent development will happen in Docker containers.
+**Note:** This initial setup step runs in your WSL terminal (not in Docker) because it creates the initial project structure. All subsequent development will happen in Docker containers.
 
-**Command:**
+**Command (run in WSL terminal):**
 ```bash
 cd frontend
-npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --import-alias "@/*"
+npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --yes
 ```
 
-**When Prompted:**
-- Use TypeScript: Yes
-- Use ESLint: Yes
-- Use Tailwind CSS: Yes
-- Use App Router: Yes
-- Customize import alias: @/*
+**The `--yes` flag accepts defaults. If you prefer interactive prompts, omit it:**
+```bash
+npx create-next-app@latest .
+```
+
+**When Prompted (if running interactively):**
+- Would you like to use TypeScript? → **Yes**
+- Would you like to use ESLint? → **Yes**
+- Would you like to use Tailwind CSS? → **Yes**
+- Would you like your code inside a `src/` directory? → **Yes**
+- Would you like to use App Router? → **Yes**
+- Would you like to use Turbopack for `next dev`? → **No** (optional, can say Yes)
+- Would you like to customize the import alias? → **Yes** (@/*)
 
 **Verification:**
 ```bash
@@ -1028,9 +1179,11 @@ grep -q "next" frontend/package.json && echo "✓ Next.js initialized" || echo "
 
 #### 6.2 Configure Next.js for Static Export
 
+**Note:** Next.js 14+ creates `next.config.mjs` (ES modules) or `next.config.ts` by default. Either format works.
+
 **Agent Prompt:**
 ```
-Update frontend/next.config.js to:
+Update file frontend/next.config.mjs (or next.config.ts if TypeScript config was created) in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Set output: 'export' for static export (needed for Phase 1a)
 2. Disable image optimization (not needed for static export)
 3. Configure base path if needed
@@ -1038,45 +1191,54 @@ Update frontend/next.config.js to:
 
 Configuration should be:
 ```javascript
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
   images: {
     unoptimized: true
   },
-  // Add other config as needed
+  // Disable server-side features for static export
+  trailingSlash: true,
 }
+
+export default nextConfig
 ```
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification:**
 ```bash
-# Check next.config.js exists and has output: 'export'
-grep "output" frontend/next.config.js
+# Check next.config exists and has output: 'export'
+# Note: File may be .mjs, .ts, or .js depending on Next.js version
+grep "output" frontend/next.config.* 2>/dev/null || echo "Check next.config file manually"
 ```
 
 #### 6.3 Install shadcn/ui
 
-**Note:** This setup step runs on your host machine (not in Docker) because it configures the project. All subsequent development will happen in Docker containers.
+**Note:** This setup step runs in your WSL terminal (not in Docker) because it configures the project. All subsequent development will happen in Docker containers.
 
-**Command:**
+**Command (run in WSL terminal):**
 ```bash
 cd frontend
-npx shadcn-ui@latest init
+npx shadcn@latest init
 ```
 
 **When Prompted:**
-- Style: Default
-- Base color: Slate
-- CSS variables: Yes
+- Which style would you like to use? → **Default**
+- Which color would you like to use as base color? → **Slate**
+- Would you like to use CSS variables for colors? → **Yes**
 
 **Install Required Components:**
 ```bash
-npx shadcn-ui@latest add button
-npx shadcn-ui@latest add card
-npx shadcn-ui@latest add input
-npx shadcn-ui@latest add toast
-npx shadcn-ui@latest add dialog
+npx shadcn@latest add button
+npx shadcn@latest add card
+npx shadcn@latest add input
+npx shadcn@latest add toast
+npx shadcn@latest add dialog
 ```
+
+**Note:** The CLI was renamed from `shadcn-ui` to `shadcn` in late 2024. Use `shadcn@latest` for all commands.
 
 **Verification:**
 ```bash
@@ -1091,9 +1253,7 @@ ls frontend/src/components/ui/
 
 **Agent Prompt:**
 ```
-Create frontend/src/app/login/page.tsx.
-
-The login page should:
+Create file frontend/src/app/login/page.tsx in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Use shadcn/ui components (Card, Input, Button)
 2. Have a password input field
 3. On submit, store password in sessionStorage
@@ -1112,6 +1272,8 @@ Use Next.js App Router patterns:
 - 'use client' directive (for interactivity)
 - useRouter from next/navigation
 - useState for form state
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification:**
@@ -1124,9 +1286,7 @@ ls frontend/src/app/login/page.tsx
 
 **Agent Prompt:**
 ```
-Create frontend/src/lib/api.ts.
-
-The api.ts file should:
+Create file frontend/src/lib/api.ts in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Export functions for API communication
 2. SSE connection function using native EventSource
 3. Message sending function using fetch
@@ -1151,6 +1311,8 @@ SSE connection:
 For Phase 0:
 - API URL: http://localhost:8000 (hardcoded for local dev)
 - No authentication headers yet (Phase 1a will add)
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification:**
@@ -1163,9 +1325,7 @@ ls frontend/src/lib/api.ts
 
 **Agent Prompt:**
 ```
-Create frontend/src/app/page.tsx (main chat page).
-
-The chat page should:
+Create file frontend/src/app/page.tsx in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Check for authentication (password in sessionStorage)
 2. Redirect to /login if not authenticated
 3. Display chat interface:
@@ -1199,6 +1359,8 @@ Use Next.js App Router:
 - useState for messages and input
 - useEffect for SSE connection
 - useRouter for navigation
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification:**
@@ -1211,7 +1373,7 @@ ls frontend/src/app/page.tsx
 
 **Agent Prompt:**
 ```
-Update frontend/src/app/layout.tsx to:
+Update file frontend/src/app/layout.tsx in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Include proper metadata (title, description)
 2. Include global styles
 3. Set up font (Inter or system font)
@@ -1221,6 +1383,8 @@ Update frontend/src/app/layout.tsx to:
 Metadata:
 - Title: "Enterprise Agentic AI Demo"
 - Description: "Enterprise-grade agentic AI system"
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification:**
@@ -1335,7 +1499,7 @@ The `docker-compose.yml` file is already provided in the repository. Review it a
 **What's Configured:**
 
 The docker-compose.yml should:
-1. Define version (use '3.8' or latest)
+1. **Note:** Do NOT include a `version` key - it's deprecated in Docker Compose V2+ (the version key has been removed from the actual file)
 2. Define services:
    - backend: FastAPI app
    - frontend: Next.js app
@@ -1367,16 +1531,26 @@ ChromaDB configuration (optional):
 Backend service:
 - Build context: ./backend
 - Dockerfile: Dockerfile.dev
-- Volumes: ./backend:/app
-- Environment: Load from .env
-- Depends_on: postgres
+- Volumes: ./backend:/app (for hot reload)
+- env_file: .env (loads API keys and secrets from .env file)
+- Environment variables:
+  - ENVIRONMENT=${ENVIRONMENT:-local} (use ENVIRONMENT, not ENV)
+  - DEBUG=${DEBUG:-true}
+  - DATABASE_URL=postgresql://demo:demo@postgres:5432/demo
+  - VECTOR_STORE_TYPE=chroma
+  - CHROMA_URL=http://chroma:8000
+- Depends_on: postgres, chroma (with health check conditions)
+- Health check: curl http://localhost:8000/health (with start_period: 30s)
+
+Note: The backend_venv volume in docker-compose.yml is a placeholder for future optimization. Dependencies are installed to system Python in the container.
 
 Frontend service:
 - Build context: ./frontend
 - Dockerfile: Dockerfile.dev
-- Volumes: ./frontend:/app
+- Volumes: ./frontend:/app, /app/node_modules (anonymous volume to preserve deps)
 - Environment: NEXT_PUBLIC_API_URL=http://localhost:8000
 - Depends_on: backend
+- Health check: Uses wget (alpine doesn't have curl by default)
 
 Add named volumes for data persistence:
 - postgres_data
@@ -1391,19 +1565,56 @@ docker-compose config
 
 **Expected Output:** Should show validated configuration without errors
 
+#### 7.4 Create .dockerignore Files
+
+**Agent Prompt:**
+```
+Create file backend/.dockerignore in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should exclude:
+- venv/, .venv/
+- __pycache__/, *.pyc
+- .pytest_cache/, .mypy_cache
+- .git/
+- *.log
+- .env (will use environment variables)
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
+```
+
+**Agent Prompt:**
+```
+Create file frontend/.dockerignore in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should exclude:
+- node_modules/
+- .next/
+- out/
+- .git/
+- *.log
+- .env.local
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
+```
+
+**Verification:**
+```bash
+# Check .dockerignore files exist
+ls backend/.dockerignore frontend/.dockerignore
+```
+
 #### 7.5 Test Docker Compose Startup
 
-**Command:**
+**Command (run in WSL terminal):**
 ```bash
 # Start all services in detached mode
-docker-compose up -d
+# Note: 'docker compose' (no hyphen) is the modern Docker Compose V2 syntax
+docker compose up -d
 
 # Wait for services to be ready (10-15 seconds)
 sleep 15
 
 # Check all services are running
-docker-compose ps
+docker compose ps
 ```
+
+**Note:** Both `docker-compose` (hyphenated) and `docker compose` (space) work. The space version is the newer Docker Compose V2 integrated into Docker CLI.
 
 **Expected Output:** All services should show "Up" status:
 - backend: Up
@@ -1443,35 +1654,6 @@ docker-compose down
 
 **Note:** Keep services running for the next sections, or restart with `docker-compose up -d` when needed.
 
-#### 7.4 Create .dockerignore Files
-
-**Agent Prompt:**
-```
-Create backend/.dockerignore and frontend/.dockerignore.
-
-Backend .dockerignore should exclude:
-- venv/, .venv/
-- __pycache__/, *.pyc
-- .pytest_cache/, .mypy_cache
-- .git/
-- *.log
-- .env (will use environment variables)
-
-Frontend .dockerignore should exclude:
-- node_modules/
-- .next/
-- out/
-- .git/
-- *.log
-- .env.local
-```
-
-**Verification:**
-```bash
-# Check .dockerignore files exist
-ls backend/.dockerignore frontend/.dockerignore
-```
-
 ---
 
 ## 8. Development Scripts
@@ -1496,28 +1678,25 @@ Creating helper scripts to simplify common development tasks like starting servi
 
 **Agent Prompt:**
 ```
-Create scripts/setup.sh that:
-1. Validates Docker is installed and running
-2. Validates Python 3.11+ is installed
-3. Validates AWS CLI is configured
-4. Creates .env from .env.example if it doesn't exist
-5. Pre-pulls Docker images (postgres:15-alpine, chromadb/chroma, python:3.11-slim, node:20-alpine)
-6. Provides clear error messages if validation fails
-7. Makes the script executable
-8. Uses bash with set -e for error handling
+Create file scripts/setup.sh in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The script should:
+1. Validate Docker is installed and running
+2. Validate Python 3.11+ is installed
+3. Validate AWS CLI is configured
+4. Create .env from .env.example if it doesn't exist
+5. Pre-pull Docker images (postgres:15-alpine, chromadb/chroma, python:3.11-slim, node:20-alpine)
+6. Provide clear error messages if validation fails
+7. Use bash with set -e for error handling
+8. Be idempotent (safe to run multiple times)
 
-The script should:
-- Check each prerequisite
-- Print status for each check
-- Exit with error code if any check fails
-- Print success message if all checks pass
-- Be idempotent (safe to run multiple times)
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
-**Command:**
+**Command (run in WSL terminal):**
 ```bash
 chmod +x scripts/setup.sh
 ```
+
+**Note:** The `chmod` command must be run in WSL, not PowerShell. If you see "command not found", you're in the wrong terminal.
 
 **Verification:**
 ```bash
@@ -1529,23 +1708,22 @@ chmod +x scripts/setup.sh
 
 **Agent Prompt:**
 ```
-Create scripts/validate_setup.py that:
-1. Checks all prerequisites programmatically
-2. Validates .env file has all required variables
-3. Tests AWS credentials (aws sts get-caller-identity)
-4. Tests Bedrock model access (list-foundation-models)
-5. Tests Pinecone API key (if provided)
-6. Tests Tavily API key (if provided)
-7. Provides clear error messages
-8. Returns exit code 0 if all checks pass, 1 if any fail
+Create file scripts/validate_setup.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The script should:
+1. Check all prerequisites programmatically
+2. Validate .env file has all required variables
+3. Test AWS credentials (aws sts get-caller-identity)
+4. Test Bedrock model access (list-foundation-models)
+5. Test Pinecone API key (if provided)
+6. Test Tavily API key (if provided)
+7. Provide clear error messages
+8. Return exit code 0 if all checks pass, 1 if any fail
+9. Use Python 3.11+
+10. Load .env file
+11. Use boto3 for AWS checks
+12. Use requests for API checks
+13. Print colored output (green for pass, red for fail)
 
-The script should:
-- Use Python 3.11+
-- Load .env file
-- Use boto3 for AWS checks
-- Use requests for API checks
-- Print colored output (green for pass, red for fail)
-- Be comprehensive but fast
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification Command:**
@@ -1560,7 +1738,7 @@ python3 scripts/validate_setup.py
 
 **Agent Prompt:**
 ```
-Create scripts/dev.sh that provides convenient commands:
+Create file scripts/dev.sh in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The script should provide convenient commands:
 - start: Start all services (docker-compose up)
 - stop: Stop all services (docker-compose down)
 - logs: View logs (docker-compose logs -f)
@@ -1576,6 +1754,8 @@ The script should:
 - Provide usage message if no command
 - Handle errors gracefully
 - Use docker-compose commands
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Command:**
@@ -1614,20 +1794,35 @@ Setting up testing infrastructure with pytest, test structure, and initial tests
 
 **Agent Prompt:**
 ```
-Create backend/pytest.ini that:
-1. Configures pytest for the project
-2. Sets test paths (tests/)
-3. Configures coverage settings
-4. Sets Python path to include src/
-5. Configures asyncio mode
-6. Sets test discovery patterns
+Create file backend/pytest.ini in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
+1. Configure pytest for the project
+2. Set test paths (tests/)
+3. Configure coverage settings
+4. Set Python path to include src/
+5. Configure asyncio mode for pytest-asyncio 0.24+
+6. Set test discovery patterns
 
 Configuration:
 - testpaths = tests
 - pythonpath = src
 - asyncio_mode = auto
+- asyncio_default_fixture_loop_scope = function (required for pytest-asyncio 0.24+)
 - addopts = --verbose --cov=src --cov-report=term-missing
 - Coverage threshold: 70% (for critical paths)
+
+Example pytest.ini:
+```ini
+[pytest]
+testpaths = tests
+pythonpath = src
+asyncio_mode = auto
+asyncio_default_fixture_loop_scope = function
+addopts = -v --cov=src --cov-report=term-missing
+filterwarnings =
+    ignore::DeprecationWarning
+```
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -1658,16 +1853,16 @@ touch backend/tests/test_api.py
 
 **Agent Prompt:**
 ```
-Create backend/tests/test_agent.py with:
+Create file backend/tests/test_agent.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should include:
 1. Tests for agent graph creation
 2. Tests for state schema
 3. Tests for node execution (with mocks)
 4. Mock Bedrock calls using unittest.mock
 5. Test error handling
 6. Test tool calling flow
-7. Use pytest fixtures for common setup
-8. Use proper assertions
-9. Add docstrings to test functions
+7. Pytest fixtures for common setup
+8. Proper assertions
+9. Docstrings to test functions
 
 Test cases:
 - test_graph_creation: Verify graph can be created
@@ -1680,6 +1875,8 @@ Mocking:
 - Use @patch decorator for Bedrock calls
 - Mock boto3 BedrockRuntime client
 - Return realistic mock responses
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification Command (After Docker Setup):**
@@ -1699,12 +1896,12 @@ docker-compose exec backend pytest tests/test_agent.py -v
 
 **Agent Prompt:**
 ```
-Create backend/tests/test_tools.py with:
+Create file backend/tests/test_tools.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should include:
 1. Tests for each tool (search, sql, rag, weather)
 2. Test tool execution with mock data
 3. Test error handling
 4. Test tool result formatting
-5. Use pytest fixtures
+5. Pytest fixtures
 6. Mock external APIs
 
 Test cases:
@@ -1713,6 +1910,8 @@ Test cases:
 - test_rag_tool: Test RAG tool returns mock data
 - test_weather_tool: Test weather tool returns mock data
 - test_tool_errors: Test error handling in tools
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -1732,7 +1931,7 @@ docker-compose exec backend pytest tests/test_tools.py -v
 
 **Agent Prompt:**
 ```
-Create backend/tests/test_api.py with:
+Create file backend/tests/test_api.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should include:
 1. Tests for FastAPI app
 2. Tests for health endpoint
 3. Use TestClient from fastapi.testclient
@@ -1743,6 +1942,8 @@ Test cases:
 - test_health_endpoint: GET /health returns 200
 - test_cors_headers: CORS headers are set correctly
 - test_app_startup: App starts without errors
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification (After Docker Setup):**
@@ -1780,15 +1981,18 @@ Setting up pre-commit hooks to automatically check code quality before commits.
 
 #### 10.1 Install pre-commit
 
-**Note:** Pre-commit is a Git hook tool that runs on your host machine (not in Docker). It hooks into Git commits to run code quality checks.
+**Note:** Pre-commit is a Git hook tool that runs in your WSL environment (not in Docker). It hooks into Git commits to run code quality checks.
 
-**Command:**
+**Command (run in WSL terminal):**
 ```bash
-# Install pre-commit on your host machine (not in Docker)
+# Install pre-commit in WSL (not in Docker)
 pip install pre-commit
 
 # Or if you prefer using pipx (recommended for CLI tools):
-# pipx install pre-commit
+pipx install pre-commit
+
+# If pip/pipx not found, install Python packages first:
+sudo apt update && sudo apt install -y python3-pip pipx
 ```
 
 **Verification:**
@@ -1803,27 +2007,32 @@ pre-commit --version
 
 **Agent Prompt:**
 ```
-Create .pre-commit-config.yaml that:
-1. Configures black for Python formatting
-2. Configures ruff for Python linting
-3. Configures mypy for type checking
-4. Configures pytest for running tests
-5. Configures prettier for TypeScript/JSON formatting (optional)
-6. Sets up hooks to run on commit
-7. Excludes certain files (migrations, generated files)
+Create file .pre-commit-config.yaml in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
+1. Configure black for Python formatting
+2. Configure ruff for Python linting
+3. Configure mypy for type checking
+4. Configure detect-secrets for secret scanning (security)
+5. Configure pre-commit-hooks for general quality (trailing whitespace, YAML/JSON validation)
+6. Set up hooks to run on commit
+7. Exclude certain files (migrations, generated files)
+
+**IMPORTANT:** Version alignment - The versions specified here MUST match DEVELOPMENT_REFERENCE.md "Technology Version Reference" section. Update that file first, then update .pre-commit-config.yaml.
 
 Configuration:
-- repos for: black, ruff, mypy, pytest
-- files: *.py for Python hooks
-- files: *.{ts,tsx,json} for frontend hooks (if using prettier)
+- repos for: black, ruff, mypy, detect-secrets, pre-commit-hooks
+- files: ^backend/ for Python hooks
 - pass_filenames: true for most hooks
 - stages: [commit]
 
 Hooks:
-- black: Format Python code
-- ruff: Lint Python code (check only, don't auto-fix)
-- mypy: Type check Python code (on src/ only)
-- pytest: Run tests (fast tests only)
+- black: Format Python code (version must match DEVELOPMENT_REFERENCE.md)
+- ruff: Lint Python code (version must match DEVELOPMENT_REFERENCE.md)
+- mypy: Type check Python code (version must match DEVELOPMENT_REFERENCE.md)
+- detect-secrets: Scan for accidentally committed secrets
+
+Note: pytest is intentionally NOT included as a pre-commit hook because running tests on every commit is slow. Run tests manually or via CI/CD.
+
+Review the new file for errors, inconsistencies, version issues, latest documentation.
 ```
 
 **Verification:**
@@ -2061,31 +2270,46 @@ docker-compose logs backend --tail=20 | grep -i reload
 
 ## 12. File Inventory
 
-### Files at Start of Phase 0
+### Files at Start of Phase 0 (Actually Exist Now)
 
-**Project Root:**
-- README.md
-- PROJECT_PLAN.md
-- DEVELOPMENT_REFERENCE.md
-- PHASE_0_HOW_TO_GUIDE.md
-- .gitignore (already in repo)
-- .env.example (already in repo - copy to .env and fill in your values)
+**Project Root - Documentation:**
+- README.md ✓
+- PROJECT_PLAN.md ✓
+- DEVELOPMENT_REFERENCE.md ✓
+- PHASE_0_HOW_TO_GUIDE.md ✓
+
+**Project Root - Configuration (exist now):**
+- .gitignore ✓
+- .env.example ✓ (copy to .env and fill in your values)
+- .pre-commit-config.yaml ✓
+- .gitleaks.toml ✓
+- .secrets.baseline ✓
+- .cursor/rules/*.mdc ✓ (AI-assisted development guidelines)
+- docker-compose.yml ✓
+
+**Project Root - User Files (create yourself, gitignored):**
 - .env (create from .env.example, gitignored)
-- .pre-commit-config.yaml (already in repo)
-- .gitleaks.toml (already in repo)
-- .secrets.baseline (already in repo)
-- .cursorrules (already in repo)
-- docker-compose.yml (already in repo)
-- docs/SECURITY.md (already in repo)
 
-**Backend:**
-- backend/Dockerfile.dev (already in repo)
+**Backend (exist now):**
+- backend/Dockerfile.dev ✓
+- backend/requirements.txt ✓
 
-**Frontend:**
-- frontend/Dockerfile.dev (already in repo)
+**Frontend (exist now):**
+- frontend/Dockerfile.dev ✓
 
-**Scripts:** (to be created in Phase 0)
-**Terraform:** (to be created in Phase 1a)
+**Documentation (exist now):**
+- docs/SECURITY.md ✓
+
+**Directories/Files Created DURING Phase 0 (do NOT exist yet):**
+- scripts/ directory and scripts (Section 8)
+- backend/src/ directory and all Python code (Sections 3-5)
+- frontend/src/ directory and all TypeScript code (Section 6)
+- backend/tests/ directory and test files (Section 9)
+
+**Directories Created in Later Phases:**
+- terraform/ (Phase 1a)
+- lambda/ (Phase 2)
+- .github/workflows/ (Phase 1b)
 
 ### Files at End of Phase 0
 
@@ -2096,7 +2320,7 @@ docker-compose logs backend --tail=20 | grep -i reload
 - `.pre-commit-config.yaml` - Pre-commit hooks including secret scanning
 - `.gitleaks.toml` - Gitleaks secret scanning configuration
 - `.secrets.baseline` - detect-secrets baseline file
-- `.cursorrules` - AI-assisted development guidelines
+- `.cursor/rules/*.mdc` - AI-assisted development guidelines (modern Cursor format)
 - `docker-compose.yml` - Docker Compose configuration
 - `PHASE_0_HOW_TO_GUIDE.md` - This guide
 
@@ -2226,13 +2450,13 @@ docker-compose logs backend --tail=20 | grep -i reload
 - [ ] All directories created
 - [ ] All __init__.py files created (Section 2.1a)
 - [x] Git repository initialized
-- [x] .gitignore created (already in repo)
-- [x] .env.example created (already in repo)
+- [x] .gitignore created (exists in repo)
+- [x] .env.example created (exists in repo)
 - [ ] .env created from .env.example with actual values
 - [ ] .env validated (check: `git check-ignore .env` should output `.env`)
 
 ### Backend
-- [ ] requirements.txt with pinned versions
+- [x] requirements.txt with pinned versions (exists in repo)
 - [ ] Configuration module (settings.py)
 - [ ] FastAPI app (main.py)
 - [ ] Health endpoint working
@@ -2302,11 +2526,59 @@ docker-compose logs backend --tail=20 | grep -i reload
 - [ ] Code has docstrings
 - [ ] README updated (if needed)
 - [ ] Troubleshooting guide created
-- [ ] .cursorrules file referenced/committed
+- [ ] .cursor/rules/ directory referenced/committed
+
+### ⚠️ CRITICAL: Branch Management (DO THIS BEFORE STARTING PHASE 1)
+- [ ] All Phase 0 work committed to git
+- [ ] Created `phase-0-local-dev` branch
+- [ ] Tagged Phase 0 as `v0.1.0-phase0`
+- [ ] Pushed branch and tag to remote (if using remote repo)
+- [ ] Verified you can switch back to Phase 0 branch: `git checkout phase-0-local-dev`
+- [ ] Created `phase-1a-mvp` branch from Phase 0 for AWS deployment work
+
+**See "Next Steps After Phase 0" section below for detailed commands.**
 
 ---
 
 ## Common Issues and Solutions
+
+### Issue: Commands Not Working (Wrong Terminal)
+
+**Symptoms:**
+- `chmod: command not found`
+- `docker: command not found` in PowerShell
+- Path format errors
+
+**Solutions:**
+1. **Always use WSL terminal for development commands**, not PowerShell or Command Prompt
+2. Open WSL: Press `Win + R`, type `wsl`, press Enter
+3. Or open Windows Terminal and select your Ubuntu profile
+4. Verify you're in WSL: `uname -a` should show "Linux"
+
+### Issue: Docker Not Connecting to WSL
+
+**Symptoms:**
+- `Cannot connect to the Docker daemon`
+- Docker commands hang or fail
+
+**Solutions:**
+1. Open Docker Desktop → Settings → Resources → WSL Integration
+2. Ensure your Ubuntu distro is enabled
+3. Restart Docker Desktop
+4. In WSL, run: `docker ps` to verify connection
+5. If still failing, restart WSL: `wsl --shutdown` (in PowerShell), then reopen WSL
+
+### Issue: Slow File Operations in Docker
+
+**Symptoms:**
+- Hot reload is very slow
+- npm install takes forever
+- File watchers don't trigger
+
+**Solutions:**
+1. **Move project to WSL filesystem:** `~/Projects/` not `/mnt/c/Users/...`
+2. Clone the repo directly in WSL: `cd ~ && git clone <repo>`
+3. Never edit files through `/mnt/c/` path - use VS Code/Cursor with WSL extension
 
 ### Issue: Docker Compose Fails to Start
 
@@ -2316,10 +2588,10 @@ docker-compose logs backend --tail=20 | grep -i reload
 - Permission denied
 
 **Solutions:**
-1. Check if ports are in use: `lsof -i :8000` or `netstat -an | grep 8000`
+1. Check if ports are in use: `lsof -i :8000` or `ss -tlnp | grep 8000`
 2. Stop conflicting services or change ports in docker-compose.yml
-3. On Linux: Add user to docker group: `sudo usermod -aG docker $USER` then re-login
-4. Ensure Docker Desktop is running
+3. In WSL, Docker group is usually automatic with Docker Desktop
+4. Ensure Docker Desktop is running (check system tray)
 
 ### Issue: Import Errors in Python
 
@@ -2466,27 +2738,154 @@ docker-compose logs backend --tail=20 | grep -i reload
 
 ---
 
+## Branch Management and Next Steps
+
+### Why Create a Phase 0 Branch?
+
+**Yes, creating a Phase 0 branch is a best practice.** Here's why:
+
+1. **Rollback Safety:** You can always return to a working local-only setup
+2. **Comparison:** Easy to diff Phase 0 vs Phase 1 changes
+3. **Debugging:** If AWS deployment breaks something, you have a known-good baseline
+4. **Learning:** Review what changed between phases
+5. **Cost Control:** Switch back to Phase 0 branch to stop incurring AWS costs
+
+### Branch Strategy
+
+```
+main (production)
+  └── phase-0-local-dev (tag: v0.1.0)
+        └── phase-1a-mvp
+              └── phase-1b-hardening
+                    └── phase-2-tools
+                          └── ... (future phases)
+```
+
+### Step-by-Step Branch Management
+
+#### Before Starting Phase 1a (After Phase 0 Complete):
+
+```bash
+# Ensure you're on main and everything is committed
+git status
+git add .
+git commit -m "Phase 0: Local development environment complete"
+
+# Create and tag the Phase 0 branch for easy reference
+git checkout -b phase-0-local-dev
+git tag -a v0.1.0-phase0 -m "Phase 0 complete - local dev environment"
+git push origin phase-0-local-dev
+git push origin v0.1.0-phase0
+
+# Now create Phase 1a branch from Phase 0
+git checkout -b phase-1a-mvp
+# ... work on Phase 1a ...
+```
+
+#### To Return to Phase 0 (Local-Only Development):
+
+```bash
+# Switch back to Phase 0 branch
+git checkout phase-0-local-dev
+
+# Start local development environment
+docker-compose up -d
+
+# Everything works locally without AWS!
+```
+
+#### After Completing Each Phase:
+
+```bash
+# Tag the phase completion
+git tag -a v0.X.0-phaseY -m "Phase Y complete"
+git push origin --tags
+
+# Merge to main if ready for production
+git checkout main
+git merge phase-Xa-name
+git push origin main
+```
+
+### Recommended Tags
+
+| Tag | Description |
+|-----|-------------|
+| `v0.1.0-phase0` | Local dev environment complete |
+| `v0.2.0-phase1a` | Minimal MVP deployed to AWS |
+| `v0.3.0-phase1b` | Production hardening complete |
+| `v0.4.0-phase2` | Core tools implemented |
+| ... | ... |
+
 ## Next Steps After Phase 0
 
-Once Phase 0 is complete and verified:
+### ⚠️ CRITICAL: Save Phase 0 as a Separate Branch Before Starting Phase 1
 
-1. **Commit Phase 0:**
-   ```bash
-   git add .
-   git commit -m "Phase 0: Local development environment complete"
-   ```
+**Before moving to Phase 1a, you MUST create a separate branch for Phase 0.** This allows you to:
+- Return to a working local-only setup anytime
+- Stop AWS costs by switching back to Phase 0
+- Compare changes between phases
+- Debug AWS deployment issues with a known-good baseline
 
-2. **Review Deliverables:**
-   - Verify all Phase 0 deliverables are met
+### Step-by-Step: Create Phase 0 Branch
+
+**Run these commands in your WSL terminal:**
+
+```bash
+# 1. Verify all Phase 0 work is complete and tested
+docker compose up -d
+# Test that everything works: http://localhost:3000, http://localhost:8000/health
+
+# 2. Ensure you're on main branch and everything is committed
+git status
+git add .
+git commit -m "Phase 0: Local development environment complete"
+
+# 3. Create the Phase 0 branch (this preserves your local-only setup)
+git checkout -b phase-0-local-dev
+
+# 4. Tag this version for easy reference
+git tag -a v0.1.0-phase0 -m "Phase 0 complete - local dev environment"
+
+# 5. Push branch and tag to remote (if using remote repository)
+git push origin phase-0-local-dev
+git push origin v0.1.0-phase0
+
+# 6. Now you're ready to start Phase 1a - create branch from Phase 0
+git checkout -b phase-1a-mvp
+
+# You're now on phase-1a-mvp branch, ready to start AWS deployment!
+```
+
+### Quick Reference: Switching Between Branches
+
+**To return to Phase 0 (local-only, no AWS):**
+```bash
+git checkout phase-0-local-dev
+docker compose up -d
+# Everything works locally without AWS costs!
+```
+
+**To continue with Phase 1a (AWS deployment):**
+```bash
+git checkout phase-1a-mvp
+# Continue AWS deployment work
+```
+
+### Additional Next Steps
+
+1. **Review Deliverables:**
+   - Verify all Phase 0 deliverables are met (check Phase 0 Completion Checklist)
    - Test complete flow end-to-end
    - Document any issues encountered
 
-3. **Prepare for Phase 1a:**
-   - Review Phase 1a requirements
+2. **Prepare for Phase 1a:**
+   - Review Phase 1a requirements in DEVELOPMENT_REFERENCE.md
    - Set up Terraform state (S3 + DynamoDB)
    - Prepare AWS IAM permissions
+   - Review AWS costs and billing alerts
 
-4. **Update Documentation:**
+3. **Update Documentation:**
    - Update README with Phase 0 completion
    - Document any deviations from plan
    - Update troubleshooting guide with Phase 0 issues

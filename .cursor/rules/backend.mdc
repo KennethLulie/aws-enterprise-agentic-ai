@@ -1,0 +1,248 @@
+---
+description: Python backend development rules - code standards, testing, error handling
+globs:
+  - backend/**
+alwaysApply: false
+---
+
+# Backend Development Rules
+
+## Code Standards
+
+- Type hints REQUIRED on all functions (no exceptions)
+- Docstrings REQUIRED (Google style) for all functions, classes, modules
+- Absolute imports from `backend/src/` only (e.g., `from src.agent.nodes.chat import chat_node`)
+- Tools: Black ~=24.10.0, Ruff ~=0.7.0, mypy ~=1.13.0 (versions in DEVELOPMENT_REFERENCE.md)
+- Code formatting: Black line length 88, Ruff for linting, mypy for type checking
+
+## File Structure
+
+```
+backend/src/
+├── agent/{nodes/, tools/}
+├── api/{routes/, middleware/}
+└── config/
+```
+
+**Naming:** snake_case for files, functions, variables
+
+## Docker Commands
+
+**See general.mdc for Docker commands.** Always use Docker - never run Python on host.
+
+## Before Committing
+
+```bash
+pre-commit run --all-files
+docker-compose exec backend pytest
+docker-compose exec backend mypy src/
+```
+
+## Error Handling
+
+**General Principles:**
+- Circuit breakers for external services (Bedrock, APIs, databases)
+- Retry with exponential backoff using tenacity ~=9.0.0
+- User-friendly error messages, NEVER expose internal details or stack traces
+- Structured logging with context (conversation_id, tool, latency_ms, error_type)
+- Graceful degradation: If one tool fails, continue with others when possible
+
+**Error Handling Patterns:**
+```python
+from tenacity import retry, stop_after_attempt, wait_exponential
+import structlog
+
+logger = structlog.get_logger()
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+async def call_bedrock(messages: list) -> dict:
+    try:
+        # Implementation
+        pass
+    except Exception as e:
+        logger.error("bedrock_call_failed", error=str(e), conversation_id=conversation_id)
+        raise  # Re-raise for retry logic
+```
+
+**Agent-Specific Error Handling:**
+- Tool failures: Log error, return user-friendly message, continue agent flow
+- Bedrock failures: Fallback to Claude, log model switch
+- Database failures: Return cached data if available, otherwise user-friendly error
+- Rate limits: Return clear message, suggest retry later
+
+## LangGraph Patterns
+
+**State Schema:**
+- Use TypedDict for state (not Pydantic BaseModel) - LangGraph requirement
+- Include: messages, conversation_id, tools_used, last_error, metadata
+- Reference: `backend/src/agent/state.py` (created in Phase 0)
+
+**Node Functions:**
+- Signature: `async def node_name(state: AgentState) -> AgentState:`
+- Always return updated state (don't mutate in place)
+- Use type hints: `from typing import TypedDict`
+- Example:
+```python
+from src.agent.state import AgentState
+
+async def chat_node(state: AgentState) -> AgentState:
+    """Process user message with LLM."""
+    # Implementation
+    return state
+```
+
+**Graph Definition:**
+- Use `StateGraph` from langgraph
+- Define edges: `graph.add_edge("node1", "node2")`
+- Conditional edges: `graph.add_conditional_edges("node", condition_func)`
+- Compile with checkpointing: `graph.compile(checkpointer=checkpointer)`
+- Reference: `backend/src/agent/graph.py`
+
+**Checkpointing:**
+- Phase 0: MemorySaver (in-memory, no DB dependency)
+- Phase 1b+: PostgresSaver (persistent state, requires Aurora)
+- Always use checkpointing for conversation state
+
+**Tool Binding:**
+- Bind tools to LLM using LangChain tool binding
+- Tools must be LangChain-compatible (use `@tool` decorator or StructuredTool)
+- Tool execution happens in separate node (not in chat node)
+- Reference: `backend/src/agent/tools/` directory
+
+## Streaming Patterns
+
+**SSE Endpoint Implementation:**
+- Use FastAPI `StreamingResponse` with async generator
+- Content-Type: `text/event-stream`
+- Format: `data: {json}\n\n` for each chunk
+- Handle client disconnection gracefully
+
+**Async Generator Pattern:**
+```python
+from fastapi.responses import StreamingResponse
+import json
+
+async def stream_agent_response(conversation_id: str):
+    async for chunk in agent.astream(state):
+        yield f"data: {json.dumps(chunk)}\n\n"
+        # Handle cancellation
+        if await request.is_disconnected():
+            break
+
+@app.post("/api/chat")
+async def chat_stream(request: Request):
+    return StreamingResponse(
+        stream_agent_response(conversation_id),
+        media_type="text/event-stream"
+    )
+```
+
+**LangGraph Streaming:**
+- Use `agent.astream()` for async streaming
+- Stream both LLM tokens and tool execution events
+- Include event types: "messages", "tool_calls", "tool_results"
+- Frontend filters events by type for progressive rendering
+
+**Error Handling During Streaming:**
+- Catch errors in generator, yield error event, then break
+- Format: `data: {"type": "error", "message": "user-friendly error"}\n\n`
+- Never stream stack traces or internal errors
+
+## Testing Patterns
+
+**Agent Testing:**
+- Mock Bedrock responses using pytest-mock
+- Test state transitions: input state → expected output state
+- Test tool selection logic
+- Test error recovery paths
+
+**Example Agent Test:**
+```python
+import pytest
+from unittest.mock import AsyncMock, patch
+from src.agent.nodes.chat import chat_node
+from src.agent.state import AgentState
+
+@pytest.mark.asyncio
+async def test_chat_node_with_tool_call(mocker):
+    # Mock Bedrock response
+    mock_response = {"messages": [{"role": "assistant", "content": "test"}]}
+    mocker.patch("src.agent.nodes.chat.bedrock_client", return_value=mock_response)
+    
+    # Test
+    state = AgentState(messages=[...])
+    result = await chat_node(state)
+    
+    # Assert
+    assert len(result["messages"]) > len(state["messages"])
+```
+
+**Tool Testing:**
+- Mock external APIs (Tavily, OpenWeatherMap)
+- Test SQL injection prevention
+- Test RAG retrieval with mock vector store
+- Test circuit breaker behavior
+
+**Streaming Tests:**
+- Test SSE format correctness
+- Test client disconnection handling
+- Test error events in stream
+
+## Observability Patterns
+
+**Structured Logging (Phase 1b+):**
+- Use structlog ~=24.4.0 for structured logging
+- Include context: conversation_id, tool, latency_ms, model_used
+- Log levels: DEBUG (development), INFO (production), ERROR (failures)
+
+**Logging Pattern:**
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+logger.info(
+    "tool_executed",
+    tool="search",
+    conversation_id=conversation_id,
+    latency_ms=150,
+    success=True
+)
+```
+
+**Tracing (Phase 5+):**
+- Use Arize Phoenix for tracing (Phase 5)
+- Include spans for: LLM calls, tool execution, database queries
+- Track token usage, latency, costs per request
+
+**Metrics to Track:**
+- Request latency (p50, p95, p99)
+- Token usage per request
+- Tool usage frequency
+- Error rates by type
+- Cache hit rates (Phase 4+)
+
+## Cost Optimization Patterns
+
+**Model Selection:**
+- Use Nova Pro for main chat (best quality)
+- Use Nova Lite for verification/guards (cheaper, sufficient)
+- Fallback to Claude only if Nova unavailable (more expensive)
+
+**Caching (Phase 4+):**
+- Cache LLM responses in DynamoDB
+- Use semantic similarity matching (threshold: 0.95)
+- TTL: 7 days default
+- Cache key: embedding of user message + conversation context
+
+**Token Usage:**
+- Monitor token counts per request
+- Log token usage for cost tracking
+- Optimize prompts to reduce token usage
+- Use streaming to reduce perceived latency
+
+**Request Optimization:**
+- Batch tool calls when possible
+- Cache vector store queries
+- Use connection pooling for databases
+- Implement request deduplication

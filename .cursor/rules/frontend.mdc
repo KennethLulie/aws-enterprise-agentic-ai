@@ -1,0 +1,172 @@
+---
+description: TypeScript/React frontend development rules - Next.js App Router, shadcn/ui, Tailwind
+globs:
+  - frontend/**
+alwaysApply: false
+---
+
+# Frontend Development Rules
+
+## Code Standards
+
+- Strict TypeScript mode enabled (`strict: true` in tsconfig.json)
+- Explicit types, NEVER use `any` (use `unknown` if type is truly unknown)
+- Functional components with interfaces/types
+- Use shadcn/ui + Tailwind conventions
+- Next.js App Router patterns (not Pages Router)
+- Static export configuration (`output: 'export'` in next.config.js)
+
+## File Structure
+
+```
+frontend/src/
+├── app/           # Next.js App Router pages
+├── components/ui/ # shadcn/ui components
+└── lib/           # Utilities and API client
+```
+
+**Naming:** camelCase for files/functions, PascalCase for components
+
+## Docker Commands
+
+**See general.mdc for Docker commands.** Always use Docker - never run npm on host.
+
+## Demo UX Considerations
+
+**Critical:** Test user demo must be smooth and impressive.
+
+**Performance Requirements:**
+- Smooth, responsive interactions (no lag during demo)
+- Real-time streaming visible and impressive (progressive text rendering)
+- Professional, polished appearance (shadcn/ui components, consistent styling)
+- Loading states for all async operations (spinners, skeletons)
+- Error handling with user-friendly messages (never show technical errors)
+- Cold start indicator: Show "Warming up..." message (up to 30s acceptable)
+
+**Streaming UX:**
+- Show typing indicator while waiting for first chunk
+- Progressive text rendering as chunks arrive
+- Smooth scrolling to keep latest content visible
+- Visual indicators for tool execution (if implemented)
+- Thought process visualization (if implemented in later phases)
+
+## Environment Variables
+
+- Use `NEXT_PUBLIC_` prefix ONLY for client-side variables
+- Never leak secrets to public env vars (no API keys, no passwords)
+- API URL: `NEXT_PUBLIC_API_URL=http://localhost:8000` (local) or CloudFront URL (production)
+- All server-side logic must use backend API (never call external APIs from frontend)
+
+## SSE/EventSource Patterns
+
+**Connection Management:**
+- Use native EventSource API (no Vercel AI SDK)
+- Handle connection errors gracefully
+- Implement reconnection logic with exponential backoff
+- Clean up connections on component unmount
+
+**EventSource Implementation:**
+```typescript
+const eventSource = new EventSource(`${API_URL}/api/chat`, {
+  withCredentials: true
+});
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  // Handle different event types: "message", "tool_call", "error"
+  switch (data.type) {
+    case "message":
+      // Update UI with streaming text
+      break;
+    case "tool_call":
+      // Show tool execution indicator
+      break;
+    case "error":
+      // Show user-friendly error message
+      eventSource.close();
+      break;
+  }
+};
+
+eventSource.onerror = () => {
+  // Handle connection errors, attempt reconnection
+  eventSource.close();
+  // Implement reconnection logic
+};
+```
+
+**Streaming UI Patterns:**
+- Progressive text rendering: Append chunks as they arrive
+- Maintain scroll position: Auto-scroll to bottom during streaming
+- Visual feedback: Show typing indicator, tool execution status
+- Error states: Display user-friendly errors, allow retry
+
+**Error Handling:**
+- Network errors: Show "Connection lost, retrying..." message
+- Server errors: Display user-friendly message, close connection
+- Timeout handling: Show timeout message after 60s, allow retry
+- Graceful degradation: If SSE fails, fallback to polling (not recommended for demo)
+
+**Reconnection Logic:**
+```typescript
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+
+function connectWithRetry() {
+  const eventSource = new EventSource(url);
+  
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      setTimeout(() => {
+        reconnectAttempts++;
+        connectWithRetry();
+      }, Math.pow(2, reconnectAttempts) * 1000); // Exponential backoff
+    }
+  };
+}
+```
+
+## Next.js App Router Patterns
+
+**File Structure:**
+- `app/` directory for routes (not `pages/`)
+- `app/layout.tsx` for root layout
+- `app/page.tsx` for home page
+- `app/login/page.tsx` for login route
+- `components/` for reusable components
+- `lib/` for utilities and API client
+
+**Static Export:**
+- Configure `output: 'export'` in next.config.js
+- No server-side features (no API routes, no getServerSideProps)
+- All API calls go to backend FastAPI server
+- Build generates static HTML/CSS/JS files for S3/CloudFront
+
+**Client Components:**
+- Use `'use client'` directive for interactive components
+- Keep server components when possible (better performance)
+- Chat interface must be client component (SSE requires client-side)
+
+## Error Handling Patterns
+
+**API Error Handling:**
+```typescript
+try {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+  return await response.json();
+} catch (error) {
+  // Show user-friendly error message
+  // Never expose technical details
+  showError("Unable to connect. Please try again.");
+}
+```
+
+**User-Friendly Error Messages:**
+- Network errors: "Connection issue. Please check your internet and try again."
+- Server errors: "Something went wrong. Please try again in a moment."
+- Timeout: "Request timed out. Please try again."
+- Never show: Stack traces, error codes, technical details
