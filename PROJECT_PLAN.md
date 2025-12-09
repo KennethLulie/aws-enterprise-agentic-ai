@@ -232,7 +232,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 - Easier debugging with full log access
 - Validate core logic before infrastructure complexity
 
-**Local Stack (Docker Compose):**
+**Local Stack (Docker Compose - Phase 0 Stub Only):**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Docker Compose - All Services Containerized            │
@@ -245,10 +245,8 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 │  │  Volume: ./backend:/app (hot reload enabled)     │  │
 │  └───────────────────────────────────────────────────┘  │
 │  ┌───────────────────────────────────────────────────┐  │
-│  │  PostgreSQL: Docker container                    │  │
-│  └───────────────────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  Chroma: Local vector store (Docker)             │  │
+│  │  Frontend: Next.js (npm run dev) on :3000         │  │
+│  │  Volume: ./frontend:/app (hot reload enabled)     │  │
 │  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
                           │
@@ -258,7 +256,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 **Development Workflow (Docker Compose with Hot Reload):**
 1. `./scripts/setup.sh` - One-time setup (validates Docker, creates .env)
-2. `docker-compose up` - Start everything (backend, frontend, postgres)
+2. `docker-compose up` - Start backend and frontend only (all tools stub-only; no local DB/vector/KG services)
 3. Code changes reflect automatically (~2-3 seconds hot reload via volume mounts)
 4. `docker-compose logs -f` - View logs from all services
 5. `docker-compose down` - Stop everything cleanly
@@ -272,8 +270,8 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 **Local Service Substitutes (All in Docker Compose):**
 | AWS Service | Local Dev | Container |
 |-------------|-----------|-----------|
-| Aurora PostgreSQL | Docker PostgreSQL | `postgres:15` |
-| Pinecone | Chroma (embedded) | `chromadb/chroma` |
+| Aurora PostgreSQL | N/A in Phase 0 (SQL tool stub only) | N/A |
+| Pinecone | N/A in Phase 0 (RAG tool stub only) | N/A |
 | S3 file upload | Local `./uploads` folder | Volume mount |
 | DynamoDB cache | In-memory dict or SQLite | Python in-memory |
 | Secrets Manager | `.env` file | Environment variables |
@@ -282,8 +280,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 **Docker Compose Services:**
 - `backend`: FastAPI app with hot reload
 - `frontend`: Next.js app with hot reload
-- `postgres`: PostgreSQL database
-- `chroma`: Vector store (optional, can use Pinecone free tier)
+- No local database, vector store, or knowledge graph in Phase 0 (SQL and RAG tools return mock data)
 
 **Phase 0 Deliverables:**
 - Working LangGraph agent with streaming responses

@@ -79,8 +79,8 @@ Fully working agent locally before any AWS deployment.
 - **Agent Framework:** LangGraph
 - **LLM:** AWS Bedrock (Nova Pro/Lite, Titan Embeddings, Claude fallback)
 - **Checkpointing:** MemorySaver (in-memory, no DB)
-- **Database:** PostgreSQL 15 (Docker container)
-- **Vector Store:** ChromaDB (Docker container) OR Pinecone (external)
+- **Database:** Stub-only in Phase 0 (SQL tool returns mock data); real DB introduced in cloud phase
+- **Vector Store:** Stub-only in Phase 0 (no local Chroma/Pinecone); real retrieval deferred to cloud phases
 - **Logging:** Basic Python logging (upgrade to structlog in Phase 1b)
 
 #### Frontend Stack
@@ -92,11 +92,10 @@ Fully working agent locally before any AWS deployment.
 - **Styling:** Tailwind CSS
 
 #### Docker Compose
-- **Services:**
+- **Services (Phase 0 stub-only):**
   - `backend`: FastAPI on port 8000
   - `frontend`: Next.js dev server on port 3000
-  - `postgres`: PostgreSQL 15 on port 5432
-  - `chroma`: ChromaDB on port 8001 (optional)
+- **No local database/vector/KG services in Phase 0** (SQL and RAG tools return mock data)
 - **Volume Mounts:** `./backend:/app`, `./frontend:/app` (hot reload)
 - **Startup Time Target:** 5-10 seconds
 

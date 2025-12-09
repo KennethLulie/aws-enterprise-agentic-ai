@@ -197,7 +197,7 @@ cp .env.example .env
 # 3. Edit .env and fill in your API keys
 # See .env.example for descriptions of each variable
 
-# 4. Start the development environment
+# 4. Start the development environment (stub-only Phase 0, all tools stubbed)
 docker compose up
 ```
 

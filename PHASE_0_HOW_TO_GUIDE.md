@@ -926,6 +926,7 @@ Creating stub implementations of all four tools (search, SQL, RAG, weather) that
 - **Tool Interface:** Tools must follow LangGraph tool format
 - **Mock Data:** Mock data should be realistic
 - **Error Cases:** Should test both success and failure paths
+- **Local Infra:** Do not run real database/vector/KG services in Phase 0; SQL and RAG stay stub-only. Real DB/vector/KG are added in later cloud phases.
 
 ### Step-by-Step Implementation
 
