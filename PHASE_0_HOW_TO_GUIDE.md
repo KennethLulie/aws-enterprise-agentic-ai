@@ -2411,9 +2411,6 @@ docker-compose logs backend --tail=20 | grep -i reload
 - `validate_setup.py` - Prerequisites validation script
 - `dev.sh` - Development helper script (executable)
 
-#### Documentation (`docs/`)
-- `troubleshooting.md` - Common issues and solutions (to be created)
-
 ### File Contents Summary
 
 #### Key Files and Their Purpose

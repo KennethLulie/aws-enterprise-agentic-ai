@@ -1520,14 +1520,7 @@ aws-enterprise-agentic-ai/
    - Cost optimization tips
    - Security best practices
 
-8. **docs/troubleshooting.md:**
-   - Common issues and solutions
-   - Debugging guide
-   - Performance issues
-   - Cost issues
-   - Integration problems
-
-9. **docs/adr/** (Architecture Decision Records):
+8. **docs/adr/** (Architecture Decision Records):
    - 001-use-langgraph.md
    - 002-use-docker-compose.md
    - 003-use-pinecone.md
@@ -1537,14 +1530,14 @@ aws-enterprise-agentic-ai/
    - 007-sqlalchemy-pooling-vs-rds-proxy.md (cost optimization)
    - 008-nextjs-static-export.md (architecture clarification)
 
-10. **docs/runbooks/** (Operational Runbooks):
+9. **docs/runbooks/** (Operational Runbooks):
     - database-connection-issues.md
     - bedrock-rate-limits.md
     - docker-startup-slow.md
     - rag-quality-poor.md
     - cost-optimization.md
 
-11. **docs/examples/** (Code Examples):
+10. **docs/examples/** (Code Examples):
     - chat_api_example.py
     - tool_usage_example.py
     - streaming_example.py
