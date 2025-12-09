@@ -914,7 +914,7 @@ docker-compose exec backend python -c "from src.agent.graph import graph; print(
 ## 5. Basic Tools (Stubs)
 
 ### What We're Doing
-Creating stub implementations of all four tools (search, SQL, RAG, weather) that return mock data. This allows testing the agent flow before implementing real tool logic.
+Creating stub implementations of all four tools (search, SQL, RAG, weather) that return mock data. The weather stub specifically uses an MCP connection to demonstrate MCP compatibility; live OpenWeather calls remain optional and can be enabled later with an API key. This allows testing the agent flow before implementing real tool logic.
 
 ### Why This Matters
 - **Early Testing:** Can test agent orchestration without external APIs
@@ -1090,7 +1090,7 @@ docker-compose exec backend python -c "from src.agent.tools.rag import RAGTool; 
 Create file backend/src/agent/tools/weather.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
 1. Create WeatherTool class
 2. Implement LangGraph tool format
-3. For Phase 0: Return mock weather data
+3. For Phase 0: Return mock weather data (exposed via an MCP connection to demonstrate MCP compatibility; API key only needed when enabling live OpenWeather calls later)
 4. Mock data should include:
    - Location parameter
    - Temperature, conditions, humidity, wind speed
@@ -1527,65 +1527,43 @@ ls frontend/Dockerfile.dev
 
 The `docker-compose.yml` file is already provided in the repository. Review it and update if needed.
 
-**What's Configured:**
+**What's Configured (Phase 0, stub-only):**
 
-The docker-compose.yml should:
-1. **Note:** Do NOT include a `version` key - it's deprecated in Docker Compose V2+ (the version key has been removed from the actual file)
-2. Define services:
-   - backend: FastAPI app
-   - frontend: Next.js app
-   - postgres: PostgreSQL 15
-   - chroma: ChromaDB (optional)
-3. Configure volumes for hot reload:
-   - ./backend:/app (backend)
-   - ./frontend:/app (frontend)
-4. Set up environment variables from .env file
-5. Configure ports:
-   - Backend: 8000:8000
-   - Frontend: 3000:3000
-   - Postgres: 5432:5432
-   - Chroma: 8001:8000
-6. Set up health checks
-7. Configure dependencies (frontend depends on backend)
-8. Use build context for custom images
+- Do **NOT** include a `version` key (deprecated in Docker Compose V2+).
+- Services (Phase 0):  
+  - `backend`: FastAPI app on 8000  
+  - `frontend`: Next.js app on 3000  
+  - **No Postgres/Chroma in Phase 0** — SQL and RAG tools are stubs that return mock data. Database/vector services are added in later phases (Phase 1a+).
+- Volumes for hot reload:
+  - `./backend:/app`
+  - `./frontend:/app`
+- Environment:
+  - Load from `.env` for API keys/region
+  - `ENVIRONMENT=${ENVIRONMENT:-local}` (use ENVIRONMENT, not ENV)
+  - `DEBUG=${DEBUG:-true}`
+  - `NEXT_PUBLIC_API_URL=http://localhost:8000` (frontend)
+- Ports:
+  - Backend: `8000:8000`
+  - Frontend: `3000:3000`
+- Health checks for backend and frontend
+- Build contexts: `./backend` and `./frontend`
 
-PostgreSQL configuration:
-- Image: postgres:15-alpine
-- Environment: POSTGRES_USER=demo, POSTGRES_PASSWORD=demo, POSTGRES_DB=demo
-- Volumes: postgres_data for persistence
+Backend service (Phase 0):
+- Build context: `./backend`
+- Dockerfile: `Dockerfile.dev`
+- Volume: `./backend:/app`
+- `env_file: .env`
+- Health check: `curl http://localhost:8000/health` (with start_period: 30s)
 
-ChromaDB configuration (optional):
-- Image: chromadb/chroma:latest
-- Port: 8001:8000
-- Volumes: chroma_data for persistence
-
-Backend service:
-- Build context: ./backend
-- Dockerfile: Dockerfile.dev
-- Volumes: ./backend:/app (for hot reload)
-- env_file: .env (loads API keys and secrets from .env file)
-- Environment variables:
-  - ENVIRONMENT=${ENVIRONMENT:-local} (use ENVIRONMENT, not ENV)
-  - DEBUG=${DEBUG:-true}
-  - DATABASE_URL=postgresql://demo:demo@postgres:5432/demo
-  - VECTOR_STORE_TYPE=chroma
-  - CHROMA_URL=http://chroma:8000
-- Depends_on: postgres, chroma (with health check conditions)
-- Health check: curl http://localhost:8000/health (with start_period: 30s)
-
-Note: The backend_venv volume in docker-compose.yml is a placeholder for future optimization. Dependencies are installed to system Python in the container.
-
-Frontend service:
-- Build context: ./frontend
-- Dockerfile: Dockerfile.dev
-- Volumes: ./frontend:/app, /app/node_modules (anonymous volume to preserve deps)
-- Environment: NEXT_PUBLIC_API_URL=http://localhost:8000
+Frontend service (Phase 0):
+- Build context: `./frontend`
+- Dockerfile: `Dockerfile.dev`
+- Volumes: `./frontend:/app`, `/app/node_modules` (anonymous volume to preserve deps)
+- Environment: `NEXT_PUBLIC_API_URL=http://localhost:8000`
 - Depends_on: backend
-- Health check: Uses wget (alpine doesn't have curl by default)
+- Health check: uses `wget` (alpine base)
 
-Add named volumes for data persistence:
-- postgres_data
-- chroma_data (if using Chroma)
+**Note:** Database/vector services (Postgres, Chroma) are intentionally omitted in Phase 0. Add them when moving to Phase 1a+; remove any unused DB/vector env vars from the Phase 0 compose to avoid startup noise.
 ```
 
 **Verification Command:**
@@ -1651,9 +1629,7 @@ docker compose ps
 
 **Expected Output:** All services should show "Up" status:
 - backend: Up
-- frontend: Up  
-- postgres: Up
-- chroma: Up (if included)
+- frontend: Up
 
 **Test Service Communication:**
 ```bash
@@ -1663,8 +1639,7 @@ curl http://localhost:8000/health
 # Test frontend is accessible
 curl -I http://localhost:3000
 
-# Test database connection
-docker-compose exec backend python -c "from src.config.settings import Settings; s = Settings(); print(f'Environment: {s.environment}')"
+# No database/vector services in Phase 0; SQL/RAG tools use stub data
 ```
 
 **Expected Results:**

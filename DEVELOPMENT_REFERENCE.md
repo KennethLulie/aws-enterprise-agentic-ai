@@ -163,7 +163,7 @@ Fully working agent locally before any AWS deployment.
    - `search.py` - Return mock data
    - `sql.py` - Return mock data
    - `rag.py` - Return mock data
-   - `weather.py` - Return mock data
+   - `weather.py` - Return mock data (MCP connection demo for Weather)
 
 #### Step 5: Frontend Foundation
 1. **Next.js Setup** (`frontend/`)
@@ -431,8 +431,11 @@ Add production-grade features: persistent state, CI/CD, observability, security 
   - Schedule: Every 5 minutes (EventBridge)
   - Calls `/health/warmup` endpoint
 - **GitHub Actions:**
-  - CI: On PR (test, lint, validate)
-  - CD: On merge to main (build, deploy)
+  - **Phase gating:** Workflows added in Phase 1b (none active in Phase 0).
+  - **CI (`pull_request`):** black, ruff, mypy; ESLint/Prettier/tsc; pytest; Docker test builds; Terraform fmt/validate/plan (no apply); security scans (Bandit, Checkov, gitleaks).
+  - **CD (`push` to `main`):** Build/push backend image to ECR; Next.js static export; upload to S3; Terraform apply (manual approval for prod); CloudFront invalidate; smoke/health checks.
+  - **Evaluation (scheduled/dispatch):** RAGAS run against eval dataset; publish metrics to Arize Phoenix/CloudWatch; fail/alert on regressions.
+  - **Secrets (GitHub):** `AWS_REGION` (us-east-1), AWS creds with ECR/Terraform perms, `AWS_ACCOUNT_ID`, `PINECONE_API_KEY`, `TAVILY_API_KEY`, Bedrock access via IAM, and any eval dataset bucket refs. Store all in GitHub Secrets; never commit.
 
 #### Backend Changes
 - **Checkpointing:** PostgresSaver (migrate from MemorySaver)
@@ -748,7 +751,7 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 
 #### Step 4: Weather API Tool
 1. **Tool Implementation** (`backend/src/agent/tools/weather.py`)
-   - OpenWeatherMap API client
+   - OpenWeatherMap API client exposed via an MCP connection (demoing MCP compatibility; API key only needed when enabling live calls)
    - Tool definition for LangGraph
    - Input validation (city/coordinates/ZIP)
    - Result formatting
@@ -1358,9 +1361,9 @@ terraform {
 - **Rate Limit:** Respect API limits
 
 ### OpenWeatherMap
-- **API Endpoint:** https://api.openweathermap.org/data/2.5/weather
+- **API Endpoint:** https://api.openweathermap.org/data/2.5/weather (accessed via MCP connection for demo compatibility)
 - **Free Tier:** 60 calls/minute, 1M calls/month
-- **Rate Limit:** 60 calls/minute
+- **Rate Limit:** 60 calls/minute (API key only needed when switching from mock MCP demo to live calls)
 
 ### AWS Bedrock
 - **Region:** us-east-1

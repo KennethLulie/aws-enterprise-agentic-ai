@@ -223,6 +223,8 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ## Phase Breakdown
 
+**Execution approach:** Within each phase, land one feature at a time and add a short checkpoint (build + smoke test) before moving to the next feature. This keeps the demo shippable at every step and limits blast radius when debugging.
+
 ### Phase 0: Local Development Environment
 **Goal:** Fully working agent locally before any AWS deployment
 
@@ -346,11 +348,11 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
    - Free tier: 1,000 searches/month (sufficient for demo)
    - Copy API key to your `.env` file
 
-3. **OpenWeatherMap (free tier - optional for Phase 2):**
+3. **OpenWeatherMap (via MCP, optional for live calls in Phase 2):**
    - Create account at https://openweathermap.org/api
    - Get API key from dashboard (free tier: 60 calls/minute, 1M calls/month)
    - Copy API key to your `.env` file
-   - Note: Can use without API key for basic demo (limited functionality)
+   - Note: Phase 0 uses a mock Weather MCP connection to demonstrate MCP compatibility; the API key is only needed when enabling live calls.
 
 **Setup Process:**
 ```bash
@@ -426,7 +428,7 @@ docker-compose up
   - Primary: `amazon.nova-pro-v1:0` (verify availability in us-east-1 - N. Virginia)
   - Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0` (more stable, proven)
 - Server-Sent Events (SSE) streaming from FastAPI to frontend
-- **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate)
+- **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate). Accept ~30s cold start to minimize cost; keep-alive warming can stay off for the demo.
 - **Conversation persistence:** conversation_id in localStorage (state in MemorySaver)
 - **Basic Terraform infrastructure** (networking, App Runner, S3, CloudFront, Secrets Manager, ECR)
 - **Manual deployment** (no CI/CD yet - deploy via `terraform apply` and manual S3 upload)
@@ -523,8 +525,8 @@ docker-compose up
 - ECR repository for container images (us-east-1)
 - CloudWatch Logs for monitoring (us-east-1)
 
-**Keep-alive Lambda Details:**
-- Purpose: hit the `/health/warmup` endpoint every 5 minutes to keep App Runner container warm.
+**Keep-alive Lambda Details (optional; default disabled to save cost):**
+- Purpose: hit the `/health/warmup` endpoint every 5 minutes to keep App Runner container warm. Disable if a ~30s cold start is acceptable for the demo.
 - Implementation:
   ```python
   # lambda/warm_app_runner/handler.py
@@ -757,7 +759,7 @@ If something isn't working, follow this systematic debugging process:
 - **Fallback mechanisms:** Graceful degradation if Pinecone/KG unavailable
 
 **2d. Weather API Tool**
-- OpenWeatherMap API integration (free tier: 60 calls/minute, 1M calls/month)
+- OpenWeatherMap integration exposed via an MCP connection (demoing MCP compatibility; live calls optional with API key)
 - Tool definition in LangGraph (using built-in tool binding)
 - Result formatting with temperature, conditions, humidity, wind speed
 - **Comprehensive error handling** with retry logic and exponential backoff
@@ -1276,6 +1278,8 @@ aws-enterprise-agentic-ai/
 ---
 
 ## GitHub Actions Workflows
+
+**Phase gating:** Introduced in Phase 1b (no CI/CD in Phase 0). Triggers are `pull_request` (CI), `push` to `main` (CD), and scheduled/manual dispatch (evaluation).
 
 ### CI Pipeline (on PR):
 1. Lint and format check (Python: black, ruff | TypeScript: ESLint, Prettier)
@@ -1989,8 +1993,8 @@ The architecture is designed to be:
 
 ## Demo Presentation Guide
 
-### Suggested Demo Walkthrough (5 minutes)
-
+### Reference Demo Plan (5 minutes)
+#All updates must be consistent with this experience.
 **1. Introduction (30 seconds):**
 > "This is an enterprise-grade AI agent I built on AWS. It demonstrates multi-tool orchestration, RAG, real-time streaming, and cost-optimized architecture."
 
