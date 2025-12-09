@@ -917,7 +917,7 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Thought process visible in real-time
 - Sources clearly cited
 - Conversation history persists
-- Mobile-friendly design
+- Mobile-friendly design (cache metrics dashboard ships with Phase 7)
 
 ---
 
@@ -977,6 +977,7 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Cache invalidation on document updates
 - Cost savings dashboard (tokens saved, $ saved)
 - Metrics feed/API from cache layer to dashboard (CloudWatch + app endpoint)
+- Wire Phase 5 dashboard UI to metrics feed once cache is live
 
 **Infrastructure Additions:**
 - DynamoDB table for inference cache (on-demand pricing, TTL enabled)
@@ -988,7 +989,7 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Cache hit rate > 30% for typical usage
 - Cost savings visible in dashboard
 - Cache invalidation works correctly
-- Dashboard shows cache hit/miss and savings sourced from Phase 7 metrics feed
+- Dashboard shows cache hit/miss and savings, driven by Phase 7 metrics feed
 
 ---
 
