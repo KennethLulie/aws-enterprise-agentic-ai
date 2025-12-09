@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2025-12-07 (Pre-Phase 0 setup complete)
+**Last Updated:** 2025-12-09 (Added 2025 SOTA RAG with Knowledge Graph plan)
 
 ---
 
@@ -132,6 +132,20 @@
 | lambda/warm_app_runner/handler.py | Warmup Lambda |
 
 ### Phase 2+ - To Be Created
+
+**Knowledge Graph & 2025 SOTA RAG:**
+| File | Purpose |
+|------|---------|
+| backend/src/ingestion/semantic_chunking.py | Grammar-aware chunking (spaCy) |
+| backend/src/ingestion/contextual_chunking.py | Context prepending for chunks |
+| backend/src/knowledge_graph/__init__.py | KG package |
+| backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
+| backend/src/knowledge_graph/store.py | Neo4j/PostgreSQL adapter |
+| backend/src/knowledge_graph/queries.py | Graph traversal queries |
+| backend/src/knowledge_graph/ontology.py | Financial domain ontology |
+| backend/src/utils/reranker.py | Cross-encoder reranking |
+
+**Lambda & Infrastructure:**
 | File | Purpose |
 |------|---------|
 | lambda/document-ingestion/handler.py | Doc processing |

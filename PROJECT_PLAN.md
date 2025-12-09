@@ -223,6 +223,8 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ## Phase Breakdown
 
+**Execution approach:** Within each phase, land one feature at a time and add a short checkpoint (build + smoke test) before moving to the next feature. This keeps the demo shippable at every step and limits blast radius when debugging.
+
 ### Phase 0: Local Development Environment
 **Goal:** Fully working agent locally before any AWS deployment
 
@@ -232,7 +234,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 - Easier debugging with full log access
 - Validate core logic before infrastructure complexity
 
-**Local Stack (Docker Compose):**
+**Local Stack (Docker Compose - Phase 0 Stub Only):**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Docker Compose - All Services Containerized            │
@@ -245,10 +247,8 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 │  │  Volume: ./backend:/app (hot reload enabled)     │  │
 │  └───────────────────────────────────────────────────┘  │
 │  ┌───────────────────────────────────────────────────┐  │
-│  │  PostgreSQL: Docker container                    │  │
-│  └───────────────────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  Chroma: Local vector store (Docker)             │  │
+│  │  Frontend: Next.js (npm run dev) on :3000         │  │
+│  │  Volume: ./frontend:/app (hot reload enabled)     │  │
 │  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
                           │
@@ -258,7 +258,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 **Development Workflow (Docker Compose with Hot Reload):**
 1. `./scripts/setup.sh` - One-time setup (validates Docker, creates .env)
-2. `docker-compose up` - Start everything (backend, frontend, postgres)
+2. `docker-compose up` - Start backend and frontend only (all tools stub-only; no local DB/vector/KG services)
 3. Code changes reflect automatically (~2-3 seconds hot reload via volume mounts)
 4. `docker-compose logs -f` - View logs from all services
 5. `docker-compose down` - Stop everything cleanly
@@ -272,8 +272,8 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 **Local Service Substitutes (All in Docker Compose):**
 | AWS Service | Local Dev | Container |
 |-------------|-----------|-----------|
-| Aurora PostgreSQL | Docker PostgreSQL | `postgres:15` |
-| Pinecone | Chroma (embedded) | `chromadb/chroma` |
+| Aurora PostgreSQL | N/A in Phase 0 (SQL tool stub only) | N/A |
+| Pinecone | N/A in Phase 0 (RAG tool stub only) | N/A |
 | S3 file upload | Local `./uploads` folder | Volume mount |
 | DynamoDB cache | In-memory dict or SQLite | Python in-memory |
 | Secrets Manager | `.env` file | Environment variables |
@@ -282,8 +282,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 **Docker Compose Services:**
 - `backend`: FastAPI app with hot reload
 - `frontend`: Next.js app with hot reload
-- `postgres`: PostgreSQL database
-- `chroma`: Vector store (optional, can use Pinecone free tier)
+- No local database, vector store, or knowledge graph in Phase 0 (SQL and RAG tools return mock data)
 
 **Phase 0 Deliverables:**
 - Working LangGraph agent with streaming responses
@@ -349,11 +348,11 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
    - Free tier: 1,000 searches/month (sufficient for demo)
    - Copy API key to your `.env` file
 
-3. **OpenWeatherMap (free tier - optional for Phase 2):**
+3. **OpenWeatherMap (via MCP, optional for live calls in Phase 2):**
    - Create account at https://openweathermap.org/api
    - Get API key from dashboard (free tier: 60 calls/minute, 1M calls/month)
    - Copy API key to your `.env` file
-   - Note: Can use without API key for basic demo (limited functionality)
+   - Note: Phase 0 uses a mock Weather MCP connection to demonstrate MCP compatibility; the API key is only needed when enabling live calls.
 
 **Setup Process:**
 ```bash
@@ -429,7 +428,7 @@ docker-compose up
   - Primary: `amazon.nova-pro-v1:0` (verify availability in us-east-1 - N. Virginia)
   - Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0` (more stable, proven)
 - Server-Sent Events (SSE) streaming from FastAPI to frontend
-- **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate)
+- **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate). Accept ~30s cold start to minimize cost; keep-alive warming can stay off for the demo.
 - **Conversation persistence:** conversation_id in localStorage (state in MemorySaver)
 - **Basic Terraform infrastructure** (networking, App Runner, S3, CloudFront, Secrets Manager, ECR)
 - **Manual deployment** (no CI/CD yet - deploy via `terraform apply` and manual S3 upload)
@@ -526,8 +525,8 @@ docker-compose up
 - ECR repository for container images (us-east-1)
 - CloudWatch Logs for monitoring (us-east-1)
 
-**Keep-alive Lambda Details:**
-- Purpose: hit the `/health/warmup` endpoint every 5 minutes to keep App Runner container warm.
+**Keep-alive Lambda Details (optional; default disabled to save cost):**
+- Purpose: hit the `/health/warmup` endpoint every 5 minutes to keep App Runner container warm. Disable if a ~30s cold start is acceptable for the demo.
 - Implementation:
   ```python
   # lambda/warm_app_runner/handler.py
@@ -701,42 +700,66 @@ If something isn't working, follow this systematic debugging process:
 - **Error handling:** Graceful failures with helpful error messages
 - **Circuit breaker:** Prevent repeated failures from overwhelming database
 
-**2c. RAG Document Tool (Advanced Hybrid Search + SOTA Techniques)**
-- Pinecone serverless index with **Hybrid Search Strategy:**
-  - **Option 1 (If Pinecone Serverless supports native hybrid):**
-    - Use Pinecone's built-in hybrid search (sparse + dense)
-    - Generate sparse vectors using BM25 or TF-IDF
-  - **Option 2 (If native hybrid not available):**
-    - Dense vectors: Bedrock Titan Embeddings
-    - Sparse vectors: Store as metadata, use metadata filtering
-    - Combine dense search + metadata filtering with RRF
-  - **Implementation:** Start with Option 2 (more reliable), test Option 1
-- Document embedding pipeline (Bedrock Titan Embeddings for dense vectors)
-- Keyword extraction for sparse vectors (BM25-style using `rank-bm25` library)
-- S3 bucket for document uploads
-- Lambda trigger for automatic ingestion on upload
-- **Advanced Chunking Strategy:**
-  - **Parent Document Retriever:** Small chunks (200 chars) for retrieval, parent docs (1000 chars) for context
-  - Recursive character splitter with 200 char overlap
-  - Preserve metadata (source, page, section, document_type, parent_id)
-- **Query Expansion (Critical for Quality):**
-  - Generate 3 alternative phrasings using LLM
-  - Multi-query retrieval with parallel searches
-  - Improves recall by 20-30%
-- **Hybrid Retrieval Method:**
-  - Vector search (semantic similarity via dense embeddings)
-  - Keyword search (exact matches, synonyms via sparse vectors)
-  - Pinecone handles hybrid search natively OR combine with RRF
-- **RRF (Reciprocal Rank Fusion)** for combining multiple retrieval results
-- **Contextual Compression:** LLMChainExtractor to reduce noise in retrieved docs
-- **Re-ranking option** (cross-encoder for top results - Phase 6 enhancement)
-- Retrieval tool with relevance scoring and explanation
-- Source citation in responses with page/section numbers
-- Metadata filtering support (document_type, date_range, etc.)
-- **Fallback mechanisms:** Graceful degradation if Pinecone unavailable
+**2c. RAG Document Tool (2025 SOTA Hybrid Search + Knowledge Graph)**
+
+**December 2025 State-of-the-Art Techniques:**
+
+- **Semantic Chunking (replaces fixed-size splitting):**
+  - Split at sentence/paragraph boundaries using spaCy
+  - Preserves complete thoughts for better retrieval
+  - Impact: +10-15% retrieval relevance
+  - Cost: $0 (ingestion time only)
+
+- **Contextual Retrieval (Anthropic technique):**
+  - Prepend document title, type, section to each chunk before embedding
+  - Chunks carry their context, improving disambiguation
+  - Impact: +15-20% precision, +67% combined with BM25
+  - Cost: $0 (ingestion time only)
+
+- **Efficient Knowledge Graph Construction (NLP-based):**
+  - Use spaCy NER + dependency parsing instead of LLM calls
+  - Custom patterns for financial domain entities
+  - Extract entities and relationships at 20-50x lower cost
+  - Impact: Same coverage as LLM, ~$0.001/doc vs $0.02-0.05/doc
+
+- **Cross-Encoder Reranking:**
+  - LLM scores query-document relevance after RRF fusion
+  - Applied before contextual compression
+  - Impact: +20-25% precision on top-k results
+  - Cost: ~$0.01-0.015/query
+
+- **Knowledge Graph Integration:**
+  - Infrastructure: Neo4j AuraDB Free (200K nodes, $0/month) or PostgreSQL fallback
+  - 1-2 hop entity relationship traversal
+  - Base ontology for financial domain (Policy, Customer, Account, Regulation, Concept)
+  - Enhances retrieval with entity relationships
+
+**Ingestion Pipeline:**
+1. Document → Semantic Chunking (spaCy sentence boundaries)
+2. Each chunk → Add Context (title, section, type)
+3. Contextualized chunks → Embed (Titan) → Store (Pinecone)
+4. Document → NLP Entity Extraction (spaCy) → Store in Knowledge Graph
+
+**Query Pipeline:**
+1. Query → Expansion (3 variants via Nova Lite)
+2. Parallel: Dense search + Sparse search (BM25) + KG entity lookup
+3. RRF Fusion → Cross-Encoder Rerank → Contextual Compression → Results
+
+**Total query cost: ~$0.035-0.04**
+
+**Core Features (unchanged):**
+- Pinecone serverless index with hybrid search (dense + sparse)
+- Document embedding pipeline (Bedrock Titan Embeddings)
+- S3 bucket for document uploads with Lambda trigger
+- Query expansion (3 alternative phrasings, +20-30% recall)
+- RRF (Reciprocal Rank Fusion) for combining results
+- Contextual Compression (LLMChainExtractor)
+- Source citation with page/section numbers
+- Metadata filtering (document_type, date_range, etc.)
+- **Fallback mechanisms:** Graceful degradation if Pinecone/KG unavailable
 
 **2d. Weather API Tool**
-- OpenWeatherMap API integration (free tier: 60 calls/minute, 1M calls/month)
+- OpenWeatherMap integration exposed via an MCP connection (demoing MCP compatibility; live calls optional with API key)
 - Tool definition in LangGraph (using built-in tool binding)
 - Result formatting with temperature, conditions, humidity, wind speed
 - **Comprehensive error handling** with retry logic and exponential backoff
@@ -762,6 +785,11 @@ If something isn't working, follow this systematic debugging process:
 - **S3 Intelligent-Tiering** for document storage (saves ~40% on storage costs)
 - Lambda function for document processing
 - Additional IAM policies for tool access
+- **Knowledge Graph Infrastructure (2025 Addition):**
+  - Primary: Neo4j AuraDB Free tier (200K nodes, 400K relationships, $0/month)
+  - Fallback: PostgreSQL with recursive CTEs (uses existing Aurora)
+  - Neo4j in Docker for local development
+  - spaCy for NLP-based entity extraction (no LLM cost)
 
 **Sample Data:**
 
@@ -993,6 +1021,90 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 
 ---
 
+### Phase 8: Future RAG Improvements (Reference)
+**Goal:** Document advanced RAG techniques for future enhancement phases
+
+This phase serves as a reference guide for potential improvements beyond the initial implementation. Each technique is rated on Power (quality), Speed (latency), and Cost.
+
+**Query Enhancement Techniques:**
+
+| Technique | What It Does | Power | Speed | Cost | Complexity |
+|-----------|--------------|-------|-------|------|------------|
+| Query Expansion (Phase 2) | Generate 3 alternative phrasings | +20-30% recall | -50ms | $0.01/q | Low |
+| HyDE | Generate hypothetical answer, embed that | +10-15% precision | -300ms | $0.005/q | Low |
+| Query Decomposition | Break complex query into sub-queries | +15-20% complex queries | -500ms | $0.02/q | Medium |
+| Step-back Prompting | Abstract to higher-level concept first | +10-15% reasoning | -200ms | $0.01/q | Medium |
+
+**Indexing/Chunking Techniques:**
+
+| Technique | What It Does | Power | Speed | Cost | Complexity |
+|-----------|--------------|-------|-------|------|------------|
+| Semantic Chunking (Phase 2) | Split at sentence boundaries | +10-15% relevance | +0ms | $0 | Low |
+| Contextual Retrieval (Phase 2) | Prepend doc context to chunks | +15-20% precision | +0ms | $0 | Very Low |
+| Parent Doc Retriever (Phase 2) | Small chunks search, large context return | +15-20% context | +0ms | $0 | Low |
+| Late Chunking | Embed full doc, then chunk | +10-15% context | +0ms | $0 | Medium |
+| Proposition Indexing | Convert to factual statements | +20-25% precision | +0ms | $0.05/doc | High |
+
+**Retrieval Techniques:**
+
+| Technique | What It Does | Power | Speed | Cost | Complexity |
+|-----------|--------------|-------|-------|------|------------|
+| Hybrid Search (Phase 2) | Dense + BM25 sparse | +20-30% recall | +0ms | $0 | Low |
+| RRF Fusion (Phase 2) | Merge multiple result sets | +10-15% | +0ms | $0 | Low |
+| KG 1-2 Hop (Phase 2) | Entity relationship traversal | +15-25% precision | +50ms | $0.01/q | Medium |
+| Multi-index Search | Search by doc type | +10% diverse | +100ms | $0 | Medium |
+
+**Post-Retrieval Techniques:**
+
+| Technique | What It Does | Power | Speed | Cost | Complexity |
+|-----------|--------------|-------|-------|------|------------|
+| Cross-Encoder Rerank (Phase 2) | LLM scores relevance | +20-25% precision | -300ms | $0.015/q | Low |
+| Contextual Compression (Phase 2) | Extract relevant portions | +10-15% relevance | -200ms | $0.01/q | Low |
+| Diversity Reranking (MMR) | Ensure diverse results | +5-10% coverage | +0ms | $0 | Low |
+| Lost-in-Middle Reorder | Best docs at start/end | +5% attention | +0ms | $0 | Very Low |
+
+**Advanced/Agentic Techniques (Future):**
+
+| Technique | What It Does | Power | Speed | Cost | Complexity |
+|-----------|--------------|-------|-------|------|------------|
+| KG-R1 (arXiv 2509.26383) | RL agent learns optimal KG traversal | +15-25% accuracy | -100ms | Training cost | High |
+| NodeRAG (arXiv 2504.11544) | Heterogeneous graph nodes | +20% efficiency | +0ms | $0 | Medium |
+| Speculative RAG (ICLR 2025) | Small model drafts, large verifies | Same quality | 2-3x faster | Lower | Medium-High |
+| KERAG (EMNLP 2025) | Subgraph retrieval + CoT reasoning | +7% over SOTA | -500ms | $0.03/q | High |
+| TAdaRAG (arXiv 2511.12520) | On-the-fly task-adaptive KG | Better generalization | -300ms | $0.02/q | High |
+| Self-RAG | LLM critiques and re-retrieves | +25% accuracy | -1000ms | $0.05/q | High |
+| Agentic RAG | LLM decides strategy dynamically | +30% complex | -500ms | $0.05/q | Very High |
+
+**Optimization Tradeoff Guide:**
+
+*Optimize for POWER (Best Quality):*
+1. Contextual Retrieval + Semantic Chunking (free)
+2. Cross-Encoder Reranking ($0.015/q)
+3. KG-enhanced retrieval ($0.01/q)
+4. KERAG subgraph reasoning ($0.03/q)
+5. Self-RAG with re-retrieval ($0.05/q)
+
+*Optimize for SPEED (Lowest Latency):*
+1. Speculative RAG (2-3x faster)
+2. Skip HyDE (save 300ms)
+3. Efficient NLP extraction (10ms vs 500ms)
+4. Pre-computed KG paths
+5. Smaller reranking batch
+
+*Optimize for COST (Cheapest):*
+1. NLP entity extraction ($0.001 vs $0.05/doc)
+2. Skip HyDE ($0.005 saved/query)
+3. Smaller query expansion (2 vs 3 variants)
+4. Contextual Retrieval + Semantic Chunking ($0)
+5. PostgreSQL instead of Neo4j ($0)
+
+**Deliverables:**
+- Reference documentation for future improvements
+- Benchmarks for technique comparison
+- Migration guides for implementing advanced techniques
+
+---
+
 ## Project Structure
 
 ```
@@ -1058,8 +1170,16 @@ aws-enterprise-agentic-ai/
 │   │   ├── ingestion/
 │   │   │   ├── __init__.py
 │   │   │   ├── document_processor.py
+│   │   │   ├── semantic_chunking.py  # Grammar-aware chunking (spaCy)
+│   │   │   ├── contextual_chunking.py  # Context prepending for chunks
 │   │   │   ├── chunking.py       # Parent document retriever strategy
 │   │   │   └── query_expansion.py  # Query expansion for RAG
+│   │   ├── knowledge_graph/
+│   │   │   ├── __init__.py
+│   │   │   ├── efficient_extractor.py  # NLP-based entity extraction (spaCy)
+│   │   │   ├── store.py          # Neo4j/PostgreSQL adapter
+│   │   │   ├── queries.py        # Graph traversal queries (1-2 hop)
+│   │   │   └── ontology.py       # Financial domain ontology
 │   │   ├── api/
 │   │   │   ├── __init__.py
 │   │   │   ├── main.py           # FastAPI app
@@ -1084,7 +1204,8 @@ aws-enterprise-agentic-ai/
 │   │       ├── __init__.py
 │   │       ├── embeddings.py
 │   │       ├── circuit_breaker.py  # Circuit breaker pattern
-│   │       └── rrf.py              # Reciprocal Rank Fusion
+│   │       ├── rrf.py              # Reciprocal Rank Fusion
+│   │       └── reranker.py         # Cross-encoder reranking (LLM-based)
 │   ├── tests/
 │   │   ├── __init__.py
 │   │   ├── test_agent.py
@@ -1161,6 +1282,8 @@ aws-enterprise-agentic-ai/
 ---
 
 ## GitHub Actions Workflows
+
+**Phase gating:** Introduced in Phase 1b (no CI/CD in Phase 0). Triggers are `pull_request` (CI), `push` to `main` (CD), and scheduled/manual dispatch (evaluation).
 
 ### CI Pipeline (on PR):
 1. Lint and format check (Python: black, ruff | TypeScript: ESLint, Prettier)
@@ -1405,14 +1528,7 @@ aws-enterprise-agentic-ai/
    - Cost optimization tips
    - Security best practices
 
-8. **docs/troubleshooting.md:**
-   - Common issues and solutions
-   - Debugging guide
-   - Performance issues
-   - Cost issues
-   - Integration problems
-
-9. **docs/adr/** (Architecture Decision Records):
+8. **docs/adr/** (Architecture Decision Records):
    - 001-use-langgraph.md
    - 002-use-docker-compose.md
    - 003-use-pinecone.md
@@ -1422,14 +1538,14 @@ aws-enterprise-agentic-ai/
    - 007-sqlalchemy-pooling-vs-rds-proxy.md (cost optimization)
    - 008-nextjs-static-export.md (architecture clarification)
 
-10. **docs/runbooks/** (Operational Runbooks):
+9. **docs/runbooks/** (Operational Runbooks):
     - database-connection-issues.md
     - bedrock-rate-limits.md
     - docker-startup-slow.md
     - rag-quality-poor.md
     - cost-optimization.md
 
-11. **docs/examples/** (Code Examples):
+10. **docs/examples/** (Code Examples):
     - chat_api_example.py
     - tool_usage_example.py
     - streaming_example.py
@@ -1881,8 +1997,8 @@ The architecture is designed to be:
 
 ## Demo Presentation Guide
 
-### Suggested Demo Walkthrough (5 minutes)
-
+### Reference Demo Plan (5 minutes)
+#All updates must be consistent with this experience.
 **1. Introduction (30 seconds):**
 > "This is an enterprise-grade AI agent I built on AWS. It demonstrates multi-tool orchestration, RAG, real-time streaming, and cost-optimized architecture."
 

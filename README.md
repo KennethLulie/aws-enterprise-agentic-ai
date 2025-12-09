@@ -197,7 +197,7 @@ cp .env.example .env
 # 3. Edit .env and fill in your API keys
 # See .env.example for descriptions of each variable
 
-# 4. Start the development environment
+# 4. Start the development environment (stub-only Phase 0, all tools stubbed)
 docker compose up
 ```
 
@@ -243,7 +243,7 @@ See [docs/SECURITY.md](./docs/SECURITY.md) for the complete security guide.
 ## 🚀 Enterprise Features Deep Dive
 
 ### Multi-Tool Orchestration
-The LangGraph agent framework intelligently coordinates multiple tools based on user queries. The agent decides which tools to use, in what order, and how to combine their outputs. For example, a query like "What's the weather in Austin and how does it compare to our customer data there?" triggers both the Weather API and SQL query tools, with the agent synthesizing the results.
+The LangGraph agent framework intelligently coordinates multiple tools based on user queries. The agent decides which tools to use, in what order, and how to combine their outputs. For example, a query like "What's the weather in Austin and how does it compare to our customer data there?" triggers the Weather MCP connection (OpenWeather via MCP demo) alongside the SQL query tool, with the agent synthesizing the results.
 
 ### Advanced RAG (Retrieval-Augmented Generation)
 Beyond basic vector search, this system implements state-of-the-art RAG techniques:
@@ -293,6 +293,12 @@ GitHub Actions automates the entire development lifecycle:
 - **Automated Deployment**: Builds Docker images, pushes to ECR, deploys via Terraform
 - **Quality Gates**: RAGAS evaluation and smoke tests before production deployment
 - **Rollback Capability**: Easy rollback via Terraform state management
+
+### Planned GitHub Actions (Phase 1b)
+- **CI (pull requests):** black, ruff, mypy; ESLint/Prettier/tsc; pytest; Docker test builds; Terraform fmt/validate/plan (no apply); security scans (Bandit, Checkov, gitleaks).
+- **CD (merge to main):** Build and push backend image to ECR; build Next.js static export; upload frontend to S3; Terraform apply (with approval for prod); CloudFront cache invalidate; post-deploy smoke tests/health checks.
+- **Evaluation (scheduled/manual):** Run RAGAS on the eval dataset, publish metrics to Arize Phoenix/CloudWatch, and fail on regressions.
+- **Phase gating:** Workflows are introduced in Phase 1b; none run in Phase 0 beyond placeholders.
 
 ## 🛠️ Technology Stack
 
