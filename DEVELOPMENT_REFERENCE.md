@@ -589,13 +589,24 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **Security:** Parameterized queries, table whitelisting
 - **Safety:** Read-only, max rows limit, query validation
 
-#### Tool 2c: RAG Retrieval
+#### Tool 2c: RAG Retrieval (2025 SOTA)
 - **Vector Store:** Pinecone Serverless
 - **Embeddings:** Bedrock Titan Embeddings (1536 dimensions)
 - **Hybrid Search:** Dense + sparse vectors with RRF
-- **Chunking:** Parent Document Retriever (200 char chunks, 1000 char parents)
-- **Query Expansion:** Generate 3 alternative phrasings
+- **Semantic Chunking:** spaCy sentence boundary detection (replaces fixed-size)
+- **Contextual Retrieval:** Prepend doc title/type/section to chunks before embedding
+- **Parent Document Retriever:** Small chunks for search, large context for response
+- **Query Expansion:** Generate 3 alternative phrasings (+20-30% recall)
+- **Cross-Encoder Reranking:** LLM scores relevance after RRF (+20-25% precision)
 - **Compression:** LLMChainExtractor for contextual compression
+
+#### Tool 2c-KG: Knowledge Graph Integration
+- **Primary Store:** Neo4j AuraDB Free (200K nodes, $0/month)
+- **Fallback:** PostgreSQL with recursive CTEs
+- **Entity Extraction:** spaCy NER + dependency parsing (no LLM needed)
+- **Ontology:** Financial domain (Policy, Customer, Account, Regulation, Concept, Person)
+- **Traversal:** 1-2 hop relationship queries
+- **Cost:** ~$0.001/doc ingestion, $0/query (free tier)
 
 #### Tool 2d: Weather API
 - **API:** OpenWeatherMap (free tier: 60 calls/minute)
@@ -608,6 +619,9 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **S3 Bucket:** Document storage (separate from frontend bucket)
 - **Lambda:** Document ingestion trigger
 - **IAM Policies:** Tool access permissions
+- **Neo4j AuraDB Free:** Knowledge graph storage (200K nodes, $0/month)
+- **Neo4j Docker:** Local development graph database
+- **spaCy Model:** en_core_web_sm for NLP entity extraction
 
 ### Implementation Order
 
@@ -649,41 +663,89 @@ Agent can search the web, query SQL databases, and retrieve from documents.
    - Query validation function
    - SQL injection prevention
 
-#### Step 3: RAG Retrieval Tool
-1. **Document Processing** (`backend/src/ingestion/document_processor.py`)
-   - PDF/text parsing
-   - Chunking strategy
-   - Metadata extraction
+#### Step 3: RAG Retrieval Tool (2025 SOTA)
 
-2. **Chunking** (`backend/src/ingestion/chunking.py`)
-   - Parent Document Retriever
-   - Recursive character splitter
-   - Overlap handling
+**3a. Ingestion Pipeline:**
+
+1. **Semantic Chunking** (`backend/src/ingestion/semantic_chunking.py`)
+   - spaCy sentence boundary detection
+   - Grammar-aware splitting
+   - Configurable max chunk size
+   - Preserves complete thoughts
+
+2. **Contextual Chunking** (`backend/src/ingestion/contextual_chunking.py`)
+   - Prepend document title to each chunk
+   - Add section header context
+   - Include document type metadata
+   - Impact: +15-20% precision
+
+3. **Document Processing** (`backend/src/ingestion/document_processor.py`)
+   - PDF/text parsing
+   - Metadata extraction
+   - Integration with semantic + contextual chunking
+
+4. **Parent Document Retriever** (`backend/src/ingestion/chunking.py`)
+   - Small chunks for retrieval
+   - Large context for response
    - Metadata preservation
 
-3. **Query Expansion** (`backend/src/ingestion/query_expansion.py`)
-   - Generate alternative phrasings
+**3b. Knowledge Graph Pipeline:**
+
+5. **Efficient Entity Extraction** (`backend/src/knowledge_graph/efficient_extractor.py`)
+   - spaCy NER (PERSON, ORG, DATE, MONEY, etc.)
+   - Custom financial domain patterns
+   - Dependency parsing for relationships
+   - Cost: ~$0.001/doc (vs $0.02-0.05 with LLM)
+
+6. **Knowledge Graph Store** (`backend/src/knowledge_graph/store.py`)
+   - Neo4j adapter for production
+   - PostgreSQL fallback with recursive CTEs
+   - Connection pooling
+   - Entity/relationship CRUD
+
+7. **Graph Ontology** (`backend/src/knowledge_graph/ontology.py`)
+   - Entity types: Document, Policy, Customer, Account, Concept, Regulation, Person
+   - Relationship types: MENTIONS, RELATES_TO, GOVERNED_BY, APPLIES_TO, SIMILAR_TO
+
+8. **Graph Queries** (`backend/src/knowledge_graph/queries.py`)
+   - 1-hop entity lookup
+   - 2-hop relationship traversal
+   - Entity-to-document linking
+
+**3c. Query Pipeline:**
+
+9. **Query Expansion** (`backend/src/ingestion/query_expansion.py`)
+   - Generate 3 alternative phrasings
    - Multi-query retrieval
    - Parallel searches
+   - Impact: +20-30% recall
 
-4. **Embeddings** (`backend/src/utils/embeddings.py`)
-   - Bedrock Titan integration
-   - Batch embedding generation
-   - Caching
+10. **Embeddings** (`backend/src/utils/embeddings.py`)
+    - Bedrock Titan integration
+    - Batch embedding generation
+    - Caching
 
-5. **RRF Implementation** (`backend/src/utils/rrf.py`)
-   - Reciprocal Rank Fusion algorithm
-   - Result merging
-   - Score normalization
+11. **RRF Implementation** (`backend/src/utils/rrf.py`)
+    - Reciprocal Rank Fusion algorithm
+    - Merge vector + sparse + KG results
+    - Score normalization
 
-6. **Tool Implementation** (`backend/src/agent/tools/rag.py`)
-   - Pinecone client
-   - Hybrid search (dense + sparse)
-   - Query expansion integration
-   - RRF result merging
-   - Contextual compression
-   - Source citation
-   - Error handling
+12. **Cross-Encoder Reranking** (`backend/src/utils/reranker.py`)
+    - LLM-based relevance scoring
+    - Score top 15 results
+    - Return top 5
+    - Impact: +20-25% precision
+    - Cost: ~$0.015/query
+
+13. **Tool Implementation** (`backend/src/agent/tools/rag.py`)
+    - Pinecone client for vector search
+    - BM25 for sparse search
+    - KG lookup integration
+    - RRF fusion of all results
+    - Cross-encoder reranking
+    - Contextual compression
+    - Source citation
+    - Error handling with fallbacks
 
 #### Step 4: Weather API Tool
 1. **Tool Implementation** (`backend/src/agent/tools/weather.py`)
@@ -1210,6 +1272,10 @@ psycopg2-binary~=2.9.9
 pinecone-client~=5.0.0
 chromadb~=0.5.15
 
+# Knowledge Graph
+neo4j~=5.25.0
+spacy~=3.8.0
+
 # Logging
 structlog~=24.4.0
 
@@ -1304,6 +1370,19 @@ terraform {
   - Nova Lite: `amazon.nova-lite-v1:0`
   - Titan Embeddings: `amazon.titan-embed-text-v1`
   - Claude Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0`
+
+### Neo4j AuraDB (Knowledge Graph)
+- **Tier:** Free (200K nodes, 400K relationships)
+- **Region:** us-east-1 (if available) or closest
+- **Connection:** Bolt protocol (neo4j+s://)
+- **Local Dev:** Docker image `neo4j:5-community`
+- **Fallback:** PostgreSQL with recursive CTEs
+
+### spaCy (NLP Entity Extraction)
+- **Model:** en_core_web_sm (small English model)
+- **Download:** `python -m spacy download en_core_web_sm`
+- **Entities:** PERSON, ORG, DATE, MONEY, GPE, etc.
+- **Usage:** Semantic chunking + entity extraction
 
 ---
 

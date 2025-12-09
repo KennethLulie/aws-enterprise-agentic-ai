@@ -43,6 +43,13 @@ pinecone-client~=5.0.0
 chromadb~=0.5.15
 
 # =============================================================================
+# Knowledge Graph (Phase 2+ for 2025 SOTA RAG)
+# =============================================================================
+neo4j~=5.25.0
+spacy~=3.8.0
+# Note: After install, download spaCy model: python -m spacy download en_core_web_sm
+
+# =============================================================================
 # Logging (Phase 1b+ uses structlog, basic logging for Phase 0)
 # =============================================================================
 structlog~=24.4.0
