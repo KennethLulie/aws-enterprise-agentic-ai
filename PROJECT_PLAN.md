@@ -969,12 +969,14 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Configurable similarity threshold (cosine similarity > 0.95)
 - Cache invalidation on document updates
 - **Cost tracking:** Monitor cache effectiveness and cost savings
+- Cost savings dashboard (cache hit/miss, tokens saved, $ saved)
 
 **Implementation:**
 - Cache check before LLM call
 - Cache write after successful response
 - Cache invalidation on document updates
 - Cost savings dashboard (tokens saved, $ saved)
+- Metrics feed/API from cache layer to dashboard (CloudWatch + app endpoint)
 
 **Infrastructure Additions:**
 - DynamoDB table for inference cache (on-demand pricing, TTL enabled)
@@ -986,6 +988,7 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Cache hit rate > 30% for typical usage
 - Cost savings visible in dashboard
 - Cache invalidation works correctly
+- Dashboard shows cache hit/miss and savings sourced from Phase 7 metrics feed
 
 ---
 
