@@ -178,6 +178,7 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
 ### Prerequisites
 
 - Docker Desktop installed and running
+- Windows 11: use WSL 2 (Ubuntu), keep the repo in `~/Projects` (not `/mnt/c`), and open the project from WSL with `cursor .`
 - AWS CLI configured (`aws configure`)
 - AWS Bedrock model access approved (Nova Pro, Nova Lite, Titan Embeddings)
 - API keys for: Tavily, Pinecone (free tiers available)
@@ -185,6 +186,7 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
 ### Setup
 
 ```bash
+# Run from WSL (Ubuntu) on Windows; macOS/Linux use your shell
 # 1. Clone the repository
 git clone https://github.com/yourusername/aws-enterprise-agentic-ai.git
 cd aws-enterprise-agentic-ai
@@ -196,7 +198,7 @@ cp .env.example .env
 # See .env.example for descriptions of each variable
 
 # 4. Start the development environment
-docker-compose up
+docker compose up
 ```
 
 ### Development Phases
@@ -231,6 +233,7 @@ This project uses pre-commit hooks with `detect-secrets` to prevent accidental c
 
 ```bash
 # Install pre-commit hooks
+# Run in WSL terminal (Ubuntu)
 pip install pre-commit
 pre-commit install
 ```

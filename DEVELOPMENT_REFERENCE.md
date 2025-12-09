@@ -13,11 +13,11 @@
 3. [Phase 1a: Minimal MVP](#phase-1a-minimal-mvp)
 4. [Phase 1b: Production Hardening](#phase-1b-production-hardening)
 5. [Phase 2: Core Agent Tools](#phase-2-core-agent-tools)
-6. [Phase 3: Input/Output Verification](#phase-3-inputoutput-verification)
-7. [Phase 4: Inference Caching](#phase-4-inference-caching)
-8. [Phase 5: Observability](#phase-5-observability)
-9. [Phase 6: RAG Evaluation](#phase-6-rag-evaluation)
-10. [Phase 7: Enhanced UI](#phase-7-enhanced-ui)
+6. [Phase 3: Observability with Arize Phoenix](#phase-3-observability-with-arize-phoenix)
+7. [Phase 4: RAG Evaluation with RAGAS](#phase-4-rag-evaluation-with-ragas)
+8. [Phase 5: Enhanced UI and Thought Process Streaming](#phase-5-enhanced-ui-and-thought-process-streaming)
+9. [Phase 6: Input/Output Verification](#phase-6-inputoutput-verification)
+10. [Phase 7: Inference Caching](#phase-7-inference-caching)
 11. [Implementation Order Guidelines](#implementation-order-guidelines)
 12. [Consistency Checks](#consistency-checks)
 
@@ -747,150 +747,7 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 
 ---
 
-## Phase 3: Input/Output Verification
-
-### Goal
-SLM guards validate user inputs and agent outputs for safety/quality.
-
-### Technology Specifications
-
-#### Verification Models
-- **Input Verification:** Nova Lite (`amazon.nova-lite-v1:0`)
-- **Output Verification:** Nova Lite (`amazon.nova-lite-v1:0`)
-- **Policy Levels:** strict, moderate, permissive
-
-#### Verification Features
-- **Input:** Prompt injection detection, jailbreak detection, content policy
-- **Output:** Hallucination scoring, PII detection, citation verification, quality checks
-
-### Implementation Order
-
-#### Step 1: Verification Nodes
-1. **Input Verification Node** (`backend/src/agent/nodes/verification.py`)
-   - Input validation logic
-   - Nova Lite invocation
-   - Policy enforcement
-   - Classification (safe/unsafe/needs-review)
-
-2. **Output Verification Node** (`backend/src/agent/nodes/verification.py`)
-   - Output validation logic
-   - Hallucination scoring
-   - PII detection
-   - Citation verification
-   - Quality checks
-
-#### Step 2: Verification Policies
-1. **Policy Configuration** (`backend/src/config/verification.py`)
-   - Policy definitions
-   - Sensitivity levels
-   - Configurable thresholds
-
-2. **Policy Enforcement** (`backend/src/agent/nodes/verification.py`)
-   - Apply policies
-   - Bypass logic for trusted requests
-   - Logging of flagged content
-
-#### Step 3: Graph Integration
-1. **Update Graph** (`backend/src/agent/graph.py`)
-   - Add verification nodes
-   - Input verification before chat
-   - Output verification after response
-   - Conditional routing based on verification results
-
-#### Step 4: Metrics and Logging
-1. **Verification Metrics** (`backend/src/api/middleware/logging.py`)
-   - Track pass/fail rates
-   - Log flagged content to CloudWatch
-   - Metrics for monitoring
-
-### Phase 3 Deliverables Checklist
-- [ ] Input verification blocks malicious prompts
-- [ ] Output verification ensures quality responses
-- [ ] Verification metrics visible in monitoring
-- [ ] Configurable policy levels
-- [ ] Flagged content logged to CloudWatch
-
-### Consistency Checks
-- [ ] Verification uses Nova Lite (not Nova Pro)
-- [ ] Policies are configurable
-- [ ] Verification results are logged
-- [ ] Metrics are tracked
-- [ ] Bypass logic works for trusted requests
-
----
-
-## Phase 4: Inference Caching
-
-### Goal
-Reduce costs and latency by caching repeated queries.
-
-### Technology Specifications
-
-#### Cache Storage
-- **Database:** DynamoDB (on-demand pricing)
-- **TTL:** 7 days (configurable)
-- **Key Generation:** Bedrock Titan embeddings (semantic similarity)
-- **Similarity Threshold:** Cosine similarity > 0.95
-
-#### Cache Features
-- **Semantic Matching:** Not just exact text match
-- **Automatic Cleanup:** DynamoDB TTL
-- **Cache Invalidation:** On document updates
-- **Metrics:** Hit/miss rates tracked in CloudWatch
-
-### Implementation Order
-
-#### Step 1: DynamoDB Infrastructure
-1. **DynamoDB Table** (`terraform/modules/dynamodb/cache.tf`)
-   - Table definition
-   - TTL attribute
-   - On-demand pricing
-   - IAM policies for App Runner
-
-#### Step 2: Cache Implementation
-1. **Cache Module** (`backend/src/cache/inference_cache.py`)
-   - DynamoDB client
-   - Embedding-based key generation
-   - Similarity matching
-   - Cache read/write
-   - TTL handling
-
-2. **Cache Integration** (`backend/src/agent/nodes/chat.py`)
-   - Check cache before LLM call
-   - Write to cache after response
-   - Cache hit/miss logging
-
-#### Step 3: Cache Invalidation
-1. **Document Update Handler** (`backend/src/cache/inference_cache.py`)
-   - Invalidate cache on document updates
-   - Pattern matching for invalidation
-   - Batch invalidation
-
-#### Step 4: Metrics
-1. **Cache Metrics** (`backend/src/api/middleware/logging.py`)
-   - Track cache hits/misses
-   - Calculate hit rate
-   - Cost savings tracking
-   - CloudWatch metrics
-
-### Phase 4 Deliverables Checklist
-- [ ] Repeated queries return instantly from cache
-- [ ] Cache hit rate > 30% for typical usage
-- [ ] Cost savings visible in dashboard
-- [ ] Cache invalidation works correctly
-- [ ] DynamoDB table provisioned
-- [ ] TTL cleanup working
-
-### Consistency Checks
-- [ ] Cache uses semantic similarity (not exact match)
-- [ ] Embedding generation uses Bedrock Titan
-- [ ] TTL is configured correctly
-- [ ] Cache invalidation triggers on document updates
-- [ ] Metrics are tracked accurately
-
----
-
-## Phase 5: Observability with Arize Phoenix
+## Phase 3: Observability with Arize Phoenix
 
 ### Goal
 Full tracing and monitoring of agent execution.
@@ -954,7 +811,7 @@ Full tracing and monitoring of agent execution.
    - Error rates
    - Tool usage
 
-### Phase 5 Deliverables Checklist
+### Phase 3 Deliverables Checklist
 - [ ] Full trace of every agent execution
 - [ ] Latency breakdown visible
 - [ ] Token usage tracked
@@ -972,7 +829,7 @@ Full tracing and monitoring of agent execution.
 
 ---
 
-## Phase 6: RAG Evaluation with RAGAS
+## Phase 4: RAG Evaluation with RAGAS
 
 ### Goal
 Automated quality measurement for RAG responses.
@@ -1030,7 +887,7 @@ Automated quality measurement for RAG responses.
    - Threshold configuration
    - SNS notifications (optional)
 
-### Phase 6 Deliverables Checklist
+### Phase 4 Deliverables Checklist
 - [ ] Automated RAG quality evaluation
 - [ ] Metrics visible in dashboard
 - [ ] Alerts on quality regression
@@ -1047,7 +904,7 @@ Automated quality measurement for RAG responses.
 
 ---
 
-## Phase 7: Enhanced UI and Thought Process Streaming
+## Phase 5: Enhanced UI and Thought Process Streaming
 
 ### Goal
 Polished user experience with visible agent reasoning.
@@ -1104,7 +961,7 @@ Polished user experience with visible agent reasoning.
    - Tablet optimization
    - Desktop layout
 
-### Phase 7 Deliverables Checklist
+### Phase 5 Deliverables Checklist
 - [ ] Beautiful, professional UI
 - [ ] Thought process visible in real-time
 - [ ] Sources clearly cited
@@ -1122,6 +979,149 @@ Polished user experience with visible agent reasoning.
 
 ---
 
+## Phase 6: Input/Output Verification
+
+### Goal
+SLM guards validate user inputs and agent outputs for safety/quality.
+
+### Technology Specifications
+
+#### Verification Models
+- **Input Verification:** Nova Lite (`amazon.nova-lite-v1:0`)
+- **Output Verification:** Nova Lite (`amazon.nova-lite-v1:0`)
+- **Policy Levels:** strict, moderate, permissive
+
+#### Verification Features
+- **Input:** Prompt injection detection, jailbreak detection, content policy
+- **Output:** Hallucination scoring, PII detection, citation verification, quality checks
+
+### Implementation Order
+
+#### Step 1: Verification Nodes
+1. **Input Verification Node** (`backend/src/agent/nodes/verification.py`)
+   - Input validation logic
+   - Nova Lite invocation
+   - Policy enforcement
+   - Classification (safe/unsafe/needs-review)
+
+2. **Output Verification Node** (`backend/src/agent/nodes/verification.py`)
+   - Output validation logic
+   - Hallucination scoring
+   - PII detection
+   - Citation verification
+   - Quality checks
+
+#### Step 2: Verification Policies
+1. **Policy Configuration** (`backend/src/config/verification.py`)
+   - Policy definitions
+   - Sensitivity levels
+   - Configurable thresholds
+
+2. **Policy Enforcement** (`backend/src/agent/nodes/verification.py`)
+   - Apply policies
+   - Bypass logic for trusted requests
+   - Logging of flagged content
+
+#### Step 3: Graph Integration
+1. **Update Graph** (`backend/src/agent/graph.py`)
+   - Add verification nodes
+   - Input verification before chat
+   - Output verification after response
+   - Conditional routing based on verification results
+
+#### Step 4: Metrics and Logging
+1. **Verification Metrics** (`backend/src/api/middleware/logging.py`)
+   - Track pass/fail rates
+   - Log flagged content to CloudWatch
+   - Metrics for monitoring
+
+### Phase 6 Deliverables Checklist
+- [ ] Input verification blocks malicious prompts
+- [ ] Output verification ensures quality responses
+- [ ] Verification metrics visible in monitoring
+- [ ] Configurable policy levels
+- [ ] Flagged content logged to CloudWatch
+
+### Consistency Checks
+- [ ] Verification uses Nova Lite (not Nova Pro)
+- [ ] Policies are configurable
+- [ ] Verification results are logged
+- [ ] Metrics are tracked
+- [ ] Bypass logic works for trusted requests
+
+---
+
+## Phase 7: Inference Caching
+
+### Goal
+Reduce costs and latency by caching repeated queries.
+
+### Technology Specifications
+
+#### Cache Storage
+- **Database:** DynamoDB (on-demand pricing)
+- **TTL:** 7 days (configurable)
+- **Key Generation:** Bedrock Titan embeddings (semantic similarity)
+- **Similarity Threshold:** Cosine similarity > 0.95
+
+#### Cache Features
+- **Semantic Matching:** Not just exact text match
+- **Automatic Cleanup:** DynamoDB TTL
+- **Cache Invalidation:** On document updates
+- **Metrics:** Hit/miss rates tracked in CloudWatch
+
+### Implementation Order
+
+#### Step 1: DynamoDB Infrastructure
+1. **DynamoDB Table** (`terraform/modules/dynamodb/cache.tf`)
+   - Table definition
+   - TTL attribute
+   - On-demand pricing
+   - IAM policies for App Runner
+
+#### Step 2: Cache Implementation
+1. **Cache Module** (`backend/src/cache/inference_cache.py`)
+   - DynamoDB client
+   - Embedding-based key generation
+   - Similarity matching
+   - Cache read/write
+   - TTL handling
+
+2. **Cache Integration** (`backend/src/agent/nodes/chat.py`)
+   - Check cache before LLM call
+   - Write to cache after response
+   - Cache hit/miss logging
+
+#### Step 3: Cache Invalidation
+1. **Document Update Handler** (`backend/src/cache/inference_cache.py`)
+   - Invalidate cache on document updates
+   - Pattern matching for invalidation
+   - Batch invalidation
+
+#### Step 4: Metrics
+1. **Cache Metrics** (`backend/src/api/middleware/logging.py`)
+   - Track cache hits/misses
+   - Calculate hit rate
+   - Cost savings tracking
+   - CloudWatch metrics
+
+### Phase 7 Deliverables Checklist
+- [ ] Repeated queries return instantly from cache
+- [ ] Cache hit rate > 30% for typical usage
+- [ ] Cost savings visible in dashboard
+- [ ] Cache invalidation works correctly
+- [ ] DynamoDB table provisioned
+- [ ] TTL cleanup working
+
+### Consistency Checks
+- [ ] Cache uses semantic similarity (not exact match)
+- [ ] Embedding generation uses Bedrock Titan
+- [ ] TTL is configured correctly
+- [ ] Cache invalidation triggers on document updates
+- [ ] Metrics are tracked accurately
+
+---
+
 ## Implementation Order Guidelines
 
 ### General Principles
@@ -1135,7 +1135,7 @@ Polished user experience with visible agent reasoning.
 1. **Phase 0:** Complete all steps before moving to Phase 1a
 2. **Phase 1a:** Deploy basic MVP before Phase 1b
 3. **Phase 1b:** Add production features before Phase 2
-4. **Phase 2:** Implement all tools before Phase 3
+4. **Phase 2:** Implement all tools before Phase 3+
 5. **Phase 3-7:** Can be implemented in parallel if dependencies are met
 
 ### Within Each Phase
@@ -1221,6 +1221,9 @@ requests~=2.32.0
 python-dotenv~=1.0.0
 tenacity~=9.0.0  # Retry logic
 
+# Rate Limiting
+slowapi~=0.1.9
+
 # Testing
 pytest~=8.3.0
 pytest-asyncio~=0.24.0
@@ -1231,6 +1234,9 @@ pytest-mock~=3.14.0
 black~=24.10.0
 ruff~=0.7.0
 mypy~=1.13.0
+
+# Type Stubs
+types-requests~=2.32.0
 ```
 
 ### Node.js Packages (frontend/package.json)
@@ -1437,7 +1443,7 @@ def test_agent_with_tool():
 - [ ] Connection pooling configured
 - [ ] Circuit breakers prevent cascade failures
 - [ ] Retry logic with exponential backoff
-- [ ] Cache implemented (Phase 4+)
+- [ ] Cache implemented (Phase 7+)
 - [ ] Async operations where appropriate
 
 ### Frontend
@@ -1464,7 +1470,7 @@ def test_agent_with_tool():
 - [ ] No RDS Proxy (use SQLAlchemy pooling)
 
 ### Application
-- [ ] Inference caching (Phase 4+)
+- [ ] Inference caching (Phase 7+)
 - [ ] Semantic similarity matching
 - [ ] TTL-based cache expiration
 - [ ] Efficient embedding generation

@@ -811,7 +811,115 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 
 ---
 
-### Phase 3: Input/Output Verification
+### Phase 3: Observability with Arize Phoenix
+**Goal:** Full tracing and monitoring of agent execution
+
+**Features:**
+- Arize Phoenix self-hosted deployment (ECS Fargate, scales to minimal)
+- LangGraph native callbacks (LangChainTracer) for built-in observability
+- OpenTelemetry integration with LangGraph
+- Structured logging (structlog) with JSON output for CloudWatch
+- Trace visualization for agent runs
+- Comprehensive metrics tracking:
+  - Token usage (input/output tokens per request)
+  - Latency breakdown (LLM call time, tool execution time, total time)
+  - Tool success rate (which tools succeed/fail)
+  - Cache hit rate (inference cache effectiveness)
+  - Cost per request (actual AWS costs)
+  - Error rate by type (timeout, API error, validation error, etc.)
+- Error rate monitoring
+- Tool usage analytics
+- Cost tracking per conversation
+- Log aggregation: centralized logging in CloudWatch with structured JSON
+
+**Infrastructure:**
+- ECS Fargate task for Phoenix (minimal instance) running in the same public subnets created in Phase 1a (still no NAT/VPC endpoints)
+- Persistent storage (EFS for Phoenix data) with mount targets in those public subnets and security groups restricted to the Phoenix task + App Runner VPC connector
+- Internal ALB for Phoenix UI
+- Password protection for Phoenix dashboard
+- CloudWatch integration
+- CloudWatch Logs Insights queries for log analysis
+- CloudWatch Dashboards for key metrics visualization
+
+**Deliverables:**
+- Full trace of every agent execution
+- Latency breakdown visible
+- Token usage tracked
+- Error rates monitored
+- Tool usage analytics
+
+---
+
+### Phase 4: RAG Evaluation with RAGAS
+**Goal:** Automated quality measurement for RAG responses
+
+**Features:**
+- RAGAS integration for evaluation metrics:
+  - Faithfulness (factual accuracy)
+  - Answer relevancy
+  - Context precision
+  - Context recall
+- Evaluation dataset management (S3)
+- Scheduled evaluation runs (daily/weekly via EventBridge)
+- Metrics dashboard in Phoenix
++- Regression alerts (CloudWatch alarms)
++- Evaluation on document updates
+
+**Implementation:**
+- Lambda function for scheduled evaluations
+- S3 bucket for evaluation datasets (separate from document storage bucket for better organization)
+- CloudWatch metrics and alarms
+- Integration with GitHub Actions for PR checks (optional)
+- Evaluation report generation
+
+**Infrastructure Additions:**
+- S3 bucket for RAGAS evaluation datasets (separate from Phase 2 document storage bucket)
+- Lambda function for scheduled RAGAS evaluations (EventBridge trigger)
+- IAM policies for Lambda to access S3 evaluation datasets and Phoenix
+- CloudWatch alarms for quality regression detection
+
+**Deliverables:**
+- Automated RAG quality evaluation
+- Metrics visible in dashboard
+- Alerts on quality regression
+- Evaluation reports generated
+
+---
+
+### Phase 5: Enhanced UI and Thought Process Streaming
+**Goal:** Polished user experience with visible agent reasoning
+
+**Features:**
+- Semantic similarity caching (not just exact match)
+- DynamoDB table for cache storage (on-demand pricing)
+- **DynamoDB TTL** for automatic cache cleanup (no manual deletion needed)
+- Embedding-based cache key generation (Bedrock Titan)
+- TTL-based cache expiration (configurable, default 7 days)
+- Cache hit/miss metrics (tracked in CloudWatch)
+- Configurable similarity threshold (cosine similarity > 0.95)
+- Cache invalidation on document updates
+- **Cost tracking:** Monitor cache effectiveness and cost savings
+
+**Implementation:**
+- Cache check before LLM call
+- Cache write after successful response
+- Cache invalidation on document updates
+- Cost savings dashboard (tokens saved, $ saved)
+
+**Infrastructure Additions:**
+- DynamoDB table for inference cache (on-demand pricing, TTL enabled)
+- IAM policies for App Runner to read/write DynamoDB cache table
+- CloudWatch metrics for cache hit/miss rates
+
+**Deliverables:**
+- Repeated queries return instantly from cache
+- Cache hit rate > 30% for typical usage
+- Cost savings visible in dashboard
+- Cache invalidation works correctly
+
+---
+
+### Phase 6: Input/Output Verification
 **Goal:** SLM guards validate user inputs and agent outputs for safety/quality
 
 **Features:**
@@ -846,116 +954,8 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 
 ---
 
-### Phase 4: Inference Caching
+### Phase 7: Inference Caching
 **Goal:** Reduce costs and latency by caching repeated queries
-
-**Features:**
-- Semantic similarity caching (not just exact match)
-- DynamoDB table for cache storage (on-demand pricing)
-- **DynamoDB TTL** for automatic cache cleanup (no manual deletion needed)
-- Embedding-based cache key generation (Bedrock Titan)
-- TTL-based cache expiration (configurable, default 7 days)
-- Cache hit/miss metrics (tracked in CloudWatch)
-- Configurable similarity threshold (cosine similarity > 0.95)
-- Cache invalidation on document updates
-- **Cost tracking:** Monitor cache effectiveness and cost savings
-
-**Implementation:**
-- Cache check before LLM call
-- Cache write after successful response
-- Cache invalidation on document updates
-- Cost savings dashboard (tokens saved, $ saved)
-
-**Infrastructure Additions:**
-- DynamoDB table for inference cache (on-demand pricing, TTL enabled)
-- IAM policies for App Runner to read/write DynamoDB cache table
-- CloudWatch metrics for cache hit/miss rates
-
-**Deliverables:**
-- Repeated queries return instantly from cache
-- Cache hit rate > 30% for typical usage
-- Cost savings visible in dashboard
-- Cache invalidation works correctly
-
----
-
-### Phase 5: Observability with Arize Phoenix
-**Goal:** Full tracing and monitoring of agent execution
-
-**Features:**
-- Arize Phoenix self-hosted deployment (ECS Fargate, scales to minimal)
-- **LangGraph native callbacks** (LangChainTracer) for built-in observability
-- OpenTelemetry integration with LangGraph
-- **Structured logging** (structlog) with JSON output for CloudWatch
-- Trace visualization for agent runs
-- **Comprehensive Metrics Tracking:**
-  - Token usage (input/output tokens per request)
-  - Latency breakdown (LLM call time, tool execution time, total time)
-  - Tool success rate (which tools succeed/fail)
-  - Cache hit rate (inference cache effectiveness)
-  - Cost per request (actual AWS costs)
-  - Error rate by type (timeout, API error, validation error, etc.)
-- Error rate monitoring
-- Tool usage analytics
-- Cost tracking per conversation
-- **Log aggregation:** Centralized logging in CloudWatch with structured JSON
-
--**Infrastructure:**
-- ECS Fargate task for Phoenix (minimal instance) running in the same public subnets created in Phase 1a (still no NAT/VPC endpoints).
-- Persistent storage (EFS for Phoenix data) with mount targets in those public subnets and security groups restricted to the Phoenix task + App Runner VPC connector.
-- Internal ALB for Phoenix UI
-- Password protection for Phoenix dashboard
-- CloudWatch integration
-- **CloudWatch Logs Insights** queries for log analysis
-- **CloudWatch Dashboards** for key metrics visualization
-
-**Deliverables:**
-- Full trace of every agent execution
-- Latency breakdown visible
-- Token usage tracked
-- Error rates monitored
-- Tool usage analytics
-
----
-
-### Phase 6: RAG Evaluation with RAGAS
-**Goal:** Automated quality measurement for RAG responses
-
-**Features:**
-- RAGAS integration for evaluation metrics:
-  - Faithfulness (factual accuracy)
-  - Answer relevancy
-  - Context precision
-  - Context recall
-- Evaluation dataset management (S3)
-- Scheduled evaluation runs (daily/weekly via EventBridge)
-- Metrics dashboard in Phoenix
-- Regression alerts (CloudWatch alarms)
-- Evaluation on document updates
-
-**Implementation:**
-- Lambda function for scheduled evaluations
-- S3 bucket for evaluation datasets (separate from document storage bucket for better organization)
-- CloudWatch metrics and alarms
-- Integration with GitHub Actions for PR checks (optional)
-- Evaluation report generation
-
-**Infrastructure Additions:**
-- S3 bucket for RAGAS evaluation datasets (separate from Phase 2 document storage bucket)
-- Lambda function for scheduled RAGAS evaluations (EventBridge trigger)
-- IAM policies for Lambda to access S3 evaluation datasets and Phoenix
-- CloudWatch alarms for quality regression detection
-
-**Deliverables:**
-- Automated RAG quality evaluation
-- Metrics visible in dashboard
-- Alerts on quality regression
-- Evaluation reports generated
-
----
-
-### Phase 7: Enhanced UI and Thought Process Streaming
-**Goal:** Polished user experience with visible agent reasoning
 
 **Features:**
 - Real-time thought process display:

@@ -53,9 +53,10 @@
 **Key Principle:** Docker-first development - all code runs in containers, dependencies installed via Docker, no local venv or npm install needed.
 
 **Execution Context Clarification:**
-- **On Host:** Initial project setup (Git init, directory creation, .env setup), pre-commit installation
-- **In Docker:** All Python/Node development, testing, running services
-- **Exception:** `npx create-next-app` and `npx shadcn-ui` run on host for initial setup, then all development moves to Docker
+- **On Host (WSL):** Initial project setup (Git init, directory creation, .env setup), install host tools (Node 20+ via nvm, Python 3.11+ for pre-commit, AWS CLI v2), run `npx create-next-app` and `npx shadcn-ui`
+- **In Docker:** All Python/Node runtime, development, testing, running services after scaffolding
+- **Paths:** Work from WSL paths (e.g., `~/Projects/aws-enterprise-agentic-ai`), not `/mnt/c/...`, for fast volumes and reliable file watching
+- **Quick start for location:** After opening your WSL terminal, run `cd ~/Projects/aws-enterprise-agentic-ai` before any commands.
 
 **Estimated Time:** 4-6 hours for complete implementation
 
@@ -93,6 +94,7 @@ wsl -l -v
 3. Go to Settings → Resources → WSL Integration
 4. ✅ Enable integration with your Ubuntu distro
 5. Click "Apply & Restart"
+6. Back in WSL, confirm: `docker --version` and `docker compose version`
 
 ### Where to Run Commands
 
@@ -103,6 +105,8 @@ wsl -l -v
 | Git commands | WSL terminal (Ubuntu) |
 | `chmod +x` scripts | WSL terminal (Ubuntu) |
 | Opening Cursor/VS Code | Windows (with WSL extension) |
+
+**Open the project from WSL:** In your WSL terminal, `cd ~/Projects/aws-enterprise-agentic-ai` then run `cursor .` (or `code .`). Avoid opening from Windows Explorer paths.
 
 ### Opening Project in Cursor/VS Code
 
@@ -151,6 +155,11 @@ Before writing any code, we need to ensure all required tools, services, and acc
 
 ### Step-by-Step Prerequisites
 
+**Host vs Container Responsibilities (Phase 0)**
+- Host (WSL): Install toolchain only (Node 20+ via nvm, Python 3.11+ for pre-commit, AWS CLI v2, Git); run scaffolding commands (`npx create-next-app`, `npx shadcn`), pre-commit, and AWS auth. Work from WSL paths (e.g., `~/Projects/aws-enterprise-agentic-ai`), not `/mnt/c/...`.
+- Containers: All runtime dependencies and services run in Docker (backend, frontend, tests, installs). Do not create a host venv or run `npm install` beyond the initial scaffolding commands.
+- Before running commands: `cd ~/Projects/aws-enterprise-agentic-ai` in your WSL terminal (avoid `/mnt/c/...`).
+
 #### 1.1 Verify Local Tools
 
 **Command (run in WSL terminal):**
@@ -176,6 +185,7 @@ git --version
 ```
 
 **Note:** If Docker commands fail, ensure Docker Desktop is running and WSL integration is enabled (Settings → Resources → WSL Integration).
+- Quick Docker Desktop verification (WSL): after enabling WSL integration, run `docker --version` and `docker compose version` in WSL to confirm connectivity.
 
 **Expected Output:**
 - Docker: 24.0+ or 20.10+
@@ -184,12 +194,24 @@ git --version
 - AWS CLI: aws-cli/2.x.x
 - Git: 2.x.x
 
-**If Missing:**
-- **Docker:** Install Docker Desktop from https://www.docker.com/products/docker-desktop
-- **Python:** Install from https://www.python.org/downloads/ (3.11+)
-- **Node.js:** Install from https://nodejs.org/ (20+)
-- **AWS CLI:** Install from https://aws.amazon.com/cli/
-- **Git:** Install from https://git-scm.com/downloads
+**Location:** Run these checks and installs from WSL paths (e.g., `~/Projects/aws-enterprise-agentic-ai`), not `/mnt/c/...`, for fast Docker volumes and reliable file watching.
+
+**If Missing (install in WSL, not Windows):**
+- **Docker:** Install Docker Desktop from https://www.docker.com/products/docker-desktop and enable WSL 2 integration
+- **Python (WSL):** Install Python 3.11+ in WSL (host Python is mainly for pre-commit; runtime is in Docker). If only Python 3.12 is present, also install 3.11 or adjust pre-commit `language_version`.
+- **Node.js (WSL):** Install Node 20+ in WSL (not Windows). Recommended: nvm  
+  ```bash
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  source ~/.bashrc
+  nvm install 20 && nvm use 20
+  node --version
+  ```
+- If `nvm` is not found, open a new terminal or `source ~/.bashrc`.
+- Alternative (fallback): NodeSource for Ubuntu 22/24 (if nvm fails) — install in WSL only.
+- **AWS CLI (WSL):** Install AWS CLI v2 in WSL and configure there (use `aws configure` or `aws configure sso` if using SSO). Verify with `aws sts get-caller-identity`.
+- **Git:** Install from https://git-scm.com/downloads (or `sudo apt install git` in WSL)
+
+**Region and paths:** Use `us-east-1` consistently (AWS/Pinecone). Keep all work and installs in WSL paths (e.g., `~/Projects/aws-enterprise-agentic-ai`), not `/mnt/c/...`.
 
 #### 1.2 Configure AWS CLI
 
@@ -203,6 +225,7 @@ aws configure
 - AWS Secret Access Key: `<your-secret-key>`
 - Default region name: `us-east-1`
 - Default output format: `json`
+- If using SSO: run `aws configure sso` in WSL and set the profile in `.env` if your app expects it.
 
 **Verify Configuration:**
 ```bash
@@ -230,6 +253,10 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?m
 
 **Common Issue:** If you get "AccessDeniedException", wait for approval (usually instant, can take up to 24 hours)
 
+**Reminder:** Add AWS credentials and region (`us-east-1`) to `.env` in WSL. Keep `.env` gitignored (`git check-ignore .env` should output `.env`). For SSO, run `aws configure sso` in WSL and ensure the profile used by the project is set in `.env` if applicable.
+- If access is denied initially, re-run the verification command after access is approved.
+- Some organizations require accepting Bedrock terms in the AWS Console before access is granted; check the Bedrock console if approval seems delayed.
+
 #### 1.4 Create Pinecone Account and Index
 
 **Action:** 
@@ -240,12 +267,12 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?m
    - **Dimensions:** `1536` (Bedrock Titan embedding size)
    - **Metric:** `cosine`
    - **Cloud:** AWS
-   - **Region:** `us-east-1` (must match AWS region)
+   - **Region:** `us-east-1` (must match AWS region; use the serverless region, e.g., `PINECONE_ENVIRONMENT=us-east-1`)
 
 **Get API Key:**
 - Go to API Keys in Pinecone dashboard
 - Copy your API key
-- Save for `.env` file (Step 2.5)
+- Save for `.env` file (Step 2.5) in WSL
 
 **Note:** Pinecone Serverless uses "environment" terminology (e.g., `us-east-1`). The `.env.example` uses `PINECONE_ENVIRONMENT` for this value.
 
@@ -255,18 +282,18 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?m
 1. Go to https://tavily.com
 2. Create free account
 3. Get API key from dashboard
-4. Free tier: 1,000 searches/month
+4. Free tier: 1,000 searches/month (no extra setup needed)
 
 **Get API Key:**
 - Copy API key from Tavily dashboard
-- Save for `.env` file (Step 2.3)
+- Save for `.env` file (Step 2.3) in WSL
 
 #### 1.6 Create OpenWeatherMap Account (Optional for Phase 0)
 
 **Action:**
 1. Go to https://openweathermap.org/api
 2. Create free account
-3. Get API key from dashboard
+3. Choose the Free plan and get API key from dashboard
 4. Free tier: 60 calls/minute, 1M calls/month
 
 **Note:** This is optional for Phase 0 but recommended to set up now. Can use mock data if not set up.
@@ -414,7 +441,10 @@ cat .env.example | grep -c "="  # Should be 15+ variables
 **Command:**
 ```bash
 # Copy example to actual .env
-cp .env.example .env
+cp .env.example .env  # run in WSL from project root
+
+# Safety: ensure .env is gitignored
+git check-ignore .env  # Should output: .env
 
 # Edit .env and fill in your actual values
 # Use your preferred editor (nano, vim, VS Code, etc.)
@@ -1564,6 +1594,8 @@ docker-compose config
 ```
 
 **Expected Output:** Should show validated configuration without errors
+
+**Command syntax note:** We use `docker compose` (V2). `docker-compose` (hyphen) also works if installed; commands are interchangeable.
 
 #### 7.4 Create .dockerignore Files
 
