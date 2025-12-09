@@ -890,32 +890,34 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 **Goal:** Polished user experience with visible agent reasoning
 
 **Features:**
-- Semantic similarity caching (not just exact match)
-- DynamoDB table for cache storage (on-demand pricing)
-- **DynamoDB TTL** for automatic cache cleanup (no manual deletion needed)
-- Embedding-based cache key generation (Bedrock Titan)
-- TTL-based cache expiration (configurable, default 7 days)
-- Cache hit/miss metrics (tracked in CloudWatch)
-- Configurable similarity threshold (cosine similarity > 0.95)
-- Cache invalidation on document updates
-- **Cost tracking:** Monitor cache effectiveness and cost savings
+- Real-time thought process display:
+  - "Searching the web for..."
+  - "Querying database..."
+  - "Analyzing documents..."
+  - Tool input/output visibility
+- Collapsible reasoning panels
+- Source citations with links
+- Conversation history (DynamoDB)
+- Dark/light mode toggle
+- Mobile responsive design
+- Loading states and animations
+- Error message display
+- Retry functionality
 
-**Implementation:**
-- Cache check before LLM call
-- Cache write after successful response
-- Cache invalidation on document updates
-- Cost savings dashboard (tokens saved, $ saved)
-
-**Infrastructure Additions:**
-- DynamoDB table for inference cache (on-demand pricing, TTL enabled)
-- IAM policies for App Runner to read/write DynamoDB cache table
-- CloudWatch metrics for cache hit/miss rates
+**UI Components:**
+- Chat message bubbles
+- Thought process timeline
+- Source citation cards
+- Tool execution cards
+- Loading skeletons
+- Error toast notifications
 
 **Deliverables:**
-- Repeated queries return instantly from cache
-- Cache hit rate > 30% for typical usage
-- Cost savings visible in dashboard
-- Cache invalidation works correctly
+- Beautiful, professional UI
+- Thought process visible in real-time
+- Sources clearly cited
+- Conversation history persists
+- Mobile-friendly design
 
 ---
 
@@ -958,34 +960,32 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 **Goal:** Reduce costs and latency by caching repeated queries
 
 **Features:**
-- Real-time thought process display:
-  - "Searching the web for..."
-  - "Querying database..."
-  - "Analyzing documents..."
-  - Tool input/output visibility
-- Collapsible reasoning panels
-- Source citations with links
-- Conversation history (DynamoDB)
-- Dark/light mode toggle
-- Mobile responsive design
-- Loading states and animations
-- Error message display
-- Retry functionality
+- Semantic similarity caching (not just exact match)
+- DynamoDB table for cache storage (on-demand pricing)
+- **DynamoDB TTL** for automatic cache cleanup (no manual deletion needed)
+- Embedding-based cache key generation (Bedrock Titan)
+- TTL-based cache expiration (configurable, default 7 days)
+- Cache hit/miss metrics (tracked in CloudWatch)
+- Configurable similarity threshold (cosine similarity > 0.95)
+- Cache invalidation on document updates
+- **Cost tracking:** Monitor cache effectiveness and cost savings
 
-**UI Components:**
-- Chat message bubbles
-- Thought process timeline
-- Source citation cards
-- Tool execution cards
-- Loading skeletons
-- Error toast notifications
+**Implementation:**
+- Cache check before LLM call
+- Cache write after successful response
+- Cache invalidation on document updates
+- Cost savings dashboard (tokens saved, $ saved)
+
+**Infrastructure Additions:**
+- DynamoDB table for inference cache (on-demand pricing, TTL enabled)
+- IAM policies for App Runner to read/write DynamoDB cache table
+- CloudWatch metrics for cache hit/miss rates
 
 **Deliverables:**
-- Beautiful, professional UI
-- Thought process visible in real-time
-- Sources clearly cited
-- Conversation history persists
-- Mobile-friendly design
+- Repeated queries return instantly from cache
+- Cache hit rate > 30% for typical usage
+- Cost savings visible in dashboard
+- Cache invalidation works correctly
 
 ---
 
