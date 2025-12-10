@@ -21,6 +21,7 @@
 | File | Purpose |
 |------|---------|
 | .gitignore | Git ignore patterns |
+| .gitattributes | Git attributes (line endings, binaries, platform defaults) |
 | .env.example | Environment variable template (copy to .env) |
 | .pre-commit-config.yaml | Pre-commit hooks configuration |
 | .gitleaks.toml | Gitleaks secret scanning rules |
