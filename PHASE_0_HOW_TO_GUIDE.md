@@ -163,6 +163,7 @@ Before writing any code, we need to ensure all required tools, services, and acc
 #### 1.1 Verify Local Tools
 
 **Command (run in WSL terminal):**
+# "bash" command changes the terminal from powershell to bash
 ```bash
 # Verify you're in WSL (should show "Linux")
 uname -a
@@ -213,7 +214,7 @@ git --version
 
 **Region and paths:** Use `us-east-1` consistently (AWS/Pinecone). Keep all work and installs in WSL paths (e.g., `~/Projects/aws-enterprise-agentic-ai`), not `/mnt/c/...`.
 
-#### 1.2 Configure AWS CLI
+#### 1.2 Configure AWS CLI 
 
 **Command:**
 ```bash
