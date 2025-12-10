@@ -283,6 +283,9 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?m
 1. Go to https://pinecone.io
 2. Create free account (Starter tier is free)
 3. Create a **Serverless** index with these settings:
+   - For phase 0, may need to go back and make a new one for later.
+   - Pick MANUAL 
+   - Pick Dense
    - **Name:** `demo-index`
    - **Dimensions:** `1536` (Bedrock Titan embedding size)
    - **Metric:** `cosine`
