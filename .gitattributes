@@ -1,0 +1,48 @@
+* text=auto
+
+# Enforce LF for source, configs, docs
+*.sh text eol=lf
+*.bash text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+Makefile text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.toml text eol=lf
+*.sql text eol=lf
+
+# Preserve Windows scripts as CRLF if added later
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+# Treat binaries as binary to avoid line ending changes
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.xz binary
+*.7z binary
+*.pyc binary
+*.pkl binary
+
