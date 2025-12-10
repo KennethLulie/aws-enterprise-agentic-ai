@@ -208,12 +208,32 @@ git --version
   ```
 - If `nvm` is not found, open a new terminal or `source ~/.bashrc`.
 - Alternative (fallback): NodeSource for Ubuntu 22/24 (if nvm fails) — install in WSL only.
-- **AWS CLI (WSL):** Install AWS CLI v2 in WSL and configure there (use `aws configure` or `aws configure sso` if using SSO). Verify with `aws sts get-caller-identity`.
+- **AWS CLI (WSL):** Install AWS CLI v2 inside WSL (not Windows). Use the official installer and keep CLI usage inside WSL for Docker-first workflows.  
+  ```bash
+  cd /tmp
+  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  unzip -q awscliv2.zip
+  sudo ./aws/install           # use --update to upgrade an existing install
+  aws --version && which aws   # verify v2 and path (should be /usr/local/bin/aws)
+  aws --help | head -n 3       # quick sanity
+  rm -rf aws awscliv2.zip      # cleanup installer artifacts
+  ```
+  - Verification (after configuration): `aws sts get-caller-identity`
+  - If you prefer SSO: `aws configure sso` in WSL and use that profile
 - **Git:** Install from https://git-scm.com/downloads (or `sudo apt install git` in WSL)
 
 **Region and paths:** Use `us-east-1` consistently (AWS/Pinecone). Keep all work and installs in WSL paths (e.g., `~/Projects/aws-enterprise-agentic-ai`), not `/mnt/c/...`.
 
 #### 1.2 Configure AWS CLI
+
+**Create a project-specific IAM user (personal account):**
+- Sign in to the AWS console (personal account, not root for daily use).
+- IAM → Users → Create user → Name: e.g., `agentic-demo-cli`.
+- Access type: Attach a policy -> Programmatic access (CLI), scroll down to the bottom then click next.
+  - For fastest start: `AdministratorAccess` (tighten later to least privilege).
+- Finish creation, then open the user → Security credentials → Create access key.
+- Choose “Command Line Interface (CLI)”, create the key, and download the `.csv`.
+- Save Access Key ID and Secret Access Key in a password manager; do not commit to git or .env.
 
 **Command:**
 ```bash
@@ -223,15 +243,14 @@ aws configure
 **Input Required:**
 - AWS Access Key ID: `<your-access-key>`
 - AWS Secret Access Key: `<your-secret-key>`
-- Default region name: `us-east-1`
+- Default region name: `us-east-1` (project default)
 - Default output format: `json`
-- If using SSO: run `aws configure sso` in WSL and set the profile in `.env` if your app expects it.
+- If using SSO: run `aws configure sso` in WSL, select profile, and set that profile in `.env` if the app expects it.
 
-**Verify Configuration:**
+**Verify identity (after configure/SSO):**
 ```bash
 aws sts get-caller-identity
 ```
-
 **Expected Output:** Should show your AWS account ID and user ARN
 
 #### 1.3 Request Bedrock Model Access
