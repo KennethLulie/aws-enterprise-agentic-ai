@@ -163,7 +163,7 @@ Fully working agent locally before any AWS deployment.
    - `search.py` - Return mock data
    - `sql.py` - Return mock data
    - `rag.py` - Return mock data
-   - `weather.py` - Return mock data (MCP connection demo for Weather)
+   - `market_data.py` - Return mock market data (FMP via MCP demo)
 
 #### Step 5: Frontend Foundation
 1. **Next.js Setup** (`frontend/`)
@@ -548,7 +548,7 @@ Add production-grade features: persistent state, CI/CD, observability, security 
    - AWS_REGION
    - TAVILY_API_KEY
    - PINECONE_API_KEY
-   - OPENWEATHER_API_KEY
+   - FMP_API_KEY
 
 ### Phase 1b Deliverables Checklist
 - [ ] Conversation state persists across restarts
@@ -610,12 +610,12 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **Traversal:** 1-2 hop relationship queries
 - **Cost:** ~$0.001/doc ingestion, $0/query (free tier)
 
-#### Tool 2d: Weather API
-- **API:** OpenWeatherMap (free tier: 60 calls/minute)
-- **Error Handling:** Retry with exponential backoff
+#### Tool 2d: Market Data (FMP via MCP)
+- **API:** Financial Modeling Prep (free tier ~250 calls/day; batch quotes supported)
+- **Error Handling:** Retry with exponential backoff; handle 429s gracefully
 - **Circuit Breaker:** 5 failures → open, recover after 60s
-- **Input Validation:** City name, coordinates, or ZIP code
-- **Output:** Temperature, conditions, humidity, wind speed
+- **Input Validation:** Ticker list (1..N), uppercased, trimmed
+- **Output:** price, change, change%, open, previous close, day high/low, volume, currency, exchange, timestamp
 
 #### Infrastructure Additions
 - **S3 Bucket:** Document storage (separate from frontend bucket)
@@ -749,13 +749,13 @@ Agent can search the web, query SQL databases, and retrieve from documents.
     - Source citation
     - Error handling with fallbacks
 
-#### Step 4: Weather API Tool
-1. **Tool Implementation** (`backend/src/agent/tools/weather.py`)
-   - OpenWeatherMap API client exposed via an MCP connection (demoing MCP compatibility; API key only needed when enabling live calls)
+#### Step 4: Market Data Tool
+1. **Tool Implementation** (`backend/src/agent/tools/market_data.py`)
+   - FMP client exposed via MCP (mock mode when no API key)
    - Tool definition for LangGraph
-   - Input validation (city/coordinates/ZIP)
+   - Input validation (ticker list)
    - Result formatting
-   - Unit conversion
+   - Basic batching guidance (comma-separated tickers)
    - Error handling with retry
    - Circuit breaker
    - Structured logging
@@ -793,7 +793,7 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - [ ] Agent can search the web and cite sources
 - [ ] Agent can query SQL database with natural language
 - [ ] Agent can retrieve relevant documents from vector store
-- [ ] Agent can retrieve current weather information
+- [ ] Agent can retrieve current market data (FMP)
 - [ ] Documents uploaded to S3 are automatically indexed
 - [ ] Tool selection is intelligent and contextual
 - [ ] All tools have circuit breakers
@@ -1360,10 +1360,10 @@ terraform {
 - **Free Tier:** 1,000 searches/month
 - **Rate Limit:** Respect API limits
 
-### OpenWeatherMap
-- **API Endpoint:** https://api.openweathermap.org/data/2.5/weather (accessed via MCP connection for demo compatibility)
-- **Free Tier:** 60 calls/minute, 1M calls/month
-- **Rate Limit:** 60 calls/minute (API key only needed when switching from mock MCP demo to live calls)
+### Financial Modeling Prep (FMP)
+- **API Endpoint:** https://financialmodelingprep.com/api/v3 (used for market data via MCP)
+- **Free Tier:** ~250 calls/day, batch quote endpoint supports multiple tickers
+- **Rate Limit Guidance:** Keep requests modest (e.g., 5–10 per minute) and batch tickers when possible; mock mode is used when no API key is provided in Phase 0
 
 ### AWS Bedrock
 - **Region:** us-east-1

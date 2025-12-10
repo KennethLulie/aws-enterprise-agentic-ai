@@ -43,6 +43,13 @@
 |------|---------|
 | backend/Dockerfile.dev | Development Docker image |
 | backend/requirements.txt | Python dependencies |
+| backend/src/config/settings.py | Pydantic settings with environment and FMP config |
+| backend/src/agent/__init__.py | Agent package marker |
+| backend/src/agent/graph.py | LangGraph tool registration |
+| backend/src/agent/tools/__init__.py | Tools package exports |
+| backend/src/agent/tools/market_data.py | FMP market data tool (mock-friendly) |
+| backend/tests/__init__.py | Tests package |
+| backend/tests/test_tools.py | Tool tests (mock/live scenarios) |
 
 ### Frontend Directory
 | File | Purpose |
@@ -70,30 +77,25 @@
 |------|---------------|---------|
 | backend/src/__init__.py | 2.1a | Package marker |
 | backend/src/config/__init__.py | 3.2 | Config package |
-| backend/src/config/settings.py | 3.2 | Pydantic settings |
 | backend/src/api/__init__.py | 3.3 | API package |
 | backend/src/api/main.py | 3.3 | FastAPI application |
 | backend/src/api/routes/__init__.py | 3.4 | Routes package |
 | backend/src/api/routes/health.py | 3.4 | Health check endpoint |
-| backend/src/agent/__init__.py | 4.1 | Agent package |
 | backend/src/agent/state.py | 4.1 | Agent state schema |
-| backend/src/agent/graph.py | 4.5 | LangGraph definition |
 | backend/src/agent/nodes/__init__.py | 4.2 | Nodes package |
 | backend/src/agent/nodes/chat.py | 4.2 | Chat node |
 | backend/src/agent/nodes/tools.py | 4.3 | Tool execution node |
 | backend/src/agent/nodes/error_recovery.py | 4.4 | Error recovery |
-| backend/src/agent/tools/__init__.py | 5.1 | Tools package |
 | backend/src/agent/tools/search.py | 5.2 | Search tool stub |
 | backend/src/agent/tools/sql.py | 5.3 | SQL tool stub |
 | backend/src/agent/tools/rag.py | 5.4 | RAG tool stub |
-| backend/src/agent/tools/weather.py | 5.5 | Weather tool stub |
+| backend/src/agent/tools/market_data.py | 5.5 | Market data tool stub (FMP via MCP) |
 
 **Backend Tests (Section 9):**
 | File | Target Section | Purpose |
 |------|---------------|---------|
 | backend/tests/__init__.py | 9.2 | Tests package |
 | backend/tests/test_agent.py | 9.3 | Agent tests |
-| backend/tests/test_tools.py | 9.4 | Tool tests |
 | backend/tests/test_api.py | 9.5 | API tests |
 | backend/pytest.ini | 9.1 | Pytest configuration |
 

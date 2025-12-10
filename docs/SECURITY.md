@@ -36,7 +36,7 @@ Open `.env` and replace the placeholder values with your actual keys:
 | `AWS_SECRET_ACCESS_KEY` | AWS Console → IAM → Users → Security credentials |
 | `TAVILY_API_KEY` | https://tavily.com → Dashboard |
 | `PINECONE_API_KEY` | https://pinecone.io → Dashboard |
-| `OPENWEATHER_API_KEY` | https://openweathermap.org/api → Dashboard |
+| `FMP_API_KEY` | https://financialmodelingprep.com → Dashboard |
 
 ### Step 3: Verify .env is Gitignored
 
@@ -64,10 +64,10 @@ For production, secrets are stored in AWS Secrets Manager and loaded automatical
 
 2. **Required Secrets:**
    ```
-   DEMO_PASSWORD      → Password for demo access
-   TAVILY_API_KEY     → Tavily search API key
-   PINECONE_API_KEY   → Pinecone vector database key
-   OPENWEATHER_API_KEY → OpenWeatherMap API key (optional)
+   DEMO_PASSWORD    → Password for demo access
+   TAVILY_API_KEY   → Tavily search API key
+   PINECONE_API_KEY → Pinecone vector database key
+   FMP_API_KEY      → Financial Modeling Prep API key
    ```
 
 3. **Backend Configuration:**

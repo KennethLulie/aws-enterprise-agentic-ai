@@ -19,7 +19,7 @@ This project demonstrates a **production-ready agentic AI system** that showcase
 - Research assistants that synthesize information from multiple sources
 
 This project showcases a production-ready AI agent system with:
-- **Multi-tool orchestration** (Web Search, SQL Query, RAG Retrieval, Weather API)
+- **Multi-tool orchestration** (Web Search, SQL Query, RAG Retrieval, Market Data API)
 - **Input/Output verification** with SLMs for cost optimization
 - **Streaming thought process** visualization
 - **Inference caching** for cost optimization
@@ -120,8 +120,8 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
 │                                                                         │
 │  ┌─────────────────────  TOOLS  ───────────────────────────────────┐    │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │    │
-│  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Weather   │ │    │
-│  │  │   Search   │  │   Query    │  │  Retrieval │  │    API     │ │    │
+│  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Market    │ │    │
+│  │  │   Search   │  │   Query    │  │  Retrieval │  │   Data     │ │    │
 │  │  │            │  │  (Aurora)  │  │ (Pinecone) │  │   (MCP)    │ │    │
 │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
@@ -167,7 +167,7 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
 2. **Runtime Layer**: 
    - **Frontend**: Static Next.js export hosted on S3/CloudFront with password protection
    - **Backend**: AWS App Runner hosts the LangGraph agent orchestrator with Bedrock Nova LLM, input/output verification, inference caching, and Arize Phoenix tracing
-   - **Tools**: Four integrated tools (Tavily web search, Aurora SQL queries, Pinecone RAG retrieval, Weather API) that the agent can intelligently select and use
+   - **Tools**: Four integrated tools (Tavily web search, Aurora SQL queries, Pinecone RAG retrieval, Market Data API) that the agent can intelligently select and use
 
 3. **Data Layer**: Aurora PostgreSQL for structured data, Pinecone Serverless for vector storage, S3 for document storage with Lambda-triggered auto-ingestion
 
@@ -206,7 +206,7 @@ docker compose up
 - **Phase 0:** Local development environment
 - **Phase 1a:** Minimal MVP (basic chat interface)
 - **Phase 1b:** Production hardening (persistent state, CI/CD)
-- **Phase 2:** Core agent tools (Search, SQL, RAG, Weather API)
+- **Phase 2:** Core agent tools (Search, SQL, RAG, Market Data API)
 - **Phase 3+:** Advanced features (verification, caching, observability, evaluation)
 
 See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for complete details.
@@ -243,7 +243,7 @@ See [docs/SECURITY.md](./docs/SECURITY.md) for the complete security guide.
 ## 🚀 Enterprise Features Deep Dive
 
 ### Multi-Tool Orchestration
-The LangGraph agent framework intelligently coordinates multiple tools based on user queries. The agent decides which tools to use, in what order, and how to combine their outputs. For example, a query like "What's the weather in Austin and how does it compare to our customer data there?" triggers the Weather MCP connection (OpenWeather via MCP demo) alongside the SQL query tool, with the agent synthesizing the results.
+The LangGraph agent framework intelligently coordinates multiple tools based on user queries. The agent decides which tools to use, in what order, and how to combine their outputs. For example, a query like "How did AAPL and MSFT move today and how does that compare to our customer data there?" triggers the Market Data MCP connection (FMP via MCP demo) alongside the SQL query tool, with the agent synthesizing the results.
 
 ### Advanced RAG (Retrieval-Augmented Generation)
 Beyond basic vector search, this system implements state-of-the-art RAG techniques:

@@ -3,7 +3,7 @@
 ## Executive Summary
 
 This project builds an enterprise-grade agentic AI system on AWS demonstrating:
-- Multi-tool agent orchestration (Web Search, SQL, RAG, Weather API)
+- Multi-tool agent orchestration (Web Search, SQL, RAG, Market Data API)
 - Input/output verification with SLMs
 - Streaming thought process visualization
 - Inference caching for cost optimization
@@ -59,8 +59,8 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
 │                                                                         │
 │  ┌─────────────────────  TOOLS  ───────────────────────────────────┐    │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │    │
-│  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Weather   │ │    │
-│  │  │   Search   │  │   Query    │  │  Retrieval │  │    API     │ │    │
+│  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Market    │ │    │
+│  │  │   Search   │  │   Query    │  │  Retrieval │  │   Data     │ │    │
 │  │  │            │  │  (Aurora)  │  │ (Pinecone) │  │   (MCP)    │ │    │
 │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
@@ -348,11 +348,11 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
    - Free tier: 1,000 searches/month (sufficient for demo)
    - Copy API key to your `.env` file
 
-3. **OpenWeatherMap (via MCP, optional for live calls in Phase 2):**
-   - Create account at https://openweathermap.org/api
-   - Get API key from dashboard (free tier: 60 calls/minute, 1M calls/month)
+3. **Financial Modeling Prep (FMP) for Market Data via MCP:**
+   - Create account at https://financialmodelingprep.com (no credit card)
+   - Get API key from dashboard (free tier: ~250 calls/day, batch quotes supported)
    - Copy API key to your `.env` file
-   - Note: Phase 0 uses a mock Weather MCP connection to demonstrate MCP compatibility; the API key is only needed when enabling live calls.
+   - Note: Phase 0 can run in mock mode; the API key enables live quotes.
 
 **Setup Process:**
 ```bash
@@ -402,7 +402,7 @@ docker-compose up
 | `docker-compose up` fails with permissions error | Docker Desktop not running or user not in docker group | Start Docker Desktop / run `sudo usermod -aG docker $USER` then re-login |
 | Pinecone 401 on startup | Missing API key in `.env` | Add `PINECONE_API_KEY` and restart backend |
 | Tavily tool fails immediately | Free-tier rate limit hit | Wait 60s, set `TAVILY_API_KEY` correctly, or upgrade plan |
-| Weather API returns 401 | Missing or invalid API key | Set `OPENWEATHER_API_KEY` in `.env` or use free tier without key (limited) |
+| Market Data API returns 401 | Missing or invalid API key | Set `FMP_API_KEY` in `.env` or use mock mode (no key required for Phase 0) |
 | Terraform state lock message | Previous `terraform apply` exited abruptly | Delete lock entry from DynamoDB table `terraform-state-lock` using AWS Console |
 
 ---
@@ -758,18 +758,17 @@ If something isn't working, follow this systematic debugging process:
 - Metadata filtering (document_type, date_range, etc.)
 - **Fallback mechanisms:** Graceful degradation if Pinecone/KG unavailable
 
-**2d. Weather API Tool**
-- OpenWeatherMap integration exposed via an MCP connection (demoing MCP compatibility; live calls optional with API key)
+**2d. Market Data Tool (FMP via MCP)**
+- Financial Modeling Prep integration exposed via MCP (live calls optional; mock mode when no API key)
 - Tool definition in LangGraph (using built-in tool binding)
-- Result formatting with temperature, conditions, humidity, wind speed
+- Result formatting with price, change, change%, open/close, day high/low, volume, currency, exchange, timestamp
 - **Comprehensive error handling** with retry logic and exponential backoff
 - **Fallback mechanisms:** Graceful degradation if API unavailable
 - **Circuit breaker pattern:** Stop trying after 5 failures, recover after 60s
-- Rate limiting (respect API limits - 60 calls/minute free tier)
-- **Structured logging** of weather queries and results
-- Input validation (city name, coordinates, or ZIP code)
-- Unit conversion (Celsius/Fahrenheit, metric/imperial)
-- **Error handling:** User-friendly messages for invalid locations
+- Rate limiting guidance for free tier (~250 calls/day) with batching for multiple tickers
+- **Structured logging** of market data queries and results
+- Input validation (ticker list, uppercase, comma-separated)
+- **Error handling:** User-friendly messages for invalid tickers
 - **No infrastructure required:** Uses existing App Runner backend, no new AWS services
 
 **Infrastructure Additions:**
@@ -833,7 +832,7 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Agent can search the web and cite sources
 - Agent can query SQL database with natural language
 - Agent can retrieve relevant documents from vector store
-- Agent can retrieve current weather information by location
+- Agent can retrieve current market data (FMP) for requested tickers
 - Documents uploaded to S3 are automatically indexed
 - Tool selection is intelligent and contextual
 
@@ -1163,7 +1162,7 @@ aws-enterprise-agentic-ai/
 │   │   │       ├── search.py     # Tavily search (with fallback, circuit breaker)
 │   │   │       ├── sql.py        # Aurora query (SQL injection prevention)
 │   │   │       ├── rag.py        # Pinecone retrieval (query expansion, RRF, compression)
-│   │   │       └── weather.py    # Weather API (OpenWeatherMap, circuit breaker)
+│   │   │       └── market_data.py # Market data (FMP via MCP, circuit breaker)
 │   │   ├── cache/
 │   │   │   ├── __init__.py
 │   │   │   └── inference_cache.py
@@ -1436,14 +1435,14 @@ aws-enterprise-agentic-ai/
 
 ### Unit Tests (Core Logic):
 - Agent nodes (chat, tools, verification) - Critical paths only
-- Individual tools (search, SQL, RAG, weather) - Main functionality
+- Individual tools (search, SQL, RAG, market data) - Main functionality
 - Cache logic - Core caching behavior
 - Utility functions - Reusable helpers
 
 **Testing Tools:**
 - Python: pytest with pytest-cov (aim for 70%+ coverage on critical paths)
 - TypeScript: Jest for frontend components
-- Mock external services (Bedrock, Tavily, Pinecone, OpenWeatherMap) for unit tests
+- Mock external services (Bedrock, Tavily, Pinecone, FMP) for unit tests
 
 ### Integration Tests (Key Flows):
 - Tool interactions - Verify tools work together
@@ -1578,7 +1577,7 @@ aws-enterprise-agentic-ai/
 2. **Service Failures:**
    - **Health checks** (`/health` endpoint with dependency checks)
    - **Graceful error handling** with user-friendly messages
-   - **Fallback mechanisms** for each tool (search, SQL, RAG, weather)
+   - **Fallback mechanisms** for each tool (search, SQL, RAG, market data)
    - **Circuit breakers** to prevent cascade failures
    - **Retry logic** with exponential backoff
    - **Auto-restart** via App Runner health checks
@@ -1649,13 +1648,13 @@ aws-enterprise-agentic-ai/
 - [ ] Bedrock model access approved (check in console)
 - [ ] Pinecone account created, index created, API key copied
 - [ ] Tavily account created, API key copied
-- [ ] OpenWeatherMap account created, API key copied (optional for Phase 2)
+- [ ] FMP account created, API key copied (optional; mock mode without key)
 - [ ] Git installed
 
 1. **Set up local development environment:**
    - Clone/initialize repository
    - Copy `.env.example` to `.env`
-   - Fill in API keys (Tavily, Pinecone, OpenWeatherMap, AWS)
+   - Fill in API keys (Tavily, Pinecone, FMP, AWS)
    - Run `./scripts/setup.sh` to validate prerequisites
    - Run `docker-compose up` to start services
 
@@ -1711,7 +1710,7 @@ aws dynamodb create-table \
 - `TAVILY_API_KEY` - For web search tool (Phase 2)
 - `PINECONE_API_KEY` - For vector store (Phase 2)
 - `PINECONE_INDEX_NAME` - demo-index (Phase 2)
-- `OPENWEATHER_API_KEY` - For weather API tool (Phase 2, optional)
+- `FMP_API_KEY` - For market data tool (FMP via MCP; mock mode without key)
 - **Note:** `DEMO_PASSWORD` is stored in Secrets Manager, not GitHub (Lambda reads from Secrets Manager)
 
 **Phase 1a Deployment Order (Minimal MVP):**

@@ -89,7 +89,7 @@ async def search_tool(query: str) -> str:
 - LLM decides which tools to call (don't hardcode tool selection)
 - Provide clear tool descriptions for LLM
 - Limit tool set to prevent confusion (4-5 tools max for demo)
-- Tools: Search (Tavily), SQL (Aurora), RAG (Pinecone), Weather (OpenWeatherMap)
+- Tools: Search (Tavily), SQL (Aurora), RAG (Pinecone), Market Data (FMP)
 
 **Tool Execution Node:**
 - Separate node for tool execution (not in chat node)
@@ -119,8 +119,8 @@ async def search_tool(query: str) -> str:
 - Demonstrates: Document retrieval + Database query
 
 **3. Market Analysis:**
-- User asks: "What's the weather in Austin and how does it affect our sales?"
-- Flow: Weather API → SQL Query (sales by location/date) → Analysis
+- User asks: "How did AAPL move today and how does that compare to our customer portfolio data?"
+- Flow: Market Data API → SQL Query (portfolio by ticker) → Analysis
 - Demonstrates: External API + Database correlation
 
 **Implementation Pattern:**

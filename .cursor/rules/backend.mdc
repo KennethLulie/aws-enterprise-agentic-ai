@@ -178,7 +178,7 @@ async def test_chat_node_with_tool_call(mocker):
 ```
 
 **Tool Testing:**
-- Mock external APIs (Tavily, OpenWeatherMap)
+- Mock external APIs (Tavily, FMP)
 - Test SQL injection prevention
 - Test RAG retrieval with mock vector store
 - Test circuit breaker behavior

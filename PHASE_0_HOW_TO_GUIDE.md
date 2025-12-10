@@ -42,7 +42,7 @@
 2. **Project Structure** (Section 2): Create directories, Git init, .env setup
 3. **Backend Foundation** (Section 3): Create config, FastAPI app, health endpoint
 4. **Agent Core** (Section 4): LangGraph agent, state, nodes, graph
-5. **Tools** (Section 5): Create tool stubs (search, SQL, RAG, weather)
+5. **Tools** (Section 5): Create tool stubs (search, SQL, RAG, market data)
 6. **Frontend** (Section 6): Next.js setup, login page, chat interface
 7. **Docker Setup** (Section 7): Dockerfiles, docker-compose.yml, **test startup**
 8. **Scripts** (Section 8): Development helper scripts
@@ -311,15 +311,15 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?m
 - Copy API key from Tavily dashboard
 - Save for `.env` file (Step 2.3) in WSL
 
-#### 1.6 Create OpenWeatherMap Account (Optional for Phase 0)
+#### 1.6 Create Financial Modeling Prep (FMP) Account (for Market Data MCP)
 
 **Action:**
-1. Go to https://openweathermap.org/api
-2. Create free account
-3. Choose the Free plan and get API key from dashboard
-4. Free tier: 60 calls/minute, 1M calls/month
+1. Go to https://financialmodelingprep.com
+2. Create free account (no credit card)
+3. Get API key from dashboard
+4. Free tier: ~250 calls/day; batch tickers supported
 
-**Note:** This is optional for Phase 0 but recommended to set up now. Can use mock data if not set up.
+**Note:** If you skip this for Phase 0, the market data tool will use mock data.
 
 ---
 
@@ -937,7 +937,7 @@ docker-compose exec backend python -c "from src.agent.graph import graph; print(
 ## 5. Basic Tools (Stubs)
 
 ### What We're Doing
-Creating stub implementations of all four tools (search, SQL, RAG, weather) that return mock data. The weather stub specifically uses an MCP connection to demonstrate MCP compatibility; live OpenWeather calls remain optional and can be enabled later with an API key. This allows testing the agent flow before implementing real tool logic.
+Creating stub implementations of all four tools (search, SQL, RAG, market data) that return mock data. The market data stub uses an MCP connection to demonstrate MCP compatibility; live Financial Modeling Prep (FMP) calls remain optional and can be enabled later with an API key. This allows testing the agent flow before implementing real tool logic.
 
 ### Why This Matters
 - **Early Testing:** Can test agent orchestration without external APIs
@@ -1106,31 +1106,34 @@ ls backend/src/agent/tools/rag.py
 docker-compose exec backend python -c "from src.agent.tools.rag import RAGTool; tool = RAGTool(); print('RAG tool created')"
 ```
 
-#### 5.5 Create Weather Tool Stub
+#### 5.5 Create Market Data Tool Stub (FMP via MCP)
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/tools/weather.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Create WeatherTool class
-2. Implement LangGraph tool format
-3. For Phase 0: Return mock weather data (exposed via an MCP connection to demonstrate MCP compatibility; API key only needed when enabling live OpenWeather calls later)
-4. Mock data should include:
-   - Location parameter
-   - Temperature, conditions, humidity, wind speed
-   - Proper units
+Create file backend/src/agent/tools/market_data.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
+1. Create a market data tool using LangGraph tool format (@tool)
+2. For Phase 0: Return mock market data when no FMP key is set (MCP demo-friendly)
+3. Support multiple tickers in one call (comma-separated list)
+4. Fields: price, change, change_percent, open, previous_close, day_high, day_low, volume, currency, exchange, timestamp, source
 5. Use type hints and docstrings
-6. Tool name: "weather_api"
-7. Tool description: "Get current weather information for a location"
+6. Tool name: "market_data"
+7. Tool description: "Get market data for one or more tickers via Financial Modeling Prep"
 
-Mock result format:
+Mock result format (per ticker):
 {
-    "location": "Austin, TX",
-    "temperature": 75,
-    "unit": "Fahrenheit",
-    "conditions": "Sunny",
-    "humidity": 65,
-    "wind_speed": 10,
-    "wind_unit": "mph"
+    "ticker": "AAPL",
+    "price": 123.45,
+    "change": 1.23,
+    "change_percent": 0.99,
+    "open": 122.0,
+    "previous_close": 122.22,
+    "day_high": 125.0,
+    "day_low": 121.5,
+    "volume": 100000,
+    "currency": "USD",
+    "exchange": "NASDAQ",
+    "timestamp": "<ISO8601>",
+    "source": "mock"
 }
 
 Review the new file for errors, inconsistencies, version issues, latest documentation.
@@ -1138,15 +1141,15 @@ Review the new file for errors, inconsistencies, version issues, latest document
 
 **Verification (After Docker Setup):**
 ```bash
-# Test weather tool can be imported (requires Docker from Section 7)
+# Test market data tool can be imported (requires Docker from Section 7)
 # This will be verified in Section 7.5 after Docker Compose is set up
 # For now, just verify the file exists:
-ls backend/src/agent/tools/weather.py
+ls backend/src/agent/tools/market_data.py
 ```
 
 **Note:** Full tool testing will happen after Docker Compose setup (Section 7.5) using:
 ```bash
-docker-compose exec backend python -c "from src.agent.tools.weather import WeatherTool; tool = WeatherTool(); print('Weather tool created')"
+docker-compose exec backend python -c "from src.agent.tools.market_data import market_data_tool; print('Market data tool created')"
 ```
 
 #### 5.6 Register Tools in Graph
@@ -1154,8 +1157,8 @@ docker-compose exec backend python -c "from src.agent.tools.weather import Weath
 **Agent Prompt:**
 ```
 Update backend/src/agent/graph.py to:
-1. Import all four tools (search, sql, rag, weather)
-2. Create list of tools: [search_tool, sql_tool, rag_tool, weather_tool]
+1. Import all four tools (search, sql, rag, market data)
+2. Create list of tools: [search_tool, sql_tool, rag_tool, market_data_tool]
 3. Bind tools to the LLM in chat_node
 4. Ensure tools are available for tool calling
 5. Update chat node to use tools list
@@ -1928,7 +1931,7 @@ docker-compose exec backend pytest tests/test_agent.py -v
 **Agent Prompt:**
 ```
 Create file backend/tests/test_tools.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should include:
-1. Tests for each tool (search, sql, rag, weather)
+1. Tests for each tool (search, sql, rag, market data)
 2. Test tool execution with mock data
 3. Test error handling
 4. Test tool result formatting
@@ -1939,7 +1942,7 @@ Test cases:
 - test_search_tool: Test search tool returns mock data
 - test_sql_tool: Test SQL tool returns mock data
 - test_rag_tool: Test RAG tool returns mock data
-- test_weather_tool: Test weather tool returns mock data
+- test_market_data_tool: Test market data tool returns mock data
 - test_tool_errors: Test error handling in tools
 
 Review the new file for errors, inconsistencies, version issues, latest documentation.
@@ -2381,7 +2384,7 @@ docker-compose logs backend --tail=20 | grep -i reload
 - `src/agent/tools/search.py` - Tavily search tool (stub with mock data)
 - `src/agent/tools/sql.py` - SQL query tool (stub with mock data)
 - `src/agent/tools/rag.py` - RAG retrieval tool (stub with mock data)
-- `src/agent/tools/weather.py` - Weather API tool (stub with mock data)
+- `src/agent/tools/market_data.py` - Market data tool (FMP via MCP, stub with mock data)
 - `tests/__init__.py` - Tests package
 - `tests/test_agent.py` - Agent tests with mocks
 - `tests/test_tools.py` - Tool tests
@@ -2472,7 +2475,7 @@ docker-compose logs backend --tail=20 | grep -i reload
 - [ ] Bedrock model access approved
 - [ ] Pinecone account created, index created
 - [ ] Tavily account created
-- [ ] OpenWeatherMap account created (optional)
+- [ ] FMP account created, API key copied (optional; mock mode without key)
 
 ### Project Structure
 - [ ] All directories created
