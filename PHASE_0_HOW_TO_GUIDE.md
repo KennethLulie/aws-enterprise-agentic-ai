@@ -321,6 +321,61 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?m
 
 **Note:** If you skip this for Phase 0, the market data tool will use mock data.
 
+#### 1.7 (Optional) Local Python Tooling for IDE Support
+
+**Purpose:** While this project follows a Docker-first approach (all runtime dependencies in containers), installing Python tooling locally provides significantly better IDE support in Cursor/VS Code:
+
+| Benefit | Impact |
+|---------|--------|
+| **Better autocomplete** | Cursor/Pylance can suggest methods, attributes, and parameters |
+| **Real-time type checking** | Catch type errors as you code, not just at runtime |
+| **Import resolution** | No more "Module not found" warnings in the editor |
+| **mypy/Pyright integration** | Pre-commit hooks and linting work properly |
+| **Faster feedback loop** | Catch issues before running Docker |
+
+**Important:** This does NOT change the Docker-first workflow. You still run the application in Docker - this is purely for IDE tooling support.
+
+**Step 1: Install python3-venv (if not already installed)**
+```bash
+# In WSL terminal - requires sudo password
+sudo apt install python3.12-venv -y
+# Or for Python 3.11: sudo apt install python3.11-venv -y
+```
+
+**Step 2: Create virtual environment**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai
+python3 -m venv .venv
+```
+
+**Step 3: Activate and install dependencies**
+```bash
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r backend/requirements.txt
+```
+
+**Step 4: Configure Cursor/VS Code to use the venv**
+1. Open Command Palette: `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+2. Search for: `Python: Select Interpreter`
+3. Select the interpreter at: `.venv/bin/python`
+
+**Verification:**
+```bash
+# With venv activated
+source .venv/bin/activate
+PYTHONPATH=backend python -c "from src.config.settings import Settings; s = Settings(); print(f'Environment: {s.environment}')"
+```
+
+**Expected Output:** `Environment: local`
+
+**Note:** The `.venv/` directory is already in `.gitignore`, so it won't be committed.
+
+**Deactivate when done (optional):**
+```bash
+deactivate
+```
+
 ---
 
 ## 2. Initial Project Structure
@@ -423,7 +478,9 @@ git commit -m "Initial commit: Project plan, documentation, and cursor rules"
 
 **Agent Prompt:**
 ```
-Create file .gitignore in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. Include patterns for:
+Create `.gitignore`
+
+Include patterns for:
 - Python: __pycache__, *.pyc, .venv, venv, *.egg-info, .pytest_cache, .mypy_cache
 - Node.js: node_modules, .next, out, .turbo, *.log
 - Environment: .env, .env.local, .env.*.local
@@ -435,7 +492,7 @@ Create file .gitignore in accordance with project plan and how to guide using be
 - Testing: .coverage, htmlcov, .pytest_cache
 - Build artifacts: dist, build, *.egg
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Verify: Check for linter errors and consistency with project structure.
 ```
 
 **Verification:**
@@ -479,16 +536,6 @@ git check-ignore .env  # Should output: .env
 3. See the comments in `.env.example` for where to obtain each key
 4. Save the file
 
-**Verification:**
-```bash
-# Verify .env is not tracked by git (CRITICAL for security)
-git check-ignore .env  # Should output: .env
-
-# If this doesn't output ".env", your secrets could be committed!
-# Check that .env is listed in .gitignore
-```
-
-**Expected Output:** `.env` (confirms the file is gitignored)
 
 ---
 
@@ -515,23 +562,28 @@ Setting up the core FastAPI application, configuration management, and dependenc
 
 **Agent Prompt:**
 ```
-Create file backend/requirements.txt in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. Include pinned versions for Phase 0:
+Create `backend/requirements.txt`
+
+Requirements:
 - Core Framework: fastapi~=0.115.0, uvicorn[standard]~=0.32.0, pydantic~=2.9.0, pydantic-settings~=2.6.0
 - Agent Framework: langgraph~=0.2.50, langchain~=0.3.0, langchain-aws~=0.2.0
 - AWS SDK: boto3~=1.35.0, botocore~=1.35.0
-- Database: sqlalchemy~=2.0.35, alembic~=1.13.0, psycopg2-binary~=2.9.9 (for Phase 1b, but include now)
+- Database: sqlalchemy~=2.0.35, alembic~=1.13.0, psycopg2-binary~=2.9.9
 - Vector Store: pinecone-client~=5.0.0, chromadb~=0.5.15
-- Logging: structlog~=24.4.0 (used in Phase 1b+, include now for consistency)
+- Logging: structlog~=24.4.0
 - HTTP Clients: httpx~=0.27.0, requests~=2.32.0
 - Utilities: python-dotenv~=1.0.0, tenacity~=9.0.0
-- Rate Limiting: slowapi~=0.1.9 (used in Phase 1b+, include now for consistency)
+- Rate Limiting: slowapi~=0.1.9
 - Testing: pytest~=8.3.0, pytest-asyncio~=0.24.0, pytest-cov~=5.0.0, pytest-mock~=3.14.0
 - Code Quality: black~=24.10.0, ruff~=0.7.0, mypy~=1.13.0
 - Type Stubs: types-requests~=2.32.0
-- Add comments grouping by phase/functionality
-- Use ~= for compatible release pinning (allows patch updates)
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Constraints:
+- Use ~= for compatible release pinning (allows patch updates)
+- Add comments grouping packages by functionality
+- Versions must match DEVELOPMENT_REFERENCE.md "Technology Version Reference"
+
+Verify: All versions match DEVELOPMENT_REFERENCE.md.
 ```
 
 **Verification:**
@@ -549,132 +601,128 @@ grep -E "(~=|==|>=|<=)" backend/requirements.txt | wc -l
 
 **Agent Prompt:**
 ```
-Create file backend/src/config/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should be empty or expose the Settings class.
+Create `backend/src/config/__init__.py`
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Requirements:
+- Package initialization file that exposes the Settings class
+- Re-export key functions: get_settings, validate_config, get_environment
+- Add module docstring explaining package purpose
+
+Reference: Follow patterns in existing package __init__.py files.
+Verify: Check for linter errors.
 ```
 
 **Agent Prompt:**
 ```
-Create file backend/src/config/settings.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
+Create `backend/src/config/settings.py`
+
+Requirements:
 1. Use Pydantic Settings (BaseSettings from pydantic_settings)
-2. Load from .env file using python-dotenv
-3. Auto-detect environment (local vs aws) based on ENVIRONMENT variable (not ENV) or AWS availability
-   - **Important:** Use `ENVIRONMENT` variable name, not `ENV`, to avoid conflicts with other tools
+2. Load from .env file using SettingsConfigDict
+3. Auto-detect environment (local vs aws) based on ENVIRONMENT variable
+   - Important: Use `ENVIRONMENT` variable name, not `ENV`
 4. Include all environment variables from .env.example with proper types
-5. Add validation for required variables
+5. Add validation for required variables with clear error messages
 6. Provide sensible defaults where possible
-7. Include a function to validate configuration on startup
-8. Add clear error messages if validation fails
-9. Use type hints throughout
-10. Add docstrings explaining each setting
+7. Use type hints throughout
+8. Add docstrings explaining each setting
 
 Structure:
 - Settings class inheriting from BaseSettings
-- Model Config with env_file=".env"
-- Fields for: AWS, Bedrock models, External APIs, Database, Application settings
+- SettingsConfigDict with env_file=".env"
+- Fields for: AWS, Bedrock models, External APIs, Database, Application
 - validate_config() function that checks all required settings
-- get_environment() function that detects local vs AWS
+- get_settings() cached singleton function
+- detect_environment() function for local vs AWS detection
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: .env.example for all required variables.
+Verify: Check for linter errors and type safety.
 ```
 
-**Verification Command (After Docker Setup):**
-```bash
-# Test configuration loads correctly (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/config/settings.py
-```
-
-**Note:** Full configuration testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.config.settings import Settings; s = Settings(); print(f'Environment: {s.environment}')"
-```
-
-**Expected Output (after Docker setup):** `Environment: local`
-
-**If Error:** 
-- Check that `.env` file exists and has correct values
-- Verify all required environment variables are set (see Section 2.5 validation)
-- Check Docker container can access .env file: `docker-compose exec backend ls -la /app/.env`
-- Review error message for specific missing variable
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 3.3 Create Backend API Main Module
 
 **Agent Prompt:**
 ```
-Create file backend/src/api/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
+Create `backend/src/api/__init__.py`
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Requirements:
+- Package initialization for FastAPI API module
+- Export app instance and create_app factory function
+- Add version tracking (__version__, __api_version__)
+- Add module docstring documenting package structure
+
+Reference: Follow patterns in src/config/__init__.py.
+Verify: Check for linter errors.
 ```
 
 **Agent Prompt:**
 ```
-Create file backend/src/api/main.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
+Create `backend/src/api/main.py`
+
+Requirements:
 1. Create FastAPI app instance with title, description, version
 2. Configure CORS middleware to allow localhost:3000 (frontend)
-3. Add basic error handling middleware
-4. Include health check endpoint at /health that returns {"status": "ok"}
+3. Add basic error handling middleware with user-friendly messages
+4. Include health check endpoint at /health
 5. Load settings from config.settings
-6. Add startup event to validate configuration
-7. Use proper type hints
-8. Add docstrings
-9. Structure for future route additions
+6. Add lifespan context manager to validate configuration on startup
+7. Use proper type hints and docstrings
+8. Structure for future route additions (use include_router pattern)
 
-The health endpoint should:
-- Return simple JSON: {"status": "ok", "environment": "local"}
-- Be accessible without authentication (for Phase 0)
-- Use GET method
+Health endpoint spec:
+- Returns: {"status": "ok", "environment": "local", "version": "0.1.0"}
+- Method: GET
+- No authentication required (Phase 0)
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: FastAPI 0.115+ lifespan pattern (not deprecated on_event).
+Verify: Check for linter errors and test endpoint accessibility.
 ```
 
-**Verification Command (After Docker Setup):**
-```bash
-# Test FastAPI app can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/api/main.py
-```
-
-**Note:** Full import testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.api.main import app; print('FastAPI app created successfully')"
-```
-
-**Expected Output (after Docker setup):** `FastAPI app created successfully`
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 3.4 Create Backend Health Route
 
 **Agent Prompt:**
 ```
-Create file backend/src/api/routes/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
+Create `backend/src/api/routes/__init__.py`
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Requirements:
+- Package initialization for API routes
+- Export routers for easy importing (health_router, etc.)
+- Add module docstring documenting route structure and versioning plan
+
+Reference: Follow patterns in other package __init__.py files.
+Verify: Check for linter errors.
 ```
 
 **Agent Prompt:**
 ```
-Create file backend/src/api/routes/health.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Create a FastAPI router
-2. Define GET /health endpoint
-3. Return {"status": "ok", "environment": <from settings>}
-4. Use proper type hints
-5. Add docstring
-6. Keep it simple for Phase 0 (no dependency checks yet - that's Phase 1b)
+Create `backend/src/api/routes/health.py`
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Requirements:
+1. Create FastAPI APIRouter with tags=["Health"]
+2. Define GET /health endpoint
+3. Return {"status": "ok", "environment": <from settings>, "version": "..."}
+4. Use Pydantic response model (HealthResponse)
+5. Use proper type hints and docstrings
+6. Keep simple for Phase 0 (no dependency checks - that's Phase 1b)
+
+Reference: FastAPI router patterns.
+Verify: Check for linter errors.
 ```
 
 **Update main.py:**
 ```
-Update file backend/src/api/main.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
-1. Import the health router
-2. Include the router with prefix "/" (so /health works)
-3. Add the import at the top
+Update `backend/src/api/main.py`
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Changes:
+1. Import health_router from src.api.routes
+2. Include router via app.include_router(health_router)
+3. Remove duplicate inline health endpoint (now in routes/health.py)
+
+Verify: Check for linter errors and test /health endpoint.
 ```
 
 **Verification Command (After Docker Setup):**
@@ -685,22 +733,14 @@ Review the new file for errors, inconsistencies, version issues, latest document
 ls backend/src/api/routes/health.py
 ```
 
-**Note:** Full endpoint testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose up -d
-sleep 5
-curl http://localhost:8000/health
-docker-compose down
-```
-
-**Expected Output (after Docker setup):** `{"status":"ok","environment":"local"}`
+**Note:** Full endpoint testing will happen after Docker Compose setup (Section 7.5)
 
 #### 3.5 Note: Dependencies Will Be Installed via Docker
 
 **Important:** Following the Docker-first approach, Python dependencies will be installed automatically when Docker containers are built (Section 7). 
 
 **No local installation needed:** Do NOT create a local venv or install packages directly on your host machine. All development happens inside Docker containers.
-
+**Note, but still best practice to enable for cursor development
 **Verification:** Dependencies will be verified after Docker Compose setup (Section 7.5).
 
 ---
@@ -728,209 +768,192 @@ Implementing the core LangGraph agent with state management, graph definition, a
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
+Create `backend/src/agent/__init__.py`
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Requirements:
+- Package initialization for LangGraph agent module
+- Export: AgentState, create_initial_state, get_registered_tools
+- Export state utilities: validate_state, add_tool_used, set_error, clear_error
+- Re-export tools for convenience (market_data_tool)
+- Add validation utility: validate_agent_config()
+- Add module docstring with architecture overview and usage examples
+
+Reference: Follow patterns in src/config/__init__.py, agentic-ai.mdc rules.
+Verify: Check for linter errors and circular import issues.
 ```
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/state.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Define TypedDict for agent state (or use Pydantic BaseModel)
+Create `backend/src/agent/state.py`
+
+Requirements:
+1. Define TypedDict for agent state (LangGraph requires TypedDict, not Pydantic)
 2. Include fields:
-   - messages: List[BaseMessage] (from langchain)
-   - conversation_id: Optional[str]
-   - tools_used: List[str] (track which tools were called)
-   - last_error: Optional[str] (for error recovery)
-   - metadata: Dict[str, Any] (for extensibility)
-3. Use proper type hints
-4. Add docstring explaining state structure
-5. Import necessary types from langchain_core.messages
+   - messages: Annotated[list[BaseMessage], add_messages] (with reducer)
+   - conversation_id: str | None
+   - tools_used: list[str]
+   - last_error: str | None
+   - metadata: dict[str, Any]
+3. Use `total=False` for incremental state updates
+4. Add factory function: create_initial_state()
+5. Add validation function: validate_state()
+6. Add state helpers: add_tool_used(), set_error(), clear_error()
+7. Use proper type hints and comprehensive docstrings
 
-Reference: LangGraph state should be a TypedDict that matches LangChain message format.
-
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc rules, LangGraph add_messages reducer pattern.
+Verify: Check for linter errors and type safety.
 ```
 
-**Verification (After Docker Setup):**
+**Verification**
 ```bash
-# Test state schema can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
 # For now, just verify the file exists:
 ls backend/src/agent/state.py
 ```
 
-**Note:** Full import testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.state import AgentState; print('State schema imported successfully')"
-```
+**Note:** Full import testing will happen after Docker Compose setup (Section 7.5):
+
 
 #### 4.2 Create Chat Node
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/nodes/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary.
+Create `backend/src/agent/nodes/__init__.py`
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Requirements:
+- Package initialization for LangGraph node functions
+- Export node functions: chat_node, tools_node, error_recovery_node
+- Add module docstring explaining node architecture
+
+Reference: agentic-ai.mdc node function patterns.
+Verify: Check for linter errors.
 ```
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/nodes/chat.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Import Bedrock client from langchain_aws
-2. Create chat node function that:
-   - Takes state (AgentState) as input
-   - Gets latest message from state.messages
-   - Invokes Bedrock Nova Pro model
-   - Handles tool calling (if model supports it)
-   - Returns updated state with new message
+Create `backend/src/agent/nodes/chat.py`
+
+Requirements:
+1. Import ChatBedrock from langchain_aws
+2. Create async chat node function:
+   - Signature: async def chat_node(state: AgentState) -> AgentState
+   - Get messages from state
+   - Invoke Bedrock model with tool binding
+   - Return updated state with new message
 3. Include fallback logic: if Nova fails, try Claude 3.5 Sonnet
 4. Use proper error handling with try/except
-5. Log errors with clear messages
-6. Use type hints throughout
-7. Add docstrings
+5. Log errors with structlog
+6. Use type hints throughout and add docstrings
 
-Configuration:
-- Model ID: amazon.nova-pro-v1:0 (from settings)
+Configuration (from settings):
+- Primary: amazon.nova-pro-v1:0
 - Fallback: anthropic.claude-3-5-sonnet-20241022-v2:0
 - Temperature: 0.7
 - Max tokens: 4096
-- Region: us-east-1 (from settings)
+- Region: us-east-1
 
-The function signature should be:
-def chat_node(state: AgentState) -> AgentState:
-
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc node patterns, LangChain ChatBedrock docs.
+Verify: Check for linter errors and proper async handling.
 ```
 
-**Verification Command (After Docker Setup):**
+**Verification**
 ```bash
-# Test chat node can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
+# For now, just verify the file exists docker will set up later in 7.5 and we will test it then:
 ls backend/src/agent/nodes/chat.py
 ```
 
-**Note:** Full import testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.nodes.chat import chat_node; print('Chat node imported successfully')"
-```
+**Note:** Full import testing will happen after Docker Compose setup:
+
 
 #### 4.3 Create Tool Execution Node
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/nodes/tools.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Create tool_execution_node function
-2. Take state as input
-3. Check if last message has tool calls
-4. Execute tools (for Phase 0, return mock results)
-5. Format tool results as messages
-6. Return updated state
-7. Handle errors gracefully
+Create `backend/src/agent/nodes/tools.py`
+
+Requirements:
+1. Create async tool_execution_node function
+   - Signature: async def tool_execution_node(state: AgentState) -> AgentState
+2. Check if last message has tool calls (AIMessage with tool_calls)
+3. Execute tools via get_registered_tools()
+4. Format tool results as ToolMessage objects
+5. Return updated state with tool results appended to messages
+6. Track tools used via add_tool_used() helper
+7. Handle errors gracefully, set last_error on failure
 8. Use type hints and docstrings
 
-For Phase 0:
-- Tools will be stubs returning mock data
-- Focus on the execution flow, not actual tool implementation
+Phase 0 notes:
+- Tools return mock data via stubs
+- Focus on execution flow, not real implementations
 - Log which tools are being called
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc tool execution patterns.
+Verify: Check for linter errors.
 ```
 
-**Verification (After Docker Setup):**
-```bash
-# Test tool execution node can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/agent/nodes/tools.py
-```
-
-**Note:** Full import testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.nodes.tools import tool_execution_node; print('Tool execution node imported')"
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 4.4 Create Error Recovery Node
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/nodes/error_recovery.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Create error_recovery_node function
-2. Check state.last_error for errors
-3. Generate user-friendly error message
-4. Add error message to state.messages
-5. Clear last_error from state
-6. Log errors appropriately
-7. Use type hints and docstrings
+Create `backend/src/agent/nodes/error_recovery.py`
 
-Error messages should be:
-- User-friendly (not technical)
+Requirements:
+1. Create async error_recovery_node function
+   - Signature: async def error_recovery_node(state: AgentState) -> AgentState
+2. Check state["last_error"] for error message
+3. Generate user-friendly error response (AIMessage)
+4. Add error response to state messages
+5. Clear last_error via clear_error() helper
+6. Log full technical details with structlog
+
+Error message guidelines:
+- User-friendly (no stack traces)
 - Actionable (suggest what user can do)
-- Logged with full technical details
+- Internal: Log full technical details
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc error recovery patterns.
+Verify: Check for linter errors.
 ```
 
-**Verification (After Docker Setup):**
-```bash
-# Test error recovery node can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/agent/nodes/error_recovery.py
-```
-
-**Note:** Full import testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.nodes.error_recovery import error_recovery_node; print('Error recovery node imported')"
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 4.5 Create LangGraph Graph
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/graph.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Import all nodes (chat, tools, error_recovery)
-2. Import state schema
-3. Create LangGraph graph using StateGraph
-4. Add nodes: chat, tools, error_recovery
-5. Add edges:
-   - Start -> chat
-   - chat -> tools (if tool calls needed)
-   - tools -> chat (continue conversation)
-   - chat -> error_recovery (if error)
-   - error_recovery -> end
-6. Configure MemorySaver for checkpointing
-7. Compile the graph
-8. Add streaming support
-9. Export compiled graph
-10. Use proper type hints and docstrings
+Create `backend/src/agent/graph.py`
+
+Requirements:
+1. Import all nodes (chat_node, tool_execution_node, error_recovery_node)
+2. Import AgentState from state module
+3. Create LangGraph StateGraph with AgentState
+4. Add nodes: "chat", "tools", "error_recovery"
+5. Add edges with conditional routing:
+   - START -> chat
+   - chat -> tools (if tool_calls present)
+   - chat -> END (if no tool_calls)
+   - tools -> chat (loop back)
+   - Add error handling edge to error_recovery
+6. Configure MemorySaver for Phase 0 checkpointing
+7. Compile graph with checkpointer
+8. Export: compiled graph, get_registered_tools()
+9. Use proper type hints and docstrings
 
 Graph flow:
-- Start -> chat -> (if tool calls) -> tools -> chat -> end
-- If error -> error_recovery -> end
+START -> chat -> [tools -> chat]* -> END
+         ↓
+    error_recovery -> END
 
 Checkpointing:
-- Use MemorySaver() for Phase 0 (in-memory, no DB)
-- Configure with proper state schema
+- MemorySaver() for Phase 0 (in-memory, no DB)
+- Phase 1b+ will use PostgresSaver
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc graph patterns, LangGraph StateGraph docs.
+Verify: Check for linter errors and proper edge configuration.
 ```
 
-**Verification Command (After Docker Setup):**
-```bash
-# Test graph can be created (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/agent/graph.py
-```
-
-**Note:** Full graph testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.graph import graph; print('Graph created successfully'); print(f'Graph nodes: {list(graph.nodes.keys())}')"
-```
-
-**Expected Output (after Docker setup):** Should show graph nodes: ['chat', 'tools', 'error_recovery']
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 ---
 
@@ -957,200 +980,140 @@ Creating stub implementations of all four tools (search, SQL, RAG, market data) 
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/tools/__init__.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Export a base Tool class or interface
-2. Define common tool interface
-3. Include error handling base
-4. Define tool result format
+Create `backend/src/agent/tools/__init__.py`
 
-The base should include:
-- execute() method signature
-- error handling pattern
-- result formatting
-- logging pattern
+Requirements:
+1. Package initialization for agent tools
+2. Export all tool instances: market_data_tool (and stubs when created)
+3. Add module docstring explaining tool architecture
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Note: Tools use LangChain @tool decorator pattern, not base class.
+
+Reference: agentic-ai.mdc tool definition patterns.
+Verify: Check for linter errors.
 ```
 
 #### 5.2 Create Search Tool Stub
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/tools/search.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Create a SearchTool class
-2. Implement LangGraph tool format (using @tool decorator or Tool class)
+Create `backend/src/agent/tools/search.py`
+
+Requirements:
+1. Use @tool decorator from langchain.tools
+2. Create Pydantic input schema (SearchInput)
 3. For Phase 0: Return mock search results
-4. Mock data should include:
-   - Query parameter
-   - Mock results with titles, snippets, URLs
-   - Proper formatting
-5. Include error handling (for Phase 0, just log)
-6. Use type hints and docstrings
-7. Tool name: "tavily_search"
-8. Tool description: "Search the web for current information using Tavily API"
+4. Mock data: titles, snippets, URLs
+5. Tool name: "tavily_search"
+6. Tool description: "Search the web for current information using Tavily API"
+7. Use type hints and docstrings
 
 Mock result format:
 {
     "results": [
-        {
-            "title": "Mock Result 1",
-            "snippet": "This is a mock search result...",
-            "url": "https://example.com/1"
-        }
+        {"title": "...", "snippet": "...", "url": "https://..."}
     ],
-    "query": "<user_query>"
+    "query": "<user_query>",
+    "source": "mock"
 }
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc tool definition pattern.
+Verify: Check for linter errors.
 ```
 
-**Verification (After Docker Setup):**
-```bash
-# Test search tool can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/agent/tools/search.py
-```
-
-**Note:** Full tool testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.tools.search import SearchTool; tool = SearchTool(); print('Search tool created')"
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 5.3 Create SQL Tool Stub
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/tools/sql.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Create SQLTool class
-2. Implement LangGraph tool format
+Create `backend/src/agent/tools/sql.py`
+
+Requirements:
+1. Use @tool decorator from langchain.tools
+2. Create Pydantic input schema (SQLQueryInput)
 3. For Phase 0: Return mock SQL query results
-4. Mock data should simulate database results:
-   - Table-like structure
-   - Multiple rows
-   - Proper data types
-5. Include SQL injection prevention comments (will implement in Phase 2)
-6. Use type hints and docstrings
-7. Tool name: "sql_query"
-8. Tool description: "Query the PostgreSQL database using natural language"
+4. Mock data: table-like structure with multiple rows
+5. Include TODO comments for Phase 2 SQL injection prevention
+6. Tool name: "sql_query"
+7. Tool description: "Query the PostgreSQL database using natural language"
+8. Use type hints and docstrings
 
 Mock result format:
 {
     "query": "SELECT * FROM customers LIMIT 5",
-    "results": [
-        {"id": 1, "name": "John Doe", "email": "john@example.com"},
-        {"id": 2, "name": "Jane Smith", "email": "jane@example.com"}
-    ],
-    "row_count": 2
+    "results": [{"id": 1, "name": "...", "email": "..."}],
+    "row_count": 2,
+    "source": "mock"
 }
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc tool definition pattern.
+Verify: Check for linter errors.
 ```
 
-**Verification (After Docker Setup):**
-```bash
-# Test SQL tool can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/agent/tools/sql.py
-```
-
-**Note:** Full tool testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.tools.sql import SQLTool; tool = SQLTool(); print('SQL tool created')"
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 5.4 Create RAG Tool Stub
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/tools/rag.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Create RAGTool class
-2. Implement LangGraph tool format
+Create `backend/src/agent/tools/rag.py`
+
+Requirements:
+1. Use @tool decorator from langchain.tools
+2. Create Pydantic input schema (RAGQueryInput)
 3. For Phase 0: Return mock document retrieval results
-4. Mock data should include:
-   - Retrieved documents with content
-   - Source citations
-   - Relevance scores
-5. Use type hints and docstrings
-6. Tool name: "rag_retrieval"
-7. Tool description: "Retrieve relevant documents from vector store using semantic search"
+4. Mock data: documents with content, source citations, relevance scores
+5. Tool name: "rag_retrieval"
+6. Tool description: "Retrieve relevant documents from vector store using semantic search"
+7. Use type hints and docstrings
 
 Mock result format:
 {
     "query": "<user_query>",
     "documents": [
-        {
-            "content": "Mock document content...",
-            "source": "document1.pdf",
-            "page": 1,
-            "score": 0.95
-        }
+        {"content": "...", "source": "doc.pdf", "page": 1, "score": 0.95}
     ],
-    "count": 1
+    "count": 1,
+    "source": "mock"
 }
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc tool definition pattern.
+Verify: Check for linter errors.
 ```
 
-**Verification (After Docker Setup):**
-```bash
-# Test RAG tool can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/agent/tools/rag.py
-```
-
-**Note:** Full tool testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.tools.rag import RAGTool; tool = RAGTool(); print('RAG tool created')"
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 5.5 Create Market Data Tool Stub (FMP via MCP)
 
 **Agent Prompt:**
 ```
-Create file backend/src/agent/tools/market_data.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Create a market data tool using LangGraph tool format (@tool)
-2. For Phase 0: Return mock market data when no FMP key is set (MCP demo-friendly)
-3. Support multiple tickers in one call (comma-separated list)
-4. Fields: price, change, change_percent, open, previous_close, day_high, day_low, volume, currency, exchange, timestamp, source
-5. Use type hints and docstrings
+Create `backend/src/agent/tools/market_data.py`
+
+Requirements:
+1. Use @tool decorator from langchain.tools
+2. Create Pydantic input schema (MarketDataInput) with tickers list
+3. Return mock data when FMP_API_KEY not set, live data when available
+4. Support multiple tickers in one call
+5. Fields: ticker, price, change, change_percent, open, previous_close, 
+   day_high, day_low, volume, currency, exchange, timestamp, source
 6. Tool name: "market_data"
 7. Tool description: "Get market data for one or more tickers via Financial Modeling Prep"
+8. Use httpx for async HTTP calls to FMP API
+9. Use type hints and docstrings
 
-Mock result format (per ticker):
+Mock result format:
 {
-    "ticker": "AAPL",
-    "price": 123.45,
-    "change": 1.23,
-    "change_percent": 0.99,
-    "open": 122.0,
-    "previous_close": 122.22,
-    "day_high": 125.0,
-    "day_low": 121.5,
-    "volume": 100000,
-    "currency": "USD",
-    "exchange": "NASDAQ",
-    "timestamp": "<ISO8601>",
-    "source": "mock"
+    "data": [{"ticker": "AAPL", "price": 123.45, ...}],
+    "mode": "mock" | "live",
+    "source": "financialmodelingprep"
 }
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: DEVELOPMENT_REFERENCE.md FMP configuration.
+Verify: Check for linter errors.
 ```
 
-**Verification (After Docker Setup):**
-```bash
-# Test market data tool can be imported (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/src/agent/tools/market_data.py
-```
-
-**Note:** Full tool testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.tools.market_data import market_data_tool; print('Market data tool created')"
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 5.6 Register Tools in Graph
 
@@ -1167,18 +1130,7 @@ The tools should be bound to the Bedrock model so it can call them.
 Reference LangGraph documentation for tool binding with Bedrock.
 ```
 
-**Verification Command (After Docker Setup):**
-```bash
-# Verify tools are registered (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, verify all tool files exist:
-ls backend/src/agent/tools/*.py
-```
-
-**Note:** Full graph testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend python -c "from src.agent.graph import graph; print('Tools registered in graph')"
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 ---
 
@@ -1205,6 +1157,10 @@ Setting up the Next.js frontend with TypeScript, shadcn/ui, and basic chat inter
 
 **Note:** This initial setup step runs in your WSL terminal (not in Docker) because it creates the initial project structure. All subsequent development will happen in Docker containers.
 
+**Pre-check (avoid conflicts):**
+- Run `ls -A frontend`. If you see existing files (e.g., `Dockerfile.dev`, `src/`, `package.json`), the Next.js scaffold already exists—skip this step and proceed to the configuration steps below.
+- If you intentionally need to recreate the app, scaffold into a new empty directory (e.g., `frontend-new`) or move/remove the existing files first; `npx create-next-app` will fail in a non-empty folder.
+
 **Command (run in WSL terminal):**
 ```bash
 cd frontend
@@ -1228,6 +1184,8 @@ npx create-next-app@latest .
 **Verification:**
 ```bash
 # Check Next.js was initialized
+#go back to rootfile if still in front end
+cd ..
 ls -la frontend/package.json
 
 # Verify package.json exists and has Next.js dependencies
@@ -1240,28 +1198,23 @@ grep -q "next" frontend/package.json && echo "✓ Next.js initialized" || echo "
 
 **Agent Prompt:**
 ```
-Update file frontend/next.config.mjs (or next.config.ts if TypeScript config was created) in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Set output: 'export' for static export (needed for Phase 1a)
-2. Disable image optimization (not needed for static export)
-3. Configure base path if needed
+Update `frontend/next.config.mjs` (or .ts if TypeScript config)
+
+Requirements:
+1. Set output: 'export' for static export
+2. Disable image optimization (images.unoptimized: true)
+3. Enable trailingSlash: true
 4. Add comments explaining each setting
 
-Configuration should be:
-```javascript
-/** @type {import('next').NextConfig} */
+Configuration:
 const nextConfig = {
   output: 'export',
-  images: {
-    unoptimized: true
-  },
-  // Disable server-side features for static export
+  images: { unoptimized: true },
   trailingSlash: true,
 }
 
-export default nextConfig
-```
-
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: Next.js 14 static export docs.
+Verify: Check for valid config syntax.
 ```
 
 **Verification:**
@@ -1291,9 +1244,11 @@ npx shadcn@latest init
 npx shadcn@latest add button
 npx shadcn@latest add card
 npx shadcn@latest add input
-npx shadcn@latest add toast
+npx shadcn@latest add sonner  # replaces deprecated toast; provides toaster + provider
 npx shadcn@latest add dialog
 ```
+
+**Note:** The `toast` component path was removed from the registry. Use `sonner` instead (official replacement for toasts/notifications).
 
 **Note:** The CLI was renamed from `shadcn-ui` to `shadcn` in late 2024. Use `shadcn@latest` for all commands.
 
@@ -1310,27 +1265,26 @@ ls frontend/src/components/ui/
 
 **Agent Prompt:**
 ```
-Create file frontend/src/app/login/page.tsx in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
+Create `frontend/src/app/login/page.tsx`
+
+Requirements:
 1. Use shadcn/ui components (Card, Input, Button)
-2. Have a password input field
-3. On submit, store password in sessionStorage
-4. Redirect to home page (/) on successful login
-5. Show error message if password is wrong
+2. Password input with form submission
+3. Call backend POST `/api/login` (cookie-based auth, no local password storage)
+4. Redirect to / on successful login
+5. Show error message if password validation fails
 6. Use TypeScript with proper types
-7. Style with Tailwind CSS
-8. Be responsive (mobile-friendly)
+7. Style with Tailwind CSS (responsive, mobile-friendly)
+8. On mount, call `/api/me` to redirect if already authenticated
 
-Password validation:
-- Check against DEMO_PASSWORD from environment (for Phase 0, hardcode or use env var)
-- Show "Invalid password" error if wrong
-- Store in sessionStorage as "auth_token" or "password"
-
-Use Next.js App Router patterns:
-- 'use client' directive (for interactivity)
+Implementation:
+- 'use client' directive
 - useRouter from next/navigation
-- useState for form state
+- useState for form state and error
+- Use `login()` and `getSession()` from `frontend/src/lib/api.ts`
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: Next.js 14 App Router patterns, shadcn/ui docs.
+Verify: Check for TypeScript errors.
 ```
 
 **Verification:**
@@ -1343,33 +1297,30 @@ ls frontend/src/app/login/page.tsx
 
 **Agent Prompt:**
 ```
-Create file frontend/src/lib/api.ts in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Export functions for API communication
-2. SSE connection function using native EventSource
-3. Message sending function using fetch
-4. Error handling for both SSE and fetch
-5. TypeScript types for requests/responses
-6. Handle CORS errors
-7. Handle connection errors
-8. Base URL from environment variable (NEXT_PUBLIC_API_URL)
+Create `frontend/src/lib/api.ts`
 
-Functions needed:
-- connectSSE(conversationId, onMessage, onError): EventSource
-- sendMessage(message, conversationId): Promise<Response>
-- getHealth(): Promise<Response>
+Requirements:
+1. TypeScript types for API requests/responses
+2. SSE connection using native EventSource API
+3. Message sending using fetch
+4. Proper error handling for SSE and fetch
+5. Base URL from NEXT_PUBLIC_API_URL (default: http://localhost:8000)
 
-SSE connection:
-- Use native EventSource API
-- Handle 'message' events
-- Handle 'error' events
-- Handle connection close
-- Parse JSON messages
+Functions:
+- connectSSE(conversationId, onMessage, onError): EventSource (with credentials)
+- sendMessage(message, conversationId): Promise<Response> (credentials included)
+- getHealth(): Promise<HealthResponse> (credentials included)
+- login(password): Promise<void> (sets HttpOnly session cookie)
+- getSession(): Promise<void> (validates session)
+- logout(): Promise<void> (clears session cookie)
 
-For Phase 0:
-- API URL: http://localhost:8000 (hardcoded for local dev)
-- No authentication headers yet (Phase 1a will add)
+SSE handling:
+- Parse JSON messages from event.data
+- Handle 'message', 'error', 'open' events
+- Reconnection logic on disconnect (EventSource native retry)
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: Native EventSource API (no Vercel AI SDK per project rules).
+Verify: Check for TypeScript errors.
 ```
 
 **Verification:**
@@ -1382,42 +1333,32 @@ ls frontend/src/lib/api.ts
 
 **Agent Prompt:**
 ```
-Create file frontend/src/app/page.tsx in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Check for authentication (password in sessionStorage)
-2. Redirect to /login if not authenticated
-3. Display chat interface:
-   - Message list (user and assistant messages)
-   - Input field for new messages
-   - Send button
-4. Connect to backend via SSE for streaming responses
-5. Display messages in real-time as they stream
-6. Handle errors gracefully
-7. Use shadcn/ui components
-8. Use TypeScript with proper types
-9. Style with Tailwind CSS
-10. Be responsive
+Create `frontend/src/app/page.tsx`
 
-Chat interface:
-- Message bubbles (user messages on right, assistant on left)
+Requirements:
+1. Check sessionStorage for authentication, redirect to /login if missing
+2. Chat interface with message list, input field, send button
+3. SSE connection for streaming responses via api.ts
+4. Real-time message display as chunks arrive
+5. Use shadcn/ui components
+6. TypeScript with proper types
+7. Tailwind CSS styling (responsive)
+
+Chat UI:
+- Message bubbles (user: right, assistant: left)
 - Input field at bottom
 - Auto-scroll to latest message
-- Loading indicator while waiting for response
-- Error messages displayed
+- Loading indicator while waiting
+- Error toast on failures
 
-SSE Integration:
-- Use api.ts connectSSE function
-- Handle streaming chunks
-- Update UI as messages arrive
-- Handle connection errors
-- Reconnect on disconnect
-
-Use Next.js App Router:
+Implementation:
 - 'use client' directive
-- useState for messages and input
-- useEffect for SSE connection
+- useState for messages[], input, isLoading
+- useEffect for auth check and SSE setup
 - useRouter for navigation
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: frontend.mdc rules, shadcn/ui docs.
+Verify: Check for TypeScript errors.
 ```
 
 **Verification:**
@@ -1430,18 +1371,21 @@ ls frontend/src/app/page.tsx
 
 **Agent Prompt:**
 ```
-Update file frontend/src/app/layout.tsx in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Include proper metadata (title, description)
-2. Include global styles
-3. Set up font (Inter or system font)
-4. Include any global providers if needed
+Update `frontend/src/app/layout.tsx`
+
+Requirements:
+1. Include metadata (title, description)
+2. Include global styles (globals.css)
+3. Set up font (Inter or system font stack)
+4. Include Toaster component for toast notifications
 5. Use TypeScript
 
 Metadata:
-- Title: "Enterprise Agentic AI Demo"
-- Description: "Enterprise-grade agentic AI system"
+- title: "Enterprise Agentic AI Demo"
+- description: "Enterprise-grade agentic AI system"
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: Next.js 14 App Router metadata docs.
+Verify: Check for TypeScript errors.
 ```
 
 **Verification:**
@@ -1484,7 +1428,7 @@ Creating Docker Compose configuration to run all services locally with hot reloa
 The `backend/Dockerfile.dev` file is already provided in the repository. Review it and update if needed.
 
 **What's Configured:**
-
+**Agent Command, review dockerfile and ensure it is properly set up, create if it doesn't exist.**
 The Dockerfile should:
 1. Use Python 3.11-slim base image
 2. Set working directory to /app
@@ -1517,8 +1461,9 @@ ls backend/Dockerfile.dev
 
 #### 7.2 Review/Update Frontend Dockerfile.dev
 
-The `frontend/Dockerfile.dev` file is already provided in the repository. Review it and update if needed.
+**Agent Command**
 
+ The `frontend/Dockerfile.dev` file should already be provided in the repository. Review it and update if needed.  Create if it does not exist
 **What's Configured:**
 
 The Dockerfile should:
@@ -1551,8 +1496,10 @@ ls frontend/Dockerfile.dev
 
 #### 7.3 Review/Update docker-compose.yml
 
-The `docker-compose.yml` file is already provided in the repository. Review it and update if needed.
 
+**Agent Command**
+
+ The `docker-compose.yml`  file should already be provided in the repository. Review it and update if needed.  Create if it does not exist
 **What's Configured (Phase 0, stub-only):**
 
 - Do **NOT** include a `version` key (deprecated in Docker Compose V2+).
@@ -1591,7 +1538,7 @@ Frontend service (Phase 0):
 
 **Note:** Database/vector services (Postgres, Chroma) are intentionally omitted in Phase 0. Add them when moving to Phase 1a+; remove any unused DB/vector env vars from the Phase 0 compose to avoid startup noise.
 ```
-
+fo
 **Verification Command:**
 ```bash
 # Validate docker-compose.yml syntax
@@ -1606,20 +1553,24 @@ docker-compose config
 
 **Agent Prompt:**
 ```
-Create file backend/.dockerignore in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should exclude:
+Create `backend/.dockerignore`
+
+Exclude:
 - venv/, .venv/
 - __pycache__/, *.pyc
 - .pytest_cache/, .mypy_cache
 - .git/
 - *.log
-- .env (will use environment variables)
+- .env
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Verify: File exists and has correct patterns.
 ```
 
 **Agent Prompt:**
 ```
-Create file frontend/.dockerignore in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should exclude:
+Create `frontend/.dockerignore`
+
+Exclude:
 - node_modules/
 - .next/
 - out/
@@ -1627,7 +1578,7 @@ Create file frontend/.dockerignore in accordance with project plan and how to gu
 - *.log
 - .env.local
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Verify: File exists and has correct patterns.
 ```
 
 **Verification:**
@@ -1657,36 +1608,65 @@ docker compose ps
 - backend: Up
 - frontend: Up
 
-**Test Service Communication:**
-```bash
-# Test backend health endpoint
-curl http://localhost:8000/health
+**Note** run this to fix some formatting errors before validation.
+docker-compose exec backend black src/
 
-# Test frontend is accessible
+#### 7.6 Docker Verification Checklist (run after services are Up)
+
+Use these commands once `docker compose up -d` is running to validate everything quickly:
+
+```bash
+# Health + frontend reachability
+curl http://localhost:8000/health
 curl -I http://localhost:3000
 
-# No database/vector services in Phase 0; SQL/RAG tools use stub data
+# Settings load and .env visibility
+docker-compose exec backend python -c "from src.config.settings import Settings; s=Settings(); print(f'Environment: {s.environment}')"
+# Environment variables are injected via env_file; the .env file itself is not mounted.
+# Verify by reading a variable (example: AWS_REGION) or by loading Settings.
+docker-compose exec backend printenv AWS_REGION
+docker-compose exec backend python -c "from src.config.settings import Settings; s=Settings(); print(s.model_dump())"
+
+# FastAPI imports and graph/tool wiring
+docker-compose exec backend python -c "from src.api.main import app; print('FastAPI app created successfully')"
+#Can ignore UserWarning: Field "model_arn" in BedrockRerank
+docker-compose exec backend python -c "from src.agent.nodes.tools import tool_execution_node; print('Tool execution node imported')"
+docker-compose exec backend python -c "from src.agent.nodes.error_recovery import error_recovery_node; print('Error recovery node imported')"
+docker-compose exec backend python -c "from src.agent.graph import graph; print('Graph created successfully'); print(f'Graph nodes: {list(graph.nodes.keys())}')"
+docker-compose exec backend python -c "from src.agent.tools.search import tavily_search; print('Search tool created')"
+docker-compose exec backend python -c "from src.agent.tools.sql import sql_query; print('SQL tool created')"
+docker-compose exec backend python -c "from src.agent.tools.rag import rag_retrieval; print('RAG tool created')"
+docker-compose exec backend python -c "from src.agent.tools.market_data import market_data_tool; print('Market data tool created')"
+docker-compose exec backend python -c "from src.agent.graph import graph; print('Tools registered in graph')"
+
+# Test suites and quality checks
+docker-compose exec backend pytest --collect-only
+docker-compose exec backend pytest tests/test_tools.py -v  # current Phase 0 tests
+# Run agent/API tests after those files are added in later steps.
+docker-compose exec backend black --check src/
+docker-compose exec backend ruff check src/
+docker-compose exec backend mypy src/
 ```
 
 **Expected Results:**
 - Health endpoint returns: `{"status":"ok","environment":"local"}`
 - Frontend returns HTTP 200 or 302 (redirect)
-- Configuration loads successfully
+- Import/graph/tool commands print success lines
+- Tests and linters complete without errors
 
 **If Services Fail to Start:**
 1. Check logs: `docker-compose logs`
 2. Verify ports aren't in use: `lsof -i :8000 -i :3000 -i :5432`
-3. Check Docker Desktop is running
-4. Verify .env file has all required variables
-5. See troubleshooting section below
+3. Confirm Docker is running
+4. Verify `.env` has required variables
+5. Rerun `docker-compose up -d` after fixes
 
 **Stop Services:**
 ```bash
-# Stop all services
 docker-compose down
 ```
 
-**Note:** Keep services running for the next sections, or restart with `docker-compose up -d` when needed.
+**Note:** Keep services running for subsequent sections, or restart with `docker-compose up -d` when needed.
 
 ---
 
@@ -1710,19 +1690,22 @@ Creating helper scripts to simplify common development tasks like starting servi
 
 #### 8.1 Create Setup Script
 
+
 **Agent Prompt:**
 ```
-Create file scripts/setup.sh in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The script should:
+Create `scripts/setup.sh`
+
+Requirements:
 1. Validate Docker is installed and running
 2. Validate Python 3.11+ is installed
 3. Validate AWS CLI is configured
-4. Create .env from .env.example if it doesn't exist
-5. Pre-pull Docker images (postgres:15-alpine, chromadb/chroma, python:3.11-slim, node:20-alpine)
-6. Provide clear error messages if validation fails
+4. Create .env from .env.example if missing
+5. Pre-pull Docker images (python:3.11-slim, node:20-alpine)
+6. Clear error messages on failure
 7. Use bash with set -e for error handling
 8. Be idempotent (safe to run multiple times)
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Verify: Script is executable and runs without errors.
 ```
 
 **Command (run in WSL terminal):**
@@ -1742,23 +1725,23 @@ chmod +x scripts/setup.sh
 
 **Agent Prompt:**
 ```
-Create file scripts/validate_setup.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The script should:
+Create `scripts/validate_setup.py`
+
+Requirements:
 1. Check all prerequisites programmatically
-2. Validate .env file has all required variables
-3. Test AWS credentials (aws sts get-caller-identity)
-4. Test Bedrock model access (list-foundation-models)
+2. Validate .env file has required variables
+3. Test AWS credentials (boto3 sts get-caller-identity)
+4. Test Bedrock access (list-foundation-models)
 5. Test Pinecone API key (if provided)
 6. Test Tavily API key (if provided)
-7. Provide clear error messages
-8. Return exit code 0 if all checks pass, 1 if any fail
-9. Use Python 3.11+
-10. Load .env file
-11. Use boto3 for AWS checks
-12. Use requests for API checks
-13. Print colored output (green for pass, red for fail)
+7. Clear error messages
+8. Exit code 0 on success, 1 on failure
+9. Python 3.11+, load .env via python-dotenv
+10. Colored output (green=pass, red=fail)
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Verify: Script runs and validates environment correctly.
 ```
+
 
 **Verification Command:**
 ```bash
@@ -1772,24 +1755,24 @@ python3 scripts/validate_setup.py
 
 **Agent Prompt:**
 ```
-Create file scripts/dev.sh in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The script should provide convenient commands:
-- start: Start all services (docker-compose up)
-- stop: Stop all services (docker-compose down)
-- logs: View logs (docker-compose logs -f)
-- test: Run tests (pytest in backend)
-- shell: Open backend shell (docker-compose exec backend bash)
-- db: Open database shell (docker-compose exec postgres psql -U demo -d demo)
-- restart: Restart all services
-- clean: Stop and remove volumes
+Create `scripts/dev.sh`
 
-The script should:
-- Use bash
+Commands:
+- start: docker compose up -d
+- stop: docker compose down
+- logs: docker compose logs -f
+- test: docker compose exec backend pytest
+- shell: docker compose exec backend bash
+- restart: down + up
+- clean: down -v (remove volumes)
+
+Requirements:
+- Bash script
 - Accept command as first argument
-- Provide usage message if no command
+- Show usage if no command
 - Handle errors gracefully
-- Use docker-compose commands
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Verify: Script is executable and commands work.
 ```
 
 **Command:**
@@ -1799,10 +1782,11 @@ chmod +x scripts/dev.sh
 
 **Verification:**
 ```bash
-# Test dev script
-./scripts/dev.sh  # Should show usage
+# Smoke test dev script
+./scripts/dev.sh start   # Starts all services via Docker Compose
+./scripts/dev.sh stop    # Stops all services
 ```
-
+#palceholder - script validation START BEGIN HERE
 ---
 
 ## 9. Testing Foundation
@@ -1828,170 +1812,110 @@ Setting up testing infrastructure with pytest, test structure, and initial tests
 
 **Agent Prompt:**
 ```
-Create file backend/pytest.ini in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Configure pytest for the project
-2. Set test paths (tests/)
-3. Configure coverage settings
-4. Set Python path to include src/
-5. Configure asyncio mode for pytest-asyncio 0.24+
-6. Set test discovery patterns
+Create `backend/pytest.ini`
 
 Configuration:
 - testpaths = tests
 - pythonpath = src
 - asyncio_mode = auto
-- asyncio_default_fixture_loop_scope = function (required for pytest-asyncio 0.24+)
-- addopts = --verbose --cov=src --cov-report=term-missing
-- Coverage threshold: 70% (for critical paths)
+- asyncio_default_fixture_loop_scope = function (pytest-asyncio 0.24+)
+- addopts = -v --cov=src --cov-report=term-missing
+- filterwarnings: ignore DeprecationWarning
 
-Example pytest.ini:
-```ini
-[pytest]
-testpaths = tests
-pythonpath = src
-asyncio_mode = auto
-asyncio_default_fixture_loop_scope = function
-addopts = -v --cov=src --cov-report=term-missing
-filterwarnings =
-    ignore::DeprecationWarning
+Reference: pytest-asyncio 0.24+ requires asyncio_default_fixture_loop_scope.
+Verify: pytest runs without configuration errors.
 ```
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
-```
 
-**Verification (After Docker Setup):**
-```bash
-# Test pytest configuration (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/pytest.ini
-```
 
-**Note:** Full pytest testing will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend pytest --collect-only
-```
+
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 9.2 Create Test Structure
 
-**Command:**
-```bash
-# Create test files
-touch backend/tests/__init__.py
-touch backend/tests/test_agent.py
-touch backend/tests/test_tools.py
-touch backend/tests/test_api.py
-```
+#note the agent will make the files as needed
 
 #### 9.3 Create Agent Tests
 
 **Agent Prompt:**
 ```
-Create file backend/tests/test_agent.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should include:
-1. Tests for agent graph creation
-2. Tests for state schema
-3. Tests for node execution (with mocks)
-4. Mock Bedrock calls using unittest.mock
-5. Test error handling
-6. Test tool calling flow
-7. Pytest fixtures for common setup
-8. Proper assertions
-9. Docstrings to test functions
+Create `backend/tests/test_agent.py`
 
 Test cases:
-- test_graph_creation: Verify graph can be created
-- test_state_schema: Verify state structure
-- test_chat_node_mock: Test chat node with mocked Bedrock
-- test_tool_execution: Test tool execution flow
-- test_error_recovery: Test error recovery node
+- test_state_creation: Verify create_initial_state() works
+- test_state_validation: Verify validate_state() catches errors
+- test_state_helpers: Test add_tool_used, set_error, clear_error
+- test_get_registered_tools: Verify tools are registered
 
-Mocking:
-- Use @patch decorator for Bedrock calls
-- Mock boto3 BedrockRuntime client
-- Return realistic mock responses
+Requirements:
+- Pytest fixtures for common setup
+- Use @pytest.mark.asyncio for async tests
+- Proper assertions with clear messages
+- Docstrings on test functions
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Reference: agentic-ai.mdc testing patterns.
+Verify: Tests pass with pytest.
 ```
 
-**Verification Command (After Docker Setup):**
-```bash
-# Run agent tests (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/tests/test_agent.py
-```
-
-**Note:** Full test execution will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend pytest tests/test_agent.py -v
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 9.4 Create Tool Tests
 
 **Agent Prompt:**
 ```
-Create file backend/tests/test_tools.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should include:
-1. Tests for each tool (search, sql, rag, market data)
-2. Test tool execution with mock data
-3. Test error handling
-4. Test tool result formatting
-5. Pytest fixtures
-6. Mock external APIs
+Create `backend/tests/test_tools.py`
 
 Test cases:
-- test_search_tool: Test search tool returns mock data
-- test_sql_tool: Test SQL tool returns mock data
-- test_rag_tool: Test RAG tool returns mock data
-- test_market_data_tool: Test market data tool returns mock data
-- test_tool_errors: Test error handling in tools
+- test_market_data_tool_mock: Test returns mock data when no API key
+- test_market_data_input_validation: Test Pydantic input schema
+- test_tool_error_handling: Test graceful error handling
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Requirements:
+- Use @pytest.mark.asyncio for async tool tests
+- Pytest fixtures for common setup
+- Mock external API calls
+- Test both success and error paths
+
+Reference: Existing market_data.py implementation.
+Verify: Tests pass with pytest.
 ```
 
-**Verification (After Docker Setup):**
-```bash
-# Run tool tests (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/tests/test_tools.py
-```
-
-**Note:** Full test execution will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend pytest tests/test_tools.py -v
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
 #### 9.5 Create API Tests
 
 **Agent Prompt:**
 ```
-Create file backend/tests/test_api.py in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should include:
-1. Tests for FastAPI app
-2. Tests for health endpoint
-3. Use TestClient from fastapi.testclient
-4. Test CORS headers
-5. Test error responses
+Create `backend/tests/test_api.py`
 
 Test cases:
-- test_health_endpoint: GET /health returns 200
-- test_cors_headers: CORS headers are set correctly
-- test_app_startup: App starts without errors
+- test_health_endpoint: GET /health returns 200 with correct JSON
+- test_root_endpoint: GET / returns API info
+- test_cors_headers: CORS headers set correctly
+- test_404_response: Unknown endpoint returns 404
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Requirements:
+- Use TestClient from fastapi.testclient
+- Pytest fixtures for app client
+- Test response status codes and JSON structure
+
+Reference: FastAPI testing docs.
+Verify: Tests pass with pytest.
 ```
 
-**Verification (After Docker Setup):**
-```bash
-# Run API tests (requires Docker from Section 7)
-# This will be verified in Section 7.5 after Docker Compose is set up
-# For now, just verify the file exists:
-ls backend/tests/test_api.py
-```
+**Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
 
-**Note:** Full test execution will happen after Docker Compose setup (Section 7.5) using:
-```bash
-docker-compose exec backend pytest tests/test_api.py -v
-```
+
+**NOTE**
+Run the below to verify tests are working
+
+
+
+
+#### START HERE PLACE HOLDER - all code should be created and checked at this point.
+docker-compose up -d
+docker-compose exec backend pytest
+docker-compose down
 
 ---
 
@@ -2041,35 +1965,35 @@ pre-commit --version
 
 **Agent Prompt:**
 ```
-Create file .pre-commit-config.yaml in accordance with project plan and how to guide using best coding practices and latest best practices/sota way of doing it that is stable, do as much research as is necessary. The file should:
-1. Configure black for Python formatting
-2. Configure ruff for Python linting
-3. Configure mypy for type checking
-4. Configure detect-secrets for secret scanning (security)
-5. Configure pre-commit-hooks for general quality (trailing whitespace, YAML/JSON validation)
-6. Set up hooks to run on commit
-7. Exclude certain files (migrations, generated files)
-
-**IMPORTANT:** Version alignment - The versions specified here MUST match DEVELOPMENT_REFERENCE.md "Technology Version Reference" section. Update that file first, then update .pre-commit-config.yaml.
-
-Configuration:
-- repos for: black, ruff, mypy, detect-secrets, pre-commit-hooks
-- files: ^backend/ for Python hooks
-- pass_filenames: true for most hooks
-- stages: [commit]
+Create `.pre-commit-config.yaml`
 
 Hooks:
-- black: Format Python code (version must match DEVELOPMENT_REFERENCE.md)
-- ruff: Lint Python code (version must match DEVELOPMENT_REFERENCE.md)
-- mypy: Type check Python code (version must match DEVELOPMENT_REFERENCE.md)
-- detect-secrets: Scan for accidentally committed secrets
+- black: Python formatting
+- ruff: Python linting  
+- mypy: Type checking
+- detect-secrets: Secret scanning
+- pre-commit-hooks: Trailing whitespace, YAML validation
 
-Note: pytest is intentionally NOT included as a pre-commit hook because running tests on every commit is slow. Run tests manually or via CI/CD.
+Configuration:
+- files: ^backend/ for Python hooks
+- stages: [commit]
+- Exclude migrations, generated files
 
-Review the new file for errors, inconsistencies, version issues, latest documentation.
+Important: Versions MUST match DEVELOPMENT_REFERENCE.md "Technology Version Reference".
+
+Note: pytest NOT included (too slow for every commit - use CI/CD).
+
+Reference: DEVELOPMENT_REFERENCE.md for versions.
+Verify: pre-commit validate-config passes.
 ```
-
+#current progress place holder placerhodler for code, fixing precommit TODO
 **Verification:**
+
+
+#re run these commands from 7.6 to double check everything.
+docker-compose exec backend black --check src/
+docker-compose exec backend ruff check src/
+docker-compose exec backend mypy src/
 ```bash
 # Validate pre-commit config
 pre-commit validate-config
@@ -2126,77 +2050,21 @@ Create a verification report listing:
 - Recommendations
 ```
 
-**Commands (After Docker Setup):**
+**Commands:** Use the Docker verification checklist in Section 7.6 for black/ruff/mypy. Review outputs and fix any reported issues.
+
+After creating the script, run the automated verification and capture the report:
+
 ```bash
-# Run code quality checks (requires Docker from Section 7)
-# Start services if not running
-docker-compose up -d
-
-# Run formatting check
-docker-compose exec backend black --check src/
-
-# Run linting
-docker-compose exec backend ruff check src/
-
-# Run type checking
-docker-compose exec backend mypy src/
+# Run inside backend container
+docker-compose exec backend python scripts/verify_code_quality.py \
+  --output reports/code_quality_report.md
 ```
-
-**Expected Results:**
-- Black: No formatting issues (or list of files needing formatting)
-- Ruff: No linting errors
-- Mypy: No type errors (or list of type issues to fix)
-
-**If Issues Found:**
-- Format code: `docker-compose exec backend black src/`
-- Fix linting: Review ruff output and fix issues
-- Fix types: Add missing type hints based on mypy output
 
 #### 11.2 Functional Testing
 
 **Prerequisites:** Docker Compose must be set up and tested (Section 7.5) before running these tests.
 
-**Commands:**
-```bash
-# Start services (if not already running)
-docker-compose up -d
-
-# Wait for services to be ready (10-15 seconds)
-sleep 15
-
-# Verify all services are running
-docker-compose ps
-
-# Test health endpoint
-curl http://localhost:8000/health
-
-# Test frontend loads
-curl -I http://localhost:3000
-
-# Run tests in Docker
-docker-compose exec backend pytest
-
-# Or use dev script (if created)
-./scripts/dev.sh test
-
-# Check logs for errors
-docker-compose logs backend | grep -i error
-docker-compose logs frontend | grep -i error
-```
-
-**Expected Results:**
-- All services show "Up" status
-- Health endpoint returns: `{"status":"ok","environment":"local"}`
-- Frontend returns HTTP 200 or 302 (redirect to login)
-- All tests pass
-- No errors in logs
-
-**If Tests Fail:**
-1. Check Docker containers are running: `docker-compose ps`
-2. Verify dependencies installed: `docker-compose exec backend pip list | grep pytest`
-3. Check test files exist: `ls backend/tests/test_*.py`
-4. Review test output for specific errors
-5. See troubleshooting section for import errors
+**Commands:** Functional test commands are consolidated in Section 7.6 (health, frontend reachability, pytest suites, and log checks). Use that checklist to validate; if anything fails, inspect container logs and rerun after fixes.
 
 #### 11.3 Integration Testing
 
@@ -2953,4 +2821,3 @@ Phase 0 establishes the complete local development environment with:
 **Time Estimate:** 4-6 hours for complete implementation
 
 **Success Criteria:** All items in Phase 0 Completion Checklist are checked ✅
-

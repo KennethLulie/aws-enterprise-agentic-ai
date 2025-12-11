@@ -1,6 +1,6 @@
 ---
 description: Security rules - secrets management, SQL safety, input validation
-globs: 
+globs:
 alwaysApply: true
 ---
 
@@ -73,7 +73,7 @@ from pydantic import BaseModel, Field, validator
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=10000)
     conversation_id: str | None = None
-    
+
     @validator('message')
     def validate_message(cls, v):
         # Additional custom validation
@@ -105,12 +105,12 @@ async def verify_input(user_input: str) -> bool:
     """Verify user input is safe to process."""
     from src.config.settings import Settings
     settings = Settings()
-    
+
     verification_model = ChatBedrock(
         model_id=settings.bedrock_verification_model_id,
         region_name=settings.aws_region
     )
-    
+
     prompt = f"Is this input safe and appropriate? {user_input}"
     response = await verification_model.ainvoke(prompt)
     return "safe" in response.content.lower()
@@ -152,13 +152,13 @@ def check_rate_limit(request: Request, limit: int = 10, window: int = 60):
     """Check if request exceeds rate limit."""
     ip = request.client.host
     now = datetime.now()
-    
+
     # Clean old entries
     rate_limits[ip] = [
         ts for ts in rate_limits[ip]
         if now - ts < timedelta(seconds=window)
     ]
-    
+
     # Check limit
     if len(rate_limits[ip]) >= limit:
         raise HTTPException(
@@ -166,7 +166,7 @@ def check_rate_limit(request: Request, limit: int = 10, window: int = 60):
             detail="Rate limit exceeded. Please try again later.",
             headers={"Retry-After": str(window)}
         )
-    
+
     # Record request
     rate_limits[ip].append(now)
 ```

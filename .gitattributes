@@ -47,4 +47,3 @@ Makefile text eol=lf
 *.7z binary
 *.pyc binary
 *.pkl binary
-

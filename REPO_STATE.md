@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2025-12-09 (Added 2025 SOTA RAG with Knowledge Graph plan)
+**Last Updated:** 2025-12-10 (Added API tests for health/root endpoints)
 
 ---
 
@@ -44,27 +44,39 @@
 | backend/Dockerfile.dev | Development Docker image |
 | backend/requirements.txt | Python dependencies |
 | backend/src/config/settings.py | Pydantic settings with environment and FMP config |
+| backend/src/api/routes/auth.py | Demo password login route |
 | backend/src/agent/__init__.py | Agent package marker |
 | backend/src/agent/graph.py | LangGraph tool registration |
 | backend/src/agent/tools/__init__.py | Tools package exports |
 | backend/src/agent/tools/market_data.py | FMP market data tool (mock-friendly) |
 | backend/tests/__init__.py | Tests package |
+| backend/tests/test_api.py | API endpoint tests |
 | backend/tests/test_tools.py | Tool tests (mock/live scenarios) |
+| backend/scripts/verify_code_quality.py | Code quality verification report generator |
+| backend/pytest.ini | Pytest configuration |
 
 ### Frontend Directory
 | File | Purpose |
 |------|---------|
 | frontend/Dockerfile.dev | Development Docker image |
+| frontend/src/app/layout.tsx | Root layout |
+| frontend/src/app/page.tsx | Chat page |
+| frontend/src/app/login/page.tsx | Login page |
+| frontend/src/lib/api.ts | API client |
 
 ### Documentation Directory
 | File | Purpose |
 |------|---------|
 | docs/SECURITY.md | Security and secrets management guide |
+| docs/integration-test-checklist.md | Phase 0 end-to-end test checklist |
 
 ### Scripts Directory
 | File | Purpose |
 |------|---------|
-| scripts/README.md | Scripts directory placeholder |
+| scripts/README.md | Scripts directory overview |
+| scripts/setup.sh | One-time setup script |
+| scripts/dev.sh | Dev helper script (start/stop/logs/test/shell/clean) |
+| scripts/validate_setup.py | Prerequisites validation script |
 
 ---
 
@@ -96,8 +108,6 @@
 |------|---------------|---------|
 | backend/tests/__init__.py | 9.2 | Tests package |
 | backend/tests/test_agent.py | 9.3 | Agent tests |
-| backend/tests/test_api.py | 9.5 | API tests |
-| backend/pytest.ini | 9.1 | Pytest configuration |
 
 **Frontend Source (Section 6):**
 | File | Target Section | Purpose |
@@ -105,17 +115,10 @@
 | frontend/package.json | 6.1 | Node.js dependencies |
 | frontend/next.config.js | 6.2 | Next.js configuration |
 | frontend/tsconfig.json | 6.1 | TypeScript config |
-| frontend/src/app/layout.tsx | 6.7 | Root layout |
-| frontend/src/app/page.tsx | 6.6 | Chat page |
-| frontend/src/app/login/page.tsx | 6.4 | Login page |
-| frontend/src/lib/api.ts | 6.5 | API client |
 
 **Scripts (Section 8):**
 | File | Target Section | Purpose |
 |------|---------------|---------|
-| scripts/setup.sh | 8.1 | One-time setup |
-| scripts/validate_setup.py | 8.2 | Validation script |
-| scripts/dev.sh | 8.3 | Dev helper script |
 
 ### Phase 1a - To Be Created
 | File | Purpose |
@@ -184,4 +187,3 @@ grep -roh '\[.*\](\./[^)]*' *.md docs/*.md | while read link; do
   [ -f "$file" ] || echo "MISSING: $file (from link: $link)"
 done
 ```
-

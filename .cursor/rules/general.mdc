@@ -1,6 +1,6 @@
 ---
 description: Core project rules - Docker-first development, cost/complexity tradeoffs, demo optimization
-globs: 
+globs:
 alwaysApply: true
 ---
 
@@ -8,9 +8,9 @@ alwaysApply: true
 
 Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestration, RAG, streaming.
 
-**Current Phase:** Phase 0 (Local Development)  
-**AWS Region:** us-east-1 (ALWAYS - never hardcode, use from settings)  
-**Cost Target:** $20-50/month for demo workloads  
+**Current Phase:** Phase 0 (Local Development)
+**AWS Region:** us-east-1 (ALWAYS - never hardcode, use from settings)
+**Cost Target:** $20-50/month for demo workloads
 **Last Updated:** December 2025
 
 ## Single Sources of Truth
@@ -107,7 +107,7 @@ docker-compose down                  # Stop services
 
 ## Technology Stack
 
-**Versions:** See DEVELOPMENT_REFERENCE.md "Technology Version Reference" section.  
+**Versions:** See DEVELOPMENT_REFERENCE.md "Technology Version Reference" section.
 **IMPORTANT:** Always check DEVELOPMENT_REFERENCE.md before adding/updating dependencies.
 
 **Backend:**
@@ -160,6 +160,87 @@ docker-compose down                  # Stop services
 - No hardcoded secrets, regions, or versions
 - Proper error handling and logging
 - Tests updated/added for new functionality
+
+## Research-First Development
+
+**Critical:** Understand before implementing. Stable patterns over bleeding-edge.
+
+### Before Writing Any Code
+
+1. **Understand the Codebase First:**
+   - Search for similar patterns already in the codebase (`grep`, `codebase_search`)
+   - Read related files to understand existing conventions and abstractions
+   - Check how similar features/components are implemented elsewhere
+   - Identify reusable utilities, helpers, and patterns already available
+
+2. **Verify Dependencies and Versions:**
+   - Check DEVELOPMENT_REFERENCE.md for pinned versions before adding/updating packages
+   - Use versions that are 2-3 months stable (not bleeding-edge, not outdated)
+   - Prefer packages with active maintenance, good documentation, and large user base
+   - Search for known issues with the specific version combinations you're using
+
+3. **Research Best Practices:**
+   - Look up current best practices for the specific pattern/feature being implemented
+   - Check official documentation for libraries being used (LangChain, FastAPI, Next.js, etc.)
+   - Verify API signatures and patterns haven't changed in newer versions
+   - When using LLM/AI patterns, verify against LangChain/LangGraph current documentation
+
+### Stability Over Novelty
+
+**Choose patterns that are:**
+- Widely adopted and battle-tested in production
+- Well-documented with clear migration paths
+- Supported by the library/framework maintainers
+- Compatible with existing project dependencies
+
+**Avoid:**
+- Beta features or experimental APIs unless explicitly needed
+- Patterns from blog posts without verifying against official docs
+- Deprecated patterns that still work but have better alternatives
+- Cutting-edge features that may change or have unknown bugs
+
+### Integration Verification
+
+**Before finalizing any implementation:**
+
+1. **Trace the full data/control flow:**
+   - Where does the data come from?
+   - What transformations happen along the way?
+   - Where does it end up?
+   - What error conditions can occur?
+
+2. **Check interface compatibility:**
+   - Verify function signatures match what callers expect
+   - Ensure type annotations are correct and complete
+   - Validate that return types match what consumers need
+
+3. **Verify imports and dependencies:**
+   - Ensure all imports are available in the codebase
+   - Check that dependent services/modules exist and are properly configured
+   - Verify environment variables and configuration exist
+
+4. **Run existing tests and lints:**
+   - `docker-compose exec backend pytest` for Python tests
+   - `docker-compose exec backend mypy src/` for type checking
+   - `docker-compose exec frontend npm run lint` for frontend linting
+   - Fix any failures before considering the work complete
+
+### Research Depth by Task Type
+
+| Task Type | Research Depth |
+|-----------|----------------|
+| Bug fix | Read surrounding code, understand root cause before fixing |
+| New feature | Search for similar patterns, read related modules, check docs |
+| Refactoring | Understand all callers and consumers, check for side effects |
+| Dependency update | Check changelog, migration guide, breaking changes, compatibility |
+| New integration | Read official docs, check examples, verify API stability |
+
+### When Uncertain
+
+- **Ask:** If unsure about patterns, cost implications, or architectural decisions, consult user
+- **Prototype small:** Test patterns in isolation before integrating
+- **Check compatibility:** Search for known issues with specific version combinations
+- **Verify against docs:** Official documentation beats Stack Overflow or AI suggestions
 
 ## Anti-Patterns
 

@@ -251,4 +251,3 @@ cp .env.example .env
 ## Questions?
 
 For security-related questions or to report a vulnerability, please open a GitHub issue or contact the repository owner directly.
-

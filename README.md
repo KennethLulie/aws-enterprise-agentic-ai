@@ -80,6 +80,76 @@ This repository contains the complete project plan and architecture documentatio
 - **[PHASE_0_HOW_TO_GUIDE.md](./PHASE_0_HOW_TO_GUIDE.md)** - Step-by-step guide for Phase 0 implementation
 - **[docs/SECURITY.md](./docs/SECURITY.md)** - Security and secrets management guide
 
+## 🧭 LangGraph Flow (Planned Graph)
+
+Planned end-state graph (per `PROJECT_PLAN.md`, implemented in `backend/src/agent/graph.py` as phases mature). Planner chooses edges dynamically; tools loop results back for multi-hop reasoning:
+
+```
+                 ┌────────────────┐
+                 │ Input Verify   │  (Nova Lite guards)
+                 └──────┬─────────┘
+                        │ safe / blocked
+                        ▼
+                 ┌────────────────┐
+                 │ Cache Check    │  (semantic, DynamoDB)
+                 └──────┬─────────┘
+                        │ hit / miss
+                        ▼
+            ┌────────────────────────────┐
+            │      Planner (LLM)         │
+            │ decides next edge:         │
+            │ - call tool(s)             │
+            │ - respond directly         │
+            │ - halt on error            │
+            └─┬────────┬─────────┬──────┘
+              │        │         │
+   tool_calls │        │ no call │ error
+              │        │         │
+              ▼        ▼         ▼
+   ┌────────────┐  ┌──────────┐  ┌────────────────┐
+   │ SQL Tool   │  │ Respond  │  │ Error Recovery │
+   │ (Aurora)   │  │ (LLM out)│  │ (fallback/stop)│
+   ├────────────┤  └────┬─────┘  └────────┬───────┘
+   │ RAG Tool   │       │                 │
+   │ (Pinecone) │       │                 │
+   ├────────────┤       │                 │
+   │ Search     │       │                 │
+   │ (Tavily)   │       │                 │
+   ├────────────┤       │                 │
+   │ Market API │       │                 │
+   │ (MCP)      │       │                 │
+   └──────┬─────┘       │                 │
+          │ results     │                 │
+          ▼             │                 │
+   ┌────────────────┐   │                 │
+   │ Tool Result    │   │                 │
+   │ (normalized)   │   │                 │
+   └──────┬─────────┘   │                 │
+          │             │                 │
+          └─────────────┴──── loop back ──┐
+                                          │
+                                          ▼
+                               (back to Planner box above for next decision)
+                                          │ finish
+                                          ▼
+                 ┌────────────────┐
+                 │ Cache Write    │  (on miss; planner-directed)
+                 └──────┬─────────┘
+                        ▼
+                 ┌────────────────┐
+                 │ Output Verify  │  (safety/quality gate)
+                 └──────┬─────────┘
+                        ▼
+                 ┌──────────────┐
+                 │     End      │
+                 └──────────────┘
+```
+
+- Planner can loop through multiple tool calls; tools return to planner before finalizing.
+- Error recovery can short-circuit to end with a safe fallback message.
+- Cache read happens before tool work; cache write happens after successful tool/LLM work.
+- Input/Output verification bookend the flow for safety.
+
 ## 🏗️ Architecture
 
 The system is organized into three layers: **DevOps & Deployment**, **Runtime**, and **Evaluation & Monitoring**.
@@ -434,4 +504,3 @@ This project is for portfolio/demonstration purposes.
 ## 👤 Author
 
 Built as a portfolio project demonstrating enterprise-grade AI system architecture.
-

@@ -75,12 +75,9 @@ tags = ["aws", "secret-key"]
 description = "Example/placeholder values in documentation"
 regexTarget = "match"
 regexes = [
-    '''AKIAIOSFODNN7EXAMPLE''',  # AWS example key from docs
-    '''wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY''',  # AWS example secret from docs
-    '''tvly-XXXX''',
+  '''tvly-XXXX''',
     '''xxxxxxxx-xxxx-xxxx''',
     '''your-.*-here''',
     '''REPLACE_ME''',
     '''change-this''',
 ]
-

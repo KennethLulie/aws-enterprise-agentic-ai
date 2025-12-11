@@ -47,7 +47,11 @@ This project uses a two-tier secrets management approach:
 2. Edit `.env` and fill in your actual API keys
 3. The `.env` file is gitignored and will never be committed
 
-**Required Variables:** See [`.env.example`](.env.example) for the complete list of environment variables with descriptions and where to obtain each key.
+**Required Variables:** See [`.env.example`](.env.example) for the complete list of environment variables with descriptions and where to obtain each key. For Phase 0 auth, set:
+- `DEMO_PASSWORD` – demo login password
+- `AUTH_TOKEN_SECRET` – HMAC secret for signing the session cookie
+- `AUTH_TOKEN_EXPIRES_MINUTES` – session lifetime (default 1440)
+- `AUTH_COOKIE_NAME` – cookie name for the signed session token
 
 **For Production Deployment:** See [`docs/SECURITY.md`](docs/SECURITY.md) for AWS Secrets Manager configuration.
 
@@ -98,6 +102,19 @@ Fully working agent locally before any AWS deployment.
 - **No local database/vector/KG services in Phase 0** (SQL and RAG tools return mock data)
 - **Volume Mounts:** `./backend:/app`, `./frontend:/app` (hot reload)
 - **Startup Time Target:** 5-10 seconds
+
+#### Local Python Tooling (Optional)
+
+For better IDE support (autocomplete, type checking, import resolution), you can install Python dependencies locally while still running the application in Docker:
+
+```bash
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+```
+
+Configure Cursor/VS Code to use `.venv/bin/python` as the Python interpreter. This does not change the Docker-first workflow - it's purely for IDE tooling support. See PHASE_0_HOW_TO_GUIDE.md section 1.7 for detailed instructions.
 
 ### Implementation Order
 
@@ -1585,4 +1602,3 @@ def test_agent_with_tool():
 **Remember:** This document should be consulted before implementing any feature. If you find inconsistencies or missing information, update this document first, then proceed with implementation.
 
 **Last Review:** Before starting each phase, review the relevant section to ensure all specifications are understood and all dependencies are met.
-

@@ -33,6 +33,7 @@ yarn-error.log*
 .pnpm-debug.log*
 .next/
 out/
+.turbo/
 dist/
 build/
 
@@ -80,7 +81,10 @@ samconfig.toml
 
 # Testing
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
+coverage.xml
 htmlcov/
 .tox/
 .hypothesis/
@@ -134,4 +138,3 @@ local-data/
 # Documentation builds
 docs/_build/
 site/
-

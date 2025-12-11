@@ -64,7 +64,7 @@ alwaysApply: false
 
 **Purpose:** Search the web for current information using Tavily API.
 
-**Input:** 
+**Input:**
 - `query` (str): Search query string
 
 **Output:**
@@ -81,6 +81,39 @@ alwaysApply: false
 - Timeout: Returns partial results if available
 
 **Cost:** ~$0.001 per search (Tavily free tier: 1,000/month)
+```
+
+## Agent Prompt Format (PHASE_0_HOW_TO_GUIDE.md)
+
+When writing prompts in PHASE_0_HOW_TO_GUIDE.md, use this concise format:
+
+```
+Create `path/to/file.py`
+
+Requirements:
+1. [Specific requirement]
+2. [Specific requirement]
+
+Reference: [Relevant docs, rules, or existing files]
+Verify: [How to check correctness]
+```
+
+**Guidelines:**
+- Use backticks for file paths: `backend/src/agent/state.py`
+- Keep requirements specific and actionable
+- Reference existing patterns: "Follow patterns in src/config/__init__.py"
+- Include specific verification: "Check for linter errors"
+- Avoid verbose boilerplate - be concise
+
+**For updates to existing files:**
+```
+Update `path/to/file.py`
+
+Changes:
+1. [Specific change]
+2. [Specific change]
+
+Verify: [How to check correctness]
 ```
 
 ## Code Documentation Standards

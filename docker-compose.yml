@@ -12,14 +12,12 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - backend_venv:/app/venv  # Preserve venv between restarts
     env_file:
       - .env  # Load API keys and secrets from .env file
     environment:
       # Override/supplement .env with docker-specific values
       - ENVIRONMENT=${ENVIRONMENT:-local}  # Use ENVIRONMENT, not ENV
       - DEBUG=${DEBUG:-true}
-    depends_on: []
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -37,7 +35,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules  # Preserve node_modules
-      - frontend_next:/app/.next  # Preserve Next.js cache
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=development
@@ -50,8 +47,3 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s  # Give time for Next.js to compile
-
-volumes:
-  backend_venv:
-  frontend_next:
-

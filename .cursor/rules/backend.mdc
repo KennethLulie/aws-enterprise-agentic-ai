@@ -168,11 +168,11 @@ async def test_chat_node_with_tool_call(mocker):
     # Mock Bedrock response
     mock_response = {"messages": [{"role": "assistant", "content": "test"}]}
     mocker.patch("src.agent.nodes.chat.bedrock_client", return_value=mock_response)
-    
+
     # Test
     state = AgentState(messages=[...])
     result = await chat_node(state)
-    
+
     # Assert
     assert len(result["messages"]) > len(state["messages"])
 ```
