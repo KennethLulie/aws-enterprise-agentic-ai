@@ -38,7 +38,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.api import __api_version__, __version__
-from src.api.routes import auth_router, health_router
+from src.api.routes import auth_router, chat_router, health_router
 from src.config import Settings, get_settings, validate_config
 
 if TYPE_CHECKING:
@@ -306,18 +306,17 @@ def _register_routes(app: FastAPI) -> None:
     Register API routes with the application.
 
     Currently registers:
+        - Auth routes (/api/login, /api/logout, /api/me)
+        - Chat routes (/api/chat)
         - Health check router (/health)
         - Root endpoint (/)
-
-    Future additions (Phase 1b+):
-        - Chat routes (/api/v1/chat)
-        - Additional versioned endpoints
 
     Args:
         app: The FastAPI application instance.
     """
     # Include routers
     app.include_router(auth_router)
+    app.include_router(chat_router)
     app.include_router(health_router)
 
     # Root endpoint for basic connectivity check

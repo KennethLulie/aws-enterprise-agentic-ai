@@ -26,6 +26,7 @@ class RAGQueryInput(BaseModel):
     @field_validator("query")
     @classmethod
     def validate_query(cls, value: str) -> str:
+        """Ensure RAG queries are present after trimming whitespace."""
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("Query cannot be empty.")

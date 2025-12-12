@@ -1,3 +1,7 @@
+"""Unit tests for LangGraph agent state helpers and tool registry."""
+
+from typing import cast
+
 import pytest
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool
@@ -65,13 +69,16 @@ async def test_state_validation_flags_errors_and_accepts_valid_state() -> None:
     assert "Missing required field: tools_used" in missing_errors
     assert "Missing required field: metadata" in missing_errors
 
-    type_errors_state: AgentState = {
-        "messages": "not-a-list",
-        "conversation_id": 123,
-        "tools_used": {},
-        "last_error": 42,
-        "metadata": [],
-    }
+    type_errors_state: AgentState = cast(
+        AgentState,
+        {
+            "messages": "not-a-list",
+            "conversation_id": 123,
+            "tools_used": {},
+            "last_error": 42,
+            "metadata": [],
+        },
+    )
     is_valid_types, type_errors = validate_state(type_errors_state)
 
     assert not is_valid_types, "State with invalid types should be rejected."

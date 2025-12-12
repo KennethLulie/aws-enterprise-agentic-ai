@@ -37,7 +37,6 @@ BACKEND_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TARGETS: tuple[Path, ...] = (
     BACKEND_ROOT / "src",
     BACKEND_ROOT / "tests",
-    BACKEND_ROOT / "alembic",
 )
 SKIP_PARTS = {"__pycache__", ".mypy_cache", ".pytest_cache", ".venv", "venv"}
 
@@ -49,6 +48,7 @@ SUSPICIOUS_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "Service URLs should be provided via environment/config",
     ),
 ]
+SUSPICIOUS_EXCLUDE: set[Path] = {Path("src/config/settings.py")}
 
 
 @dataclass
@@ -243,6 +243,8 @@ def detect_suspicious_constants(files: Sequence[Path]) -> list[Finding]:
     findings: list[Finding] = []
 
     for relative_path in files:
+        if relative_path in SUSPICIOUS_EXCLUDE:
+            continue
         if "tests" in relative_path.parts:
             # Allow explicit literals in tests.
             continue

@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 
 import structlog
 from langchain_aws import ChatBedrock
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import BaseMessage, BaseMessageChunk
 
 from src.agent.state import AgentState, set_error
 from src.config.settings import get_settings
@@ -157,7 +157,10 @@ async def chat_node(
         log.warning("chat_node called with empty messages")
         return state
 
-    log.info("chat_node: Processing messages with primary model")
+    log.info(
+        "chat_node: Processing messages with primary model",
+        model_id=settings.bedrock_model_id,
+    )
 
     # Try primary model first
     try:
@@ -177,11 +180,16 @@ async def chat_node(
         log.warning(
             "chat_node: Primary model failed, trying fallback",
             model_id=settings.bedrock_model_id,
+            fallback_model_id=settings.bedrock_fallback_model_id,
             error=str(primary_error),
         )
 
         # Try fallback model
         try:
+            log.info(
+                "chat_node: Processing messages with fallback model",
+                model_id=settings.bedrock_fallback_model_id,
+            )
             response = await _invoke_model(
                 model_id=settings.bedrock_fallback_model_id,
                 messages=messages,
@@ -236,16 +244,43 @@ async def _invoke_model(
     model = _create_chat_model(model_id)
     model_with_tools = _bind_tools_to_model(model, tools)
 
-    # Use ainvoke for async invocation
-    response = await model_with_tools.ainvoke(messages)
-
-    # Preserve structured responses (tool_calls, etc.); coerce only if unexpected
-    if isinstance(response, BaseMessage):
-        return response
-
-    response = AIMessage(content=str(response))
+    response = await _stream_response(model_with_tools, messages, log)
+    log.debug("Model stream completed", model_id=model_id)
 
     return response
+
+
+async def _stream_response(
+    model: ChatBedrock,
+    messages: list[BaseMessage],
+    log: structlog.BoundLogger,
+) -> BaseMessage:
+    """
+    Stream model responses and combine chunks into a full message.
+
+    Uses LangChain's astream to support UI streaming while still returning
+    a complete BaseMessage (including tool_calls) back to the graph.
+    """
+    combined_chunk: BaseMessageChunk | None = None
+    final_message: BaseMessage | None = None
+
+    async for chunk in model.astream(messages):
+        log.debug("Received stream chunk")
+
+        if isinstance(chunk, BaseMessage):
+            final_message = chunk
+            continue
+
+        if isinstance(chunk, BaseMessageChunk):
+            combined_chunk = chunk if combined_chunk is None else combined_chunk + chunk
+
+    if final_message:
+        return final_message
+
+    if combined_chunk:
+        return combined_chunk.to_message()
+
+    raise ValueError("No response received from model stream")
 
 
 def _create_success_state(state: AgentState, response: BaseMessage) -> AgentState:

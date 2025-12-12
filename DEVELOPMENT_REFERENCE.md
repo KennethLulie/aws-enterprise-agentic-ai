@@ -80,26 +80,28 @@ Fully working agent locally before any AWS deployment.
 - **Language:** Python 3.11+
 - **Framework:** FastAPI
 - **ASGI Server:** Uvicorn (with `--reload` for hot reload)
-- **Agent Framework:** LangGraph
+- **Agent Framework:** LangGraph (real, with tool orchestration)
 - **LLM:** AWS Bedrock (Nova Pro/Lite, Titan Embeddings, Claude fallback)
 - **Checkpointing:** MemorySaver (in-memory, no DB)
+- **Web Search:** Real Tavily API (with mock fallback when API key not set)
+- **Market Data:** Real FMP API (with mock fallback when API key not set)
 - **Database:** Stub-only in Phase 0 (SQL tool returns mock data); real DB introduced in cloud phase
-- **Vector Store:** Stub-only in Phase 0 (no local Chroma/Pinecone); real retrieval deferred to cloud phases
+- **Vector Store:** Stub-only in Phase 0 (RAG tool returns mock data); real retrieval deferred to cloud phases
 - **Logging:** Basic Python logging (upgrade to structlog in Phase 1b)
 
 #### Frontend Stack
-- **Framework:** Next.js 14+ (App Router)
-- **Language:** TypeScript
-- **UI Library:** shadcn/ui
+- **Framework:** Next.js 16 (App Router, static export)
+- **Language:** TypeScript (TS 5)
+- **UI Library:** shadcn/ui + Radix primitives
 - **SSE Client:** Native EventSource API (no Vercel AI SDK)
-- **Build:** Static export (`output: 'export'` in next.config.js)
-- **Styling:** Tailwind CSS
+- **Styling:** Tailwind CSS 4
 
 #### Docker Compose
-- **Services (Phase 0 stub-only):**
+- **Services:**
   - `backend`: FastAPI on port 8000
   - `frontend`: Next.js dev server on port 3000
 - **No local database/vector/KG services in Phase 0** (SQL and RAG tools return mock data)
+- **External APIs:** Tavily (search) and FMP (market data) are real API calls to external managed services
 - **Volume Mounts:** `./backend:/app`, `./frontend:/app` (hot reload)
 - **Startup Time Target:** 5-10 seconds
 
@@ -170,17 +172,17 @@ Configure Cursor/VS Code to use `.venv/bin/python` as the Python interpreter. Th
    - Retry logic
    - User-friendly error messages
 
-#### Step 4: Basic Tools (Stubs)
+#### Step 4: Basic Tools
 1. **Tool Base** (`backend/src/agent/tools/__init__.py`)
    - Tool interface/base class
    - Common error handling
    - Circuit breaker base
 
-2. **Tool Stubs** (for Phase 0, implement basic versions)
-   - `search.py` - Return mock data
-   - `sql.py` - Return mock data
-   - `rag.py` - Return mock data
-   - `market_data.py` - Return mock market data (FMP via MCP demo)
+2. **Tools** (Phase 0 implementation)
+   - `search.py` - Real Tavily API (with mock fallback when API key not set)
+   - `market_data.py` - Real FMP API (with mock fallback when API key not set)
+   - `sql.py` - Stub returning mock data (real Aurora in Phase 2)
+   - `rag.py` - Stub returning mock data (real Pinecone in Phase 2)
 
 #### Step 5: Frontend Foundation
 1. **Next.js Setup** (`frontend/`)
@@ -1326,23 +1328,26 @@ types-requests~=2.32.0
 
 ### Node.js Packages (frontend/package.json)
 
-**Version Philosophy:** Use `^` (caret) for semver-compatible updates. Next.js 14.2.x is stable LTS.
+**Version Philosophy:** Mirror the current codebase (Next.js 16 / React 19 / Tailwind 4). Keep semver-compatible ranges where possible, but Next/React are pinned to exact versions for stability during the major upgrade.
 
 ```json
 {
   "dependencies": {
-    "next": "^14.2.0",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "@radix-ui/react-*": "latest",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.6.0"
+    "next": "16.0.8",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-slot": "^1.2.4",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/react": "^18.3.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
-    "prettier": "^3.3.0"
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.0.0"
   }
 }
 ```

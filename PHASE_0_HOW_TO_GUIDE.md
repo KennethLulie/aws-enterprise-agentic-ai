@@ -26,12 +26,13 @@
 10. [Development Scripts](#8-development-scripts)
 11. [Testing Foundation](#9-testing-foundation)
 12. [Pre-commit Hooks](#10-pre-commit-hooks)
-13. [Verification and Testing](#11-verification-and-testing)
-14. [Important Notes About Execution Order](#important-notes-about-execution-order)
-15. [Phase 0 Completion Checklist](#phase-0-completion-checklist)
-16. [Common Issues and Solutions](#common-issues-and-solutions)
-17. [File Inventory](#12-file-inventory)
-18. [Branch Management and Next Steps](#branch-management-and-next-steps)
+13. [Real Tool Integration](#11-real-tool-integration)
+14. [Verification and Testing](#12-verification-and-testing)
+15. [Important Notes About Execution Order](#important-notes-about-execution-order)
+16. [Phase 0 Completion Checklist](#phase-0-completion-checklist)
+17. [Common Issues and Solutions](#common-issues-and-solutions)
+18. [File Inventory](#13-file-inventory)
+19. [Branch Management and Next Steps](#branch-management-and-next-steps)
 
 ---
 
@@ -48,7 +49,10 @@
 8. **Scripts** (Section 8): Development helper scripts
 9. **Testing** (Section 9): Pytest setup, test files
 10. **Pre-commit** (Section 10): Code quality hooks
-11. **Verification** (Section 11): End-to-end testing
+11. **Real Tools** (Section 11): Enable real Tavily search and FMP market data APIs
+12. **Verification** (Section 12): End-to-end testing
+
+**Phase 0 default:** Tavily search and FMP market data run in mock mode unless you provide API keys. Keep them mocked while stabilizing MVP login + chat; add keys only after tests pass.
 
 **Key Principle:** Docker-first development - all code runs in containers, dependencies installed via Docker, no local venv or npm install needed.
 
@@ -1500,13 +1504,15 @@ ls frontend/Dockerfile.dev
 **Agent Command**
 
  The `docker-compose.yml`  file should already be provided in the repository. Review it and update if needed.  Create if it does not exist
-**What's Configured (Phase 0, stub-only):**
+**What's Configured (Phase 0):**
 
 - Do **NOT** include a `version` key (deprecated in Docker Compose V2+).
 - Services (Phase 0):  
   - `backend`: FastAPI app on 8000  
   - `frontend`: Next.js app on 3000  
-  - **No Postgres/Chroma in Phase 0** — SQL and RAG tools are stubs that return mock data. Database/vector services are added in later phases (Phase 1a+).
+  - **No Postgres/Chroma in Phase 0** — SQL and RAG tools use mock data. Database/vector services are added in later phases.
+  - **External APIs** — Tavily (search) and FMP (market data) make real API calls when keys are configured.
+  - **Chat route** — `/api/chat` streams mock responses by default; it switches to real LangGraph + Bedrock automatically when AWS credentials are set.
 - Volumes for hot reload:
   - `./backend:/app`
   - `./frontend:/app`
@@ -1986,18 +1992,26 @@ Note: pytest NOT included (too slow for every commit - use CI/CD).
 Reference: DEVELOPMENT_REFERENCE.md for versions.
 Verify: pre-commit validate-config passes.
 ```
-#current progress place holder placerhodler for code, fixing precommit TODO
+
 **Verification:**
 
 
-#re run these commands from 7.6 to double check everything.
+#run these commands from 7.6 to double check everything for back end.
+# we are starting up the backend docker container in detached mode, running the tests, then stopping it.
+docker-compose up -d backend
 docker-compose exec backend black --check src/
 docker-compose exec backend ruff check src/
 docker-compose exec backend mypy src/
+docker-compose stop backend
+
+
 ```bash
 # Validate pre-commit config
 pre-commit validate-config
 ```
+
+**Note this is a good time to committ for safety sake as pre-commit hooks may impact the functionality of committing until resolved**
+**only for a demo project, otherwise we would actually want to move this to the top of the development process for enterprise workflows**
 
 #### 10.3 Install Pre-commit Hooks
 
@@ -2013,10 +2027,319 @@ pre-commit run --all-files
 ```
 
 **Expected Output:** Should run all hooks and show results
+**re run it twice if you get black formatting errors, it should fix automatically on first go**
 
 ---
 
-## 11. Verification and Testing
+## 11. Real Tool Integration
+
+### What We're Doing
+Enable real LangGraph agent flow with real external API tools (Tavily web search, FMP market data) now that Docker services and UI are running. Test each tool incrementally in Docker.
+
+### Why This Matters
+- **Easier Troubleshooting:** Website is running, making debugging easier with visible UI feedback
+- **No Infrastructure Duplication:** Tavily and FMP are pure API calls to external managed services (no local infrastructure to set up)
+- **Validate Orchestration:** Testing real tools now validates the agent orchestration pattern before cloud deployment
+- **Incremental Testing:** Test each tool one-by-one to isolate issues
+- **Gradual Enablement:** `/api/chat` streams **mock** responses by default; it automatically switches to real LangGraph + Bedrock when AWS credentials are set (so you can verify the UI first, then turn on the real pipeline).
+
+**Note:** SQL and RAG tools remain stubbed in Phase 0. They require database/vector store setup that would duplicate effort needed in later phases. Real SQL (Aurora) and RAG (Pinecone) are enabled in Phase 2.
+
+### Step-by-Step Implementation
+
+#### 11.1 Verify API Keys Are Configured
+
+**Prerequisites:** Ensure your `.env` file has the required API keys from Section 1:
+
+```bash
+# Check .env has these keys (should not be empty)
+grep -E "^TAVILY_API_KEY=" .env
+grep -E "^FMP_API_KEY=" .env
+grep -E "^AWS_ACCESS_KEY_ID=" .env
+grep -E "^AWS_SECRET_ACCESS_KEY=" .env
+```
+
+**If any keys are missing:**
+- `TAVILY_API_KEY` - Get from https://tavily.com (free: 1,000 searches/month)
+- `FMP_API_KEY` - Get from https://financialmodelingprep.com (free: ~250 calls/day)
+- AWS credentials - From `aws configure` or IAM console
+
+**Recommended order (test one at a time):**
+1) Set AWS credentials first (enables real LangGraph + Bedrock on `/api/chat`)
+2) Add `TAVILY_API_KEY` to turn on real web search (search tool)
+3) Add `FMP_API_KEY` to turn on real market data (market data tool)
+
+**Restart containers after adding keys:**
+```bash
+docker-compose down && docker-compose up -d
+sleep 10  # Wait for services to start
+docker-compose ps  # Verify all services are "Up"
+```
+
+> Quick fix for `ModuleNotFoundError: langchain_community`: rebuild the backend image so the pinned dependency is installed:
+> ```bash
+> docker-compose build backend && docker-compose up -d backend
+> ```
+
+#### 11.2 Enable Real LangGraph with Bedrock
+
+**Agent Prompt:**
+```
+Update `backend/src/agent/nodes/chat.py`
+
+Changes:
+1. Ensure ChatBedrock is initialized with settings.bedrock_model_id (Nova Pro)
+2. Add fallback to Claude 3.5 Sonnet if Nova Pro fails
+3. Bind tools to LLM using LangChain tool binding pattern
+4. Use proper async invocation with astream for streaming
+5. Log model used and any fallback events
+
+Model IDs (from DEVELOPMENT_REFERENCE.md):
+- Nova Pro: amazon.nova-pro-v1:0 (primary)
+- Nova Lite: amazon.nova-lite-v1:0 (verification/cheaper tasks)
+- Claude: anthropic.claude-3-5-sonnet-20241022-v2:0 (fallback)
+
+Reference: agentic-ai.mdc "Tool Binding" and "Cost Optimization" sections
+Verify: docker-compose exec backend pytest tests/test_agent.py -v
+```
+
+**Verification:**
+```bash
+# Verify Bedrock configuration
+docker-compose exec backend python -c "
+from src.config.settings import Settings
+s = Settings()
+print(f'Primary Model: {s.bedrock_model_id}')
+print(f'Fallback Model: {s.bedrock_fallback_model_id}')
+print(f'AWS Region: {s.aws_region}')
+"
+
+# Test Bedrock connectivity
+docker-compose exec backend python -c "
+import boto3
+client = boto3.client('bedrock-runtime', region_name='us-east-1')
+print('Bedrock client created successfully')
+"
+```
+
+**Expected Output:** Should show model IDs and confirm Bedrock client creation.
+
+#### 11.3 Enable Real Tavily Search Tool
+
+**Agent Prompt:**
+```
+Update `backend/src/agent/tools/search.py`
+
+Changes:
+1. Replace mock data with real Tavily API call when TAVILY_API_KEY is set
+2. Keep mock fallback when API key is missing (graceful degradation)
+3. Add rate limit handling (free tier: 1,000 searches/month)
+4. Return structured results: title, snippet, url
+5. Add proper error handling with user-friendly messages
+6. Log whether using real API or mock mode
+
+Tool Configuration:
+- Use TavilySearchResults from langchain_community.tools
+- Max results: 5 (configurable)
+- Search depth: "basic" for free tier
+
+Reference:
+- agentic-ai.mdc "Tool Definition Pattern"
+- security.mdc "Input Validation"
+- Cost: Free tier 1,000 searches/month
+
+Verify: docker-compose exec backend pytest tests/test_tools.py -k search -v
+```
+
+**Verification Commands:**
+```bash
+# Test search tool directly
+docker-compose exec backend python -c "
+from src.agent.tools.search import search_tool
+from src.config.settings import Settings
+s = Settings()
+print(f'Tavily API Key set: {bool(s.tavily_api_key)}')
+
+# Test search (uses real API if key is set)
+import asyncio
+result = asyncio.run(search_tool.ainvoke({'query': 'latest AI news'}))
+print(f'Search result type: {type(result)}')
+print(f'Result preview: {str(result)[:200]}...')
+"
+
+# Run search tool tests
+docker-compose exec backend pytest tests/test_tools.py -k search -v
+```
+
+**Manual Test via UI:**
+1. Open http://localhost:3000
+2. Login with DEMO_PASSWORD
+3. Ask: "What are the latest AI news headlines?"
+4. Verify response includes real web search results (not obviously mock data)
+5. Check backend logs for Tavily API call:
+   ```bash
+   docker-compose logs backend | grep -i tavily
+   ```
+
+**Expected Output:** Real search results with actual titles, snippets, and URLs from current web content.
+
+#### 11.4 Enable Real FMP Market Data Tool
+
+**Agent Prompt:**
+```
+Update `backend/src/agent/tools/market_data.py`
+
+Changes:
+1. Replace mock data with real FMP API call when FMP_API_KEY is set
+2. Keep mock fallback when API key is missing (graceful degradation)
+3. Use batch quote endpoint for multiple tickers (rate limit friendly)
+4. Add rate limit handling (free tier: ~250 calls/day)
+5. Return structured data: ticker, price, change, change_percent, volume
+6. Log whether using real API or mock mode
+
+API Configuration:
+- Base URL: https://financialmodelingprep.com/api/v3
+- Endpoint: /quote/{symbol} or /quote-short/{symbol}
+- Batch: /quote/{symbol1,symbol2,...} for multiple tickers
+
+Reference:
+- DEVELOPMENT_REFERENCE.md "Financial Modeling Prep" section
+- agentic-ai.mdc "Tool Definition Pattern"
+
+Verify: docker-compose exec backend pytest tests/test_tools.py -k market -v
+```
+
+**Verification Commands:**
+```bash
+# Test market data tool directly
+docker-compose exec backend python -c "
+from src.agent.tools.market_data import market_data_tool
+from src.config.settings import Settings
+s = Settings()
+print(f'FMP API Key set: {bool(s.fmp_api_key)}')
+
+# Test market data (uses real API if key is set)
+import asyncio
+result = asyncio.run(market_data_tool.ainvoke({'symbol': 'AAPL'}))
+print(f'Market data result: {result}')
+"
+
+# Run market data tool tests
+docker-compose exec backend pytest tests/test_tools.py -k market -v
+```
+
+**Manual Test via UI:**
+1. Open http://localhost:3000
+2. Ask: "What is the current stock price of AAPL?"
+3. Verify response includes real market data (current price, not static mock)
+4. Check backend logs for FMP API call:
+   ```bash
+   docker-compose logs backend | grep -i fmp
+   ```
+
+**Expected Output:** Real stock price data that matches current market values.
+
+#### 11.5 Test Multi-Tool Agent Flow
+
+Now test that the agent correctly orchestrates multiple tools in a single query.
+
+**Manual Test via UI:**
+1. Open http://localhost:3000
+2. Ask: "What's the latest news about Apple and what is AAPL trading at?"
+3. Verify agent uses both tools:
+   - Tavily search for Apple news
+   - FMP for AAPL stock price
+   - Ensure AWS credentials are set; otherwise `/api/chat` will remain in mock mode
+4. Check backend logs show both tool calls:
+   ```bash
+   docker-compose logs backend | grep -iE "(tavily|fmp|tool)"
+   ```
+
+**Verification Commands:**
+```bash
+# Run all tool tests
+docker-compose exec backend pytest tests/test_tools.py -v
+
+# Check tool registration in graph
+docker-compose exec backend python -c "
+from src.agent.graph import create_agent_graph
+graph = create_agent_graph()
+print('Graph nodes:', list(graph.nodes.keys()))
+"
+
+# Verify tools are bound to LLM
+docker-compose exec backend python -c "
+from src.agent.tools import get_all_tools
+tools = get_all_tools()
+print(f'Registered tools: {[t.name for t in tools]}')
+"
+```
+
+**Expected Output:** Agent synthesizes information from both tools into a coherent response.
+
+#### 11.6 Verify Graceful Degradation
+
+Test that the agent works correctly when API keys are missing (falls back to mock data).
+
+**Test Mock Fallback:**
+```bash
+# Test search fallback (temporarily unset key)
+docker-compose exec backend python -c "
+import os
+# Simulate missing API key
+original_key = os.environ.pop('TAVILY_API_KEY', None)
+try:
+    from src.agent.tools.search import get_search_mode
+    mode = get_search_mode()
+    print(f'Search mode without key: {mode}')
+finally:
+    if original_key:
+        os.environ['TAVILY_API_KEY'] = original_key
+"
+
+# Test market data fallback
+docker-compose exec backend python -c "
+import os
+original_key = os.environ.pop('FMP_API_KEY', None)
+try:
+    from src.agent.tools.market_data import get_market_data_mode
+    mode = get_market_data_mode()
+    print(f'Market data mode without key: {mode}')
+finally:
+    if original_key:
+        os.environ['FMP_API_KEY'] = original_key
+"
+```
+
+**Expected Output:** Tools should report "mock" mode when API keys are not set, and still return valid (mock) data.
+
+#### 11.7 Real Tools Integration Checklist
+
+Before proceeding to Section 12, verify:
+
+- [ ] Bedrock connection working (Nova Pro accessible)
+- [ ] Tavily search returns real results (when API key set)
+- [ ] FMP market data returns real prices (when API key set)
+- [ ] Multi-tool queries work correctly
+- [ ] Graceful fallback to mock data when API keys missing
+- [ ] Backend logs show tool execution details
+- [ ] No errors in browser console during tool use
+
+**Troubleshooting:**
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| `AccessDeniedException` from Bedrock | Model access not approved | Request access in AWS Console → Bedrock → Model access |
+| Tavily returns 401 | Invalid or missing API key | Verify `TAVILY_API_KEY` in `.env`, restart containers |
+| FMP returns 401 | Invalid or missing API key | Verify `FMP_API_KEY` in `.env`, restart containers |
+| Tavily rate limit error | Exceeded 1,000/month free tier | Wait until next month or upgrade plan |
+| FMP rate limit error | Exceeded ~250/day free tier | Wait 24 hours or upgrade plan |
+| Tools return mock data | API key not loaded | Run `docker-compose down && docker-compose up -d` |
+| Agent doesn't call tools | Tools not bound to LLM | Check `graph.py` tool binding, verify tool registration |
+
+---
+
+## 12. Verification and Testing
 
 ### What We're Doing
 Comprehensive verification that Phase 0 is complete and working correctly.
@@ -2029,7 +2352,7 @@ Comprehensive verification that Phase 0 is complete and working correctly.
 
 ### Step-by-Step Verification
 
-#### 11.1 Code Quality Verification
+#### 12.1 Code Quality Verification
 
 **Agent Prompt:**
 ```
@@ -2056,17 +2379,19 @@ After creating the script, run the automated verification and capture the report
 
 ```bash
 # Run inside backend container
+docker-compose up -d backend
 docker-compose exec backend python scripts/verify_code_quality.py \
   --output reports/code_quality_report.md
+docker-compose stop backend
 ```
 
-#### 11.2 Functional Testing
+#### 12.2 Functional Testing
 
 **Prerequisites:** Docker Compose must be set up and tested (Section 7.5) before running these tests.
 
 **Commands:** Functional test commands are consolidated in Section 7.6 (health, frontend reachability, pytest suites, and log checks). Use that checklist to validate; if anything fails, inspect container logs and rerun after fixes.
 
-#### 11.3 Integration Testing
+#### 12.3 Integration Testing
 
 **Agent Prompt:**
 ```
@@ -2170,7 +2495,7 @@ docker-compose logs backend --tail=20 | grep -i reload
 
 ---
 
-## 12. File Inventory
+## 13. File Inventory
 
 ### Files at Start of Phase 0 (Actually Exist Now)
 
@@ -2305,8 +2630,11 @@ docker-compose logs backend --tail=20 | grep -i reload
 - **Changes in Phase 1b:** Migrate to PostgresSaver
 
 **backend/src/agent/tools/*.py:**
-- Tool stubs returning mock data
-- **Changes in Phase 2:** Implement real API integrations
+- Search tool: Real Tavily API (when key set) or mock fallback
+- Market data tool: Real FMP API (when key set) or mock fallback
+- SQL tool: Stub returning mock data (real in Phase 2)
+- RAG tool: Stub returning mock data (real in Phase 2)
+- **Changes in Phase 2:** Implement real SQL (Aurora) and RAG (Pinecone) integrations
 
 **frontend/src/app/page.tsx:**
 - Chat interface
@@ -2366,6 +2694,13 @@ docker-compose logs backend --tail=20 | grep -i reload
 - [ ] Error recovery node implemented
 - [ ] All four tool stubs created
 - [ ] Tools registered in graph
+
+### Real Tool Integration
+- [ ] Bedrock connection working (Nova Pro accessible)
+- [ ] Tavily search returns real results (when API key set)
+- [ ] FMP market data returns real prices (when API key set)
+- [ ] Multi-tool queries work correctly
+- [ ] Graceful fallback to mock data when API keys missing
 
 ### Frontend
 - [ ] Next.js initialized

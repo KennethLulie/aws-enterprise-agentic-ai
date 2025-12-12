@@ -132,6 +132,7 @@ service-account*.json
 # Local development
 uploads/
 local-data/
+backend/reports/code_quality_report.md
 *.db
 *.sqlite
 

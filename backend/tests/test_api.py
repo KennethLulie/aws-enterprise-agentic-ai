@@ -1,3 +1,5 @@
+"""API surface and CORS behavior smoke tests."""
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -33,6 +35,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]
 
 
 def test_health_endpoint(client: TestClient) -> None:
+    """Health endpoint returns status payload with versions and environment."""
     response = client.get("/health")
 
     assert response.status_code == 200
@@ -45,6 +48,7 @@ def test_health_endpoint(client: TestClient) -> None:
 
 
 def test_root_endpoint(client: TestClient) -> None:
+    """Root endpoint returns service metadata."""
     response = client.get("/")
 
     assert response.status_code == 200
@@ -57,7 +61,22 @@ def test_root_endpoint(client: TestClient) -> None:
     assert data["environment"] == "local"
 
 
+def test_chat_post_returns_conversation_id(client: TestClient) -> None:
+    """POST /api/chat returns a conversation id for streaming."""
+
+    login = client.post("/api/login", json={"password": "test-demo-password"})
+    assert login.status_code == 200
+
+    response = client.post("/api/chat", json={"message": "hello world"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["conversationId"], str)
+    assert data["conversationId"]
+
+
 def test_cors_headers(client: TestClient) -> None:
+    """CORS headers allow browser access from configured origin."""
     origin = "http://localhost:3000"
 
     response = client.get("/health", headers={"Origin": origin})
@@ -69,6 +88,7 @@ def test_cors_headers(client: TestClient) -> None:
 
 
 def test_cors_preflight_options(client: TestClient) -> None:
+    """CORS preflight responds with allowed methods and credentials."""
     origin = "http://localhost:3000"
 
     response = client.options(
@@ -86,6 +106,7 @@ def test_cors_preflight_options(client: TestClient) -> None:
 
 
 def test_404_response(client: TestClient) -> None:
+    """Unknown routes return FastAPI default 404 JSON shape."""
     response = client.get("/does-not-exist")
 
     assert response.status_code == 404

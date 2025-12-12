@@ -45,8 +45,7 @@ Example:
     from src.api.main import app
     from src.api.routes.health import router as health_router
 
-    # Health endpoint is automatically included
-    # Access at: http://localhost:8000/health
+    # Health endpoint is automatically included at /health on the configured host/port
 """
 
 from __future__ import annotations

@@ -65,15 +65,18 @@ class SessionPayload(TypedDict):
 
 
 def _b64url_encode(data: bytes) -> str:
+    """Base64 URL-safe encode without padding."""
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
 
 
 def _b64url_decode(data: str) -> bytes:
+    """Decode base64 URL-safe string, restoring padding as needed."""
     padding = "=" * (-len(data) % 4)
     return base64.urlsafe_b64decode(data + padding)
 
 
 def _sign_payload(payload: SessionPayload, secret: str) -> str:
+    """Create an HMAC-signed token from the payload and secret."""
     payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode(
         "utf-8"
     )
@@ -86,6 +89,7 @@ def _sign_payload(payload: SessionPayload, secret: str) -> str:
 
 
 def _verify_token(token: str, secret: str) -> SessionPayload:
+    """Validate signature and expiry for the session token."""
     try:
         encoded_payload, encoded_sig = token.split(".", maxsplit=1)
     except ValueError as exc:  # pragma: no cover - defensive guard
@@ -131,6 +135,7 @@ def _verify_token(token: str, secret: str) -> SessionPayload:
 
 
 def _issue_session_token(settings: Settings) -> str:
+    """Generate a signed session token with demo subject and configured expiry."""
     now = datetime.now(timezone.utc)
     exp = now + timedelta(minutes=settings.auth_token_expires_minutes)
     payload: SessionPayload = {
@@ -142,6 +147,7 @@ def _issue_session_token(settings: Settings) -> str:
 
 
 def _cookie_params(settings: Settings) -> dict[str, Any]:
+    """Return cookie flags tuned for local vs AWS environments."""
     if settings.is_aws():
         return {"secure": True, "samesite": "none"}
     return {"secure": False, "samesite": "lax"}

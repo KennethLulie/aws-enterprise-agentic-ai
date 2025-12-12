@@ -436,8 +436,8 @@ class Settings(BaseSettings):
         """
         Ensure authentication secrets are not left at placeholder defaults.
 
-        This enforces supplying values via .env for local runs and via Secrets
-        Manager or environment variables in AWS.
+        In AWS, placeholders are rejected. In local development, we emit a warning
+        so mock-only Phase 0 flows (e.g., Tavily mock) can run without secrets set.
         """
 
         placeholders = {"change-me", "change-this-password", "change-this-secret"}
@@ -445,17 +445,28 @@ class Settings(BaseSettings):
         password_value = self.demo_password.get_secret_value()
         secret_value = self.auth_token_secret.get_secret_value()
 
-        if password_value in placeholders:
-            raise ValueError(
-                "demo_password is using a placeholder. Set DEMO_PASSWORD in .env "
-                "for local or via Secrets Manager in AWS."
-            )
-
-        if secret_value in placeholders:
-            raise ValueError(
-                "auth_token_secret is using a placeholder. Set AUTH_TOKEN_SECRET in "
-                ".env for local or via Secrets Manager in AWS."
-            )
+        if self.is_aws():
+            if password_value in placeholders:
+                raise ValueError(
+                    "DEMO_PASSWORD must be set in AWS (placeholder detected). "
+                    "Store it in Secrets Manager."
+                )
+            if secret_value in placeholders:
+                raise ValueError(
+                    "AUTH_TOKEN_SECRET must be set in AWS (placeholder detected). "
+                    "Store it in Secrets Manager."
+                )
+        else:
+            if password_value in placeholders:
+                logger.warning(
+                    "DEMO_PASSWORD is using a placeholder in local dev. "
+                    "Set a unique value in .env for closer parity with AWS."
+                )
+            if secret_value in placeholders:
+                logger.warning(
+                    "AUTH_TOKEN_SECRET is using a placeholder in local dev. "
+                    "Set a unique value in .env for closer parity with AWS."
+                )
 
         return self
 
@@ -505,6 +516,10 @@ class Settings(BaseSettings):
         Returns the database URL configured for synchronous operations.
         Use this for SQLAlchemy synchronous operations.
         """
+        if not self.database_url:
+            raise ValueError(
+                "database_url is not configured. Check environment settings."
+            )
         return self.database_url
 
     def get_database_url_async(self) -> str:
@@ -514,11 +529,10 @@ class Settings(BaseSettings):
         Converts postgresql:// to postgresql+asyncpg:// for async operations.
         Use this for SQLAlchemy async operations.
         """
-        if self.database_url.startswith("postgresql://"):
-            return self.database_url.replace(
-                "postgresql://", "postgresql+asyncpg://", 1
-            )
-        return self.database_url
+        database_url = self.get_database_url_sync()
+        if database_url.startswith("postgresql://"):
+            return database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return database_url
 
 
 def detect_environment() -> str:

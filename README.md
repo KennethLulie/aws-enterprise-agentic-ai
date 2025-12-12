@@ -69,9 +69,20 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 ## 📋 Project Status
 
-**Current Phase:** Planning Complete - Ready for Phase 0 (Local Development)
+**Current Phase:** Phase 0 (Local Development)
 
-This repository contains the complete project plan and architecture documentation. Implementation will begin with Phase 0.
+Phase 0 establishes a fully working local development environment with:
+- LangGraph agent with Bedrock (Nova Pro) and streaming responses
+- Tavily search running in mock mode by default; live path enabled only when `TAVILY_API_KEY` is set
+- Financial Modeling Prep (FMP) market data tool running in mock mode by default; live path enabled when `FMP_API_KEY` is set
+- SQL and RAG tools remain stubbed (real implementations in Phase 2)
+- Docker Compose for all services with hot reload
+- Password-protected web interface
+
+**Local setup tip:** If you see `ModuleNotFoundError: langchain_community` in the backend container, rebuild the backend image to pull the pinned dependency:
+```bash
+docker-compose build backend && docker-compose up -d backend
+```
 
 ## 📚 Documentation
 
@@ -267,16 +278,19 @@ cp .env.example .env
 # 3. Edit .env and fill in your API keys
 # See .env.example for descriptions of each variable
 
-# 4. Start the development environment (stub-only Phase 0, all tools stubbed)
+# 4. Start the development environment
+# Search (Tavily) and Market Data (FMP) use real APIs when keys are set
+# SQL and RAG tools use mock data in Phase 0
+# /api/chat streams real LangGraph+Bedrock only when AWS creds are set; otherwise mock
 docker compose up
 ```
 
 ### Development Phases
 
-- **Phase 0:** Local development environment
+- **Phase 0:** Local development environment (real Tavily search, FMP market data; SQL/RAG stubbed)
 - **Phase 1a:** Minimal MVP (basic chat interface)
 - **Phase 1b:** Production hardening (persistent state, CI/CD)
-- **Phase 2:** Core agent tools (Search, SQL, RAG, Market Data API)
+- **Phase 2:** Core agent tools (real SQL with Aurora, real RAG with Pinecone)
 - **Phase 3+:** Advanced features (verification, caching, observability, evaluation)
 
 See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for complete details.

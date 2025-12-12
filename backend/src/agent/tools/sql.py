@@ -26,6 +26,7 @@ class SQLQueryInput(BaseModel):
     @field_validator("query")
     @classmethod
     def validate_query(cls, value: str) -> str:
+        """Validate and trim incoming SQL/natural language queries."""
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("Query cannot be empty.")

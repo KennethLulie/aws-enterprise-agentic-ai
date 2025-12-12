@@ -234,7 +234,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 - Easier debugging with full log access
 - Validate core logic before infrastructure complexity
 
-**Local Stack (Docker Compose - Phase 0 Stub Only):**
+**Local Stack (Docker Compose):**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Docker Compose - All Services Containerized            │
@@ -258,10 +258,16 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 **Development Workflow (Docker Compose with Hot Reload):**
 1. `./scripts/setup.sh` - One-time setup (validates Docker, creates .env)
-2. `docker-compose up` - Start backend and frontend only (all tools stub-only; no local DB/vector/KG services)
+2. `docker-compose up` - Start backend and frontend (no local DB/vector services)
 3. Code changes reflect automatically (~2-3 seconds hot reload via volume mounts)
 4. `docker-compose logs -f` - View logs from all services
 5. `docker-compose down` - Stop everything cleanly
+
+**Tool Status in Phase 0:**
+- Search: Real Tavily API (with mock fallback)
+- Market Data: Real FMP API (with mock fallback)
+- SQL: Stub (mock data) - real Aurora in Phase 2
+- RAG: Stub (mock data) - real Pinecone in Phase 2
 
 **Hot Reload Configuration:**
 - Backend: Volume mount `./backend:/app` + `uvicorn --reload`
@@ -272,17 +278,20 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 **Local Service Substitutes (All in Docker Compose):**
 | AWS Service | Local Dev | Container |
 |-------------|-----------|-----------|
-| Aurora PostgreSQL | N/A in Phase 0 (SQL tool stub only) | N/A |
-| Pinecone | N/A in Phase 0 (RAG tool stub only) | N/A |
+| Aurora PostgreSQL | N/A in Phase 0 (SQL tool stub) | N/A |
+| Pinecone | N/A in Phase 0 (RAG tool stub) | N/A |
 | S3 file upload | Local `./uploads` folder | Volume mount |
 | DynamoDB cache | In-memory dict or SQLite | Python in-memory |
 | Secrets Manager | `.env` file | Environment variables |
-| Bedrock Nova | Bedrock API (still AWS) | External API call |
+| Bedrock Nova | Bedrock API (real AWS call) | External API call |
+| Tavily Search | Tavily API (real call) | External API call |
+| FMP Market Data | FMP API (real call) | External API call |
 
 **Docker Compose Services:**
 - `backend`: FastAPI app with hot reload
 - `frontend`: Next.js app with hot reload
-- No local database, vector store, or knowledge graph in Phase 0 (SQL and RAG tools return mock data)
+- No local database or vector store in Phase 0 (SQL and RAG tools return mock data)
+- External API calls: Tavily (search), FMP (market data), Bedrock (LLM)
 
 **Phase 0 Deliverables:**
 - Working LangGraph agent with streaming responses
@@ -293,9 +302,12 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 - **Error recovery nodes** for graceful failure handling
 - **Built-in tool calling** via LangGraph tool binding (with Bedrock compatibility check)
 - **Model fallback:** Nova Pro → Claude 3.5 Sonnet if Nova unavailable
+- **Real tool integration:**
+  - Tavily web search (real API with mock fallback)
+  - FMP market data (real API with mock fallback)
+  - SQL and RAG tools stubbed (real implementations in Phase 2)
 - Chat UI with real-time streaming
 - Basic conversation flow validated
-- All tools working with local substitutes
 - Environment variable config for local/cloud switching
 - **Optimized Docker Compose** (5-10s startup time)
 - Requirements.txt and package.json with all dependencies

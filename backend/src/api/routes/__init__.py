@@ -7,6 +7,7 @@ included in the main application.
 
 Package Structure:
     - health.py: Health check endpoints (Phase 0)
+    - chat.py: Chat endpoints (Phase 0 mock streaming)
     - v1/: Version 1 API endpoints (Phase 1b+)
         - __init__.py: V1 router aggregation
         - chat.py: Chat/conversation endpoints
@@ -47,6 +48,7 @@ from __future__ import annotations
 
 # Import routers for easy access
 from src.api.routes.auth import router as auth_router
+from src.api.routes.chat import router as chat_router
 from src.api.routes.health import router as health_router
 
 # Phase 1b+: v1_router will be added after v1/ routes are created
@@ -54,4 +56,5 @@ from src.api.routes.health import router as health_router
 __all__ = [
     "health_router",
     "auth_router",
+    "chat_router",
 ]
