@@ -52,10 +52,9 @@ async def error_recovery_node(state: AgentState) -> AgentState:
     error_response = AIMessage(content=user_message)
     cleared_state = clear_error(state)
 
-    return AgentState(
-        **cleared_state,
-        messages=[error_response],
-    )
+    new_state = AgentState(**cleared_state)
+    new_state["messages"] = [error_response]
+    return new_state
 
 
 def _friendly_error_message(error_text: str) -> str:

@@ -266,7 +266,7 @@ aws sts get-caller-identity
 1. Amazon Nova Pro (`amazon.nova-pro-v1:0`)
 2. Amazon Nova Lite (`amazon.nova-lite-v1:0`)
 3. Amazon Titan Embeddings (`amazon.titan-embed-text-v1`)
-4. Anthropic Claude 3.5 Sonnet (`anthropic.claude-3-5-sonnet-20241022-v2:0`)
+4. Anthropic Claude 3.5 Sonnet (`anthropic.claude-3-5-sonnet-20240620-v1:0`)
 
 **Verification:**
 ```bash
@@ -850,7 +850,7 @@ Requirements:
 
 Configuration (from settings):
 - Primary: amazon.nova-pro-v1:0
-- Fallback: anthropic.claude-3-5-sonnet-20241022-v2:0
+- Fallback: anthropic.claude-3-5-sonnet-20240620-v1:0
 - Temperature: 0.7
 - Max tokens: 4096
 - Region: us-east-1
@@ -2097,7 +2097,7 @@ Changes:
 Model IDs (from DEVELOPMENT_REFERENCE.md):
 - Nova Pro: amazon.nova-pro-v1:0 (primary)
 - Nova Lite: amazon.nova-lite-v1:0 (verification/cheaper tasks)
-- Claude: anthropic.claude-3-5-sonnet-20241022-v2:0 (fallback)
+- Claude: anthropic.claude-3-5-sonnet-20240620-v1:0 (fallback)
 
 Reference: agentic-ai.mdc "Tool Binding" and "Cost Optimization" sections
 Verify: docker-compose exec backend pytest tests/test_agent.py -v
@@ -2172,7 +2172,7 @@ docker-compose exec backend pytest tests/test_tools.py -k search -v
 ```
 
 **Manual Test via UI:**
-1. Open http://localhost:3000
+1. Open  
 2. Login with DEMO_PASSWORD
 3. Ask: "What are the latest AI news headlines?"
 4. Verify response includes real web search results (not obviously mock data)

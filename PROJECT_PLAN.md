@@ -438,7 +438,7 @@ docker-compose up
 - **LangGraph native streaming** with proper event handling
 - Bedrock Nova integration with fallback:
   - Primary: `amazon.nova-pro-v1:0` (verify availability in us-east-1 - N. Virginia)
-  - Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0` (more stable, proven)
+  - Fallback: `anthropic.claude-3-5-sonnet-20240620-v1:0` (Bedrock on-demand supported)
 - Server-Sent Events (SSE) streaming from FastAPI to frontend
 - **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate). Accept ~30s cold start to minimize cost; keep-alive warming can stay off for the demo.
 - **Conversation persistence:** conversation_id in localStorage (state in MemorySaver)

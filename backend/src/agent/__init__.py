@@ -51,13 +51,13 @@ Phase 1b+ (Planned):
 
 Example - Tool Registration:
     from src.agent import get_registered_tools
-    from langchain_aws import ChatBedrock
+    from langchain_aws import ChatBedrockConverse
 
     # Get tools for LLM binding
     tools = get_registered_tools()
 
-    # Bind to LLM (Phase 1b+)
-    llm = ChatBedrock(model_id="amazon.nova-pro-v1:0")
+    # Bind to LLM (uses Converse API, recommended for Nova Pro)
+    llm = ChatBedrockConverse(model="amazon.nova-pro-v1:0")
     llm_with_tools = llm.bind_tools(tools)
 """
 

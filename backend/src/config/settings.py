@@ -121,8 +121,11 @@ class Settings(BaseSettings):
     )
 
     bedrock_fallback_model_id: str = Field(
-        default="anthropic.claude-3-5-sonnet-20241022-v2:0",
-        description="Fallback Bedrock model ID if primary is unavailable.",
+        default="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        description=(
+            "Fallback Bedrock model ID if primary is unavailable. Must support "
+            "on-demand throughput."
+        ),
     )
 
     bedrock_embedding_model_id: str = Field(

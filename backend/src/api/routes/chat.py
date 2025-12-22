@@ -6,15 +6,29 @@ are configured, the endpoints stream real LangGraph responses (LLM + tools).
 This keeps the API surface stable while enabling incremental bring-up:
 verify UI first with mocks, then switch to real agent behavior without
 changing the routes.
+
+Streaming Implementation:
+    Uses LangGraph's astream() with stream_mode="values" to receive the full
+    AgentState after each graph step. This allows extracting messages and errors
+    from the complete state rather than handling per-node updates.
+
+Thinking Content:
+    Nova Pro and other models may include <thinking>...</thinking> tags for
+    chain-of-thought reasoning. This module parses these out and sends them
+    as separate "thinking" events so the frontend can display them appropriately
+    (e.g., in a collapsible section). The main message content is sent without
+    the thinking tags.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from typing import Any, AsyncIterator, Dict, Sequence
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
@@ -24,6 +38,41 @@ from src.agent.graph import graph
 from src.agent.state import AgentState, create_initial_state
 from src.api.routes.auth import SessionPayload, require_session
 from src.config import Settings
+
+# Configure module logger
+logger = structlog.get_logger(__name__)
+
+# Regex pattern to extract <thinking>...</thinking> content
+# Supports multiline thinking blocks
+THINKING_PATTERN = re.compile(
+    r"<thinking>(.*?)</thinking>",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _parse_thinking_content(content: str) -> tuple[str, str | None]:
+    """
+    Parse thinking content from model response.
+
+    Some models (like Nova Pro) include <thinking>...</thinking> tags
+    for chain-of-thought reasoning. This function extracts the thinking
+    content and returns the cleaned message.
+
+    Args:
+        content: Raw content string that may contain thinking tags.
+
+    Returns:
+        Tuple of (cleaned_content, thinking_content).
+        thinking_content is None if no thinking tags found.
+    """
+    thinking_match = THINKING_PATTERN.search(content)
+    if thinking_match:
+        thinking_content = thinking_match.group(1).strip()
+        # Remove all thinking blocks from the content
+        cleaned_content = THINKING_PATTERN.sub("", content).strip()
+        return cleaned_content, thinking_content
+    return content, None
+
 
 router = APIRouter(prefix="/api", tags=["Chat"])
 
@@ -109,41 +158,187 @@ async def _stream_langgraph_events(
 
     This keeps the API surface the same while allowing real tool execution when
     Bedrock credentials are present.
-    """
 
+    Uses stream_mode="values" to receive the full AgentState after each graph
+    step, allowing proper extraction of messages and error state.
+
+    Args:
+        conversation_id: Unique identifier for this conversation.
+        user_message: The user's chat message to process.
+        settings: Application settings (used for configuration).
+    """
     queue = _get_queue(conversation_id)
+    log = logger.bind(conversation_id=conversation_id)
 
     state: AgentState = create_initial_state(conversation_id=conversation_id)
     state["messages"] = [HumanMessage(content=user_message)]
 
+    log.info("Starting LangGraph agent stream", user_message_length=len(user_message))
+
+    # Track the position of the user's new message in the conversation.
+    # With checkpointing, the graph state includes ALL previous messages.
+    # We only want to stream NEW responses (after the user's current input).
+    user_message_index: int | None = None
+    last_processed_index: int = 0
+
     try:
-        async for event in graph.astream(
+        # Use stream_mode="values" to get full state after each step.
+        # Default "updates" mode returns per-node dicts, not the full state.
+        async for graph_state in graph.astream(
             state,
             config={"configurable": {"thread_id": conversation_id}},
+            stream_mode="values",
         ):
-            messages: Sequence[BaseMessage] = event.get("messages", [])  # type: ignore[arg-type]
-            last_error = event.get("last_error")
+            messages: Sequence[BaseMessage] = graph_state.get("messages", [])
+            last_error = graph_state.get("last_error")
 
-            for message in messages:
-                if isinstance(message, AIMessage):
-                    queue.put_nowait(
-                        {
-                            "type": "message",
-                            "content": message.content,
-                            "conversationId": conversation_id,
-                        }
+            # On first iteration, find the user's new message (last HumanMessage)
+            # and set our baseline to only stream messages AFTER it
+            if user_message_index is None:
+                for i, msg in enumerate(messages):
+                    if isinstance(msg, HumanMessage) and msg.content == user_message:
+                        user_message_index = i
+                # If we found the user's message, start processing AFTER it
+                if user_message_index is not None:
+                    last_processed_index = user_message_index + 1
+                    log.debug(
+                        "Found user message position",
+                        user_message_index=user_message_index,
+                        starting_from=last_processed_index,
+                        total_messages=len(messages),
                     )
+
+            log.debug(
+                "Received graph state",
+                message_count=len(messages),
+                has_error=bool(last_error),
+                last_processed_index=last_processed_index,
+            )
+
+            # Only process NEW messages (those after the user's input)
+            # This prevents re-sending messages from previous turns
+            for i, message in enumerate(messages):
+                if i < last_processed_index:
+                    continue
+
+                if isinstance(message, AIMessage):
+                    raw_content = message.content
+                    tool_calls = getattr(message, "tool_calls", None)
+                    additional_kwargs = getattr(message, "additional_kwargs", {})
+
+                    # Debug: log the full AI message structure
+                    log.debug(
+                        "AI message structure",
+                        raw_content_type=type(raw_content).__name__,
+                        raw_content_repr=repr(raw_content)[:500],
+                        has_tool_calls=bool(tool_calls),
+                        tool_calls_count=len(tool_calls) if tool_calls else 0,
+                        additional_kwargs_keys=(
+                            list(additional_kwargs.keys()) if additional_kwargs else []
+                        ),
+                    )
+
+                    # Handle content that can be string or list of content blocks
+                    if isinstance(raw_content, str):
+                        content = raw_content
+                    elif isinstance(raw_content, list):
+                        # Extract text from content blocks (various formats)
+                        text_parts = []
+                        for block in raw_content:
+                            if isinstance(block, str):
+                                text_parts.append(block)
+                            elif isinstance(block, dict):
+                                # Try different key names used by various providers
+                                text = (
+                                    block.get("text")
+                                    or block.get("content")
+                                    or block.get("value")
+                                    or ""
+                                )
+                                if text:
+                                    text_parts.append(str(text))
+                            elif hasattr(block, "text"):
+                                # Handle object with .text attribute
+                                text_parts.append(str(block.text))
+                        content = "".join(text_parts)
+                    else:
+                        # Fallback: convert to string
+                        content = str(raw_content) if raw_content else ""
+
+                    # Parse out <thinking> content if present
+                    # Nova Pro uses this for chain-of-thought reasoning
+                    cleaned_content, thinking_content = _parse_thinking_content(content)
+
+                    # Send thinking content as separate event (if present)
+                    if thinking_content:
+                        log.debug(
+                            "Streaming thinking content to client",
+                            thinking_preview=thinking_content[:100],
+                        )
+                        queue.put_nowait(
+                            {
+                                "type": "thinking",
+                                "content": thinking_content,
+                                "conversationId": conversation_id,
+                            }
+                        )
+
+                    log.debug(
+                        "Extracted AI message content",
+                        content_length=len(cleaned_content) if cleaned_content else 0,
+                        has_thinking=bool(thinking_content),
+                        content_preview=(
+                            cleaned_content[:100] if cleaned_content else "empty"
+                        ),
+                    )
+
+                    # Skip empty AI messages (can occur before tool calls)
+                    if cleaned_content:
+                        log.info(
+                            "Streaming AI message to client",
+                            content_preview=cleaned_content[:100],
+                        )
+                        queue.put_nowait(
+                            {
+                                "type": "message",
+                                "content": cleaned_content,
+                                "conversationId": conversation_id,
+                            }
+                        )
                 elif isinstance(message, ToolMessage):
+                    # Don't send raw tool results to the frontend - they're intermediate
+                    # results that the AI will process. The user should only see the
+                    # AI's final response that incorporates the tool results.
+                    log.debug(
+                        "Tool result received (not streaming to client)",
+                        tool_name=message.name,
+                        result_length=(
+                            len(str(message.content)) if message.content else 0
+                        ),
+                    )
+                    # Optionally notify frontend that a tool was used (without raw content)
                     queue.put_nowait(
                         {
-                            "type": "tool_result",
-                            "content": message.content,
+                            "type": "tool_used",
                             "tool": message.name,
                             "conversationId": conversation_id,
                         }
                     )
+                elif isinstance(message, HumanMessage):
+                    # Skip human messages (we don't need to stream these back)
+                    log.debug("Skipping HumanMessage (already sent by user)")
+                else:
+                    log.debug(
+                        "Skipping unknown message type",
+                        message_type=type(message).__name__,
+                    )
 
+            # Update our tracking index to the current message count
+            last_processed_index = len(messages)
+
+            # Check for errors in the graph state
             if last_error:
+                log.warning("Agent encountered error", error=last_error)
                 queue.put_nowait(
                     {
                         "type": "error",
@@ -153,13 +348,15 @@ async def _stream_langgraph_events(
                 )
                 return
 
+        log.info("LangGraph agent stream completed successfully")
         queue.put_nowait({"type": "complete", "conversationId": conversation_id})
 
-    except Exception as exc:  # pragma: no cover - defensive guard
+    except Exception as exc:
+        log.exception("LangGraph agent stream failed", error=str(exc))
         queue.put_nowait(
             {
                 "type": "error",
-                "content": f"Agent error: {exc!s}",
+                "content": "I'm having trouble processing that request. Please try again.",
                 "conversationId": conversation_id,
             }
         )

@@ -10,7 +10,7 @@ using AWS Bedrock models (Nova Pro with Claude fallback). It handles:
 
 Configuration is loaded from settings:
 - Primary model: amazon.nova-pro-v1:0
-- Fallback model: anthropic.claude-3-5-sonnet-20241022-v2:0
+- Fallback model: anthropic.claude-3-5-sonnet-20240620-v1:0
 - Temperature: 0.7
 - Max tokens: 4096
 
@@ -22,7 +22,13 @@ Usage:
 
 Reference:
     - agentic-ai.mdc for node patterns
-    - LangChain ChatBedrock docs
+    - LangChain ChatBedrockConverse docs (Converse API)
+
+LangChain Version Notes (langchain-aws~=0.2.0, langchain~=0.3.0):
+    - Use ChatBedrockConverse for Converse API (recommended for Nova Pro)
+    - AIMessageChunk does NOT have to_message() in 0.3.x
+    - Combine chunks with + operator, then extract content directly
+    - Nova Pro returns content as list: [{'type': 'text', 'text': '...'}]
 """
 
 from __future__ import annotations
@@ -30,8 +36,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Sequence
 
 import structlog
-from langchain_aws import ChatBedrock
-from langchain_core.messages import BaseMessage, BaseMessageChunk
+from langchain_aws import ChatBedrockConverse
+from langchain_core.messages import AIMessage, BaseMessage, AIMessageChunk
 
 from src.agent.state import AgentState, set_error
 from src.config.settings import get_settings
@@ -60,9 +66,13 @@ def _create_chat_model(
     model_id: str,
     temperature: float = DEFAULT_TEMPERATURE,
     max_tokens: int = DEFAULT_MAX_TOKENS,
-) -> ChatBedrock:
+) -> ChatBedrockConverse:
     """
-    Create a ChatBedrock model instance.
+    Create a ChatBedrockConverse model instance.
+
+    Uses the Converse API which is the recommended approach for
+    Amazon Nova and newer Bedrock models. Provides better tool calling
+    support and standardized message handling.
 
     Args:
         model_id: The Bedrock model ID to use.
@@ -70,30 +80,29 @@ def _create_chat_model(
         max_tokens: Maximum tokens in response.
 
     Returns:
-        Configured ChatBedrock instance.
+        Configured ChatBedrockConverse instance.
     """
     settings = get_settings()
 
-    # NOTE: langchain-aws stubs may lag runtime; allow region/model kwargs explicitly.
-    return ChatBedrock(  # type: ignore[call-arg]
-        model_id=model_id,
+    # ChatBedrockConverse uses the Converse API (recommended for Nova Pro)
+    # Note: temperature and max_tokens are direct kwargs, not in model_kwargs
+    return ChatBedrockConverse(  # type: ignore[call-arg]
+        model=model_id,
         region_name=settings.aws_region,
-        model_kwargs={
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        },
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
 
 
 def _bind_tools_to_model(
-    model: ChatBedrock,
+    model: ChatBedrockConverse,
     tools: Sequence[BaseTool] | None = None,
 ) -> Any:
     """
-    Bind tools to a ChatBedrock model for tool calling.
+    Bind tools to a ChatBedrockConverse model for tool calling.
 
     Args:
-        model: The ChatBedrock model instance.
+        model: The ChatBedrockConverse model instance.
         tools: Optional sequence of tools to bind.
 
     Returns:
@@ -102,6 +111,71 @@ def _bind_tools_to_model(
     if tools:
         return model.bind_tools(tools)
     return model
+
+
+# =============================================================================
+# Message Sanitization for Bedrock
+# =============================================================================
+
+
+def _sanitize_messages_for_bedrock(
+    messages: list[BaseMessage],
+    log: structlog.BoundLogger,
+) -> list[BaseMessage]:
+    """
+    Sanitize messages for Bedrock API compatibility.
+
+    Bedrock rejects messages with empty content fields. This commonly occurs
+    with AIMessages that have tool_calls but no text content. This function
+    ensures all messages have valid content.
+
+    Args:
+        messages: List of messages to sanitize.
+        log: Bound logger for contextual logging.
+
+    Returns:
+        List of sanitized messages safe for Bedrock API.
+    """
+    sanitized: list[BaseMessage] = []
+
+    for msg in messages:
+        if isinstance(msg, AIMessage):
+            content = msg.content
+            tool_calls = getattr(msg, "tool_calls", None)
+
+            # Check if content is empty (string or list)
+            is_empty = (
+                content == ""
+                or content is None
+                or (isinstance(content, list) and len(content) == 0)
+            )
+
+            if is_empty and tool_calls:
+                # AIMessage with tool calls but no content - add placeholder
+                log.debug(
+                    "Sanitizing empty AIMessage with tool calls",
+                    tool_count=len(tool_calls),
+                )
+                # Create a new AIMessage with placeholder content
+                sanitized.append(
+                    AIMessage(
+                        content="(calling tools)",
+                        tool_calls=tool_calls,
+                        id=msg.id,
+                    )
+                )
+            elif is_empty:
+                # Empty AIMessage with no tool calls - skip it
+                log.debug("Skipping empty AIMessage with no tool calls")
+                continue
+            else:
+                # Normal message - keep as is
+                sanitized.append(msg)
+        else:
+            # Non-AI messages (Human, Tool, System) - keep as is
+            sanitized.append(msg)
+
+    return sanitized
 
 
 # =============================================================================
@@ -118,14 +192,14 @@ async def chat_node(
 
     This node:
     1. Takes the current conversation state with message history
-    2. Creates a ChatBedrock model with tool binding
+    2. Creates a ChatBedrockConverse model with tool binding
     3. Invokes the LLM with the message history
     4. Falls back to alternative model if primary fails
     5. Returns updated state with LLM response
 
     The node implements a fallback strategy:
     - Primary: Nova Pro (amazon.nova-pro-v1:0)
-    - Fallback: Claude 3.5 Sonnet (anthropic.claude-3-5-sonnet-20241022-v2:0)
+    - Fallback: Claude 3.5 Sonnet (anthropic.claude-3-5-sonnet-20240620-v1:0)
 
     Args:
         state: Current agent state with messages and context.
@@ -204,14 +278,14 @@ async def chat_node(
 
         except Exception as fallback_error:
             error_msg = (
-                f"Both primary and fallback models failed. "
-                f"Primary ({settings.bedrock_model_id}): {primary_error}. "
-                f"Fallback ({settings.bedrock_fallback_model_id}): {fallback_error}."
+                "The model is temporarily unavailable. Please try again in a moment."
             )
             log.error(
                 "chat_node: All models failed",
                 primary_error=str(primary_error),
                 fallback_error=str(fallback_error),
+                primary_model=settings.bedrock_model_id,
+                fallback_model=settings.bedrock_fallback_model_id,
             )
             return set_error(state, error_msg)
 
@@ -237,21 +311,29 @@ async def _invoke_model(
     Raises:
         Exception: If model invocation fails.
     """
+    # Sanitize messages to ensure Bedrock compatibility
+    # (handles empty content in AIMessages with tool calls)
+    sanitized_messages = _sanitize_messages_for_bedrock(messages, log)
+
     log.debug(
-        "Invoking model", model_id=model_id, tool_count=len(tools) if tools else 0
+        "Invoking model",
+        model_id=model_id,
+        tool_count=len(tools) if tools else 0,
+        original_message_count=len(messages),
+        sanitized_message_count=len(sanitized_messages),
     )
 
     model = _create_chat_model(model_id)
     model_with_tools = _bind_tools_to_model(model, tools)
 
-    response = await _stream_response(model_with_tools, messages, log)
+    response = await _stream_response(model_with_tools, sanitized_messages, log)
     log.debug("Model stream completed", model_id=model_id)
 
     return response
 
 
 async def _stream_response(
-    model: ChatBedrock,
+    model: ChatBedrockConverse,
     messages: list[BaseMessage],
     log: structlog.BoundLogger,
 ) -> BaseMessage:
@@ -260,25 +342,83 @@ async def _stream_response(
 
     Uses LangChain's astream to support UI streaming while still returning
     a complete BaseMessage (including tool_calls) back to the graph.
+
+    LangChain 0.3.x + langchain-aws 0.2.x Notes:
+    - AIMessageChunk does NOT have to_message() method
+    - Accumulate chunks with + operator, then extract content directly
+    - Nova Pro via Converse API returns content as list of blocks:
+      [{'type': 'text', 'text': '...', 'index': 0}, ...]
+    - We convert this to a plain string for the final AIMessage
     """
-    combined_chunk: BaseMessageChunk | None = None
-    final_message: BaseMessage | None = None
+    combined_chunk: AIMessageChunk | None = None
+    chunk_count = 0
 
     async for chunk in model.astream(messages):
-        log.debug("Received stream chunk")
+        chunk_count += 1
 
-        if isinstance(chunk, BaseMessage):
-            final_message = chunk
-            continue
+        # Log first few chunks in detail to understand structure
+        if chunk_count <= 3:
+            log.debug(
+                "Stream chunk detail",
+                chunk_num=chunk_count,
+                chunk_type=type(chunk).__name__,
+                chunk_content=repr(getattr(chunk, "content", "NO_CONTENT"))[:200],
+            )
+        else:
+            log.debug("Received stream chunk", chunk_num=chunk_count)
 
-        if isinstance(chunk, BaseMessageChunk):
+        # Accumulate chunks - AIMessageChunk supports + operator for combining
+        if isinstance(chunk, AIMessageChunk):
             combined_chunk = chunk if combined_chunk is None else combined_chunk + chunk
 
-    if final_message:
-        return final_message
+    log.debug(
+        "Stream completed",
+        total_chunks=chunk_count,
+        has_combined_chunk=combined_chunk is not None,
+    )
 
     if combined_chunk:
-        return combined_chunk.to_message()
+        # Extract content from the accumulated chunk
+        # ChatBedrockConverse returns content as list: [{'type': 'text', 'text': '...'}]
+        raw_content = combined_chunk.content
+
+        # Convert list-format content to string
+        if isinstance(raw_content, list):
+            text_parts = []
+            for block in raw_content:
+                if isinstance(block, dict):
+                    # Nova Pro format: {'type': 'text', 'text': '...', 'index': 0}
+                    text = block.get("text", "")
+                    if text:
+                        text_parts.append(text)
+                elif isinstance(block, str):
+                    text_parts.append(block)
+            combined_text = "".join(text_parts)
+        elif isinstance(raw_content, str):
+            combined_text = raw_content
+        else:
+            combined_text = str(raw_content) if raw_content else ""
+
+        # Extract tool_calls from the accumulated chunk
+        # In LangChain 0.3.x, tool_calls is a list of ToolCall objects
+        tool_calls = getattr(combined_chunk, "tool_calls", None) or []
+
+        # Create AIMessage with string content (LangChain 0.3.x compatible)
+        result = AIMessage(
+            content=combined_text,
+            tool_calls=tool_calls,
+            additional_kwargs=getattr(combined_chunk, "additional_kwargs", {}) or {},
+            response_metadata=getattr(combined_chunk, "response_metadata", {}) or {},
+        )
+
+        log.info(
+            "Model response assembled",
+            content_length=len(result.content),
+            content_preview=result.content[:100] if result.content else "(empty)",
+            has_tool_calls=bool(result.tool_calls),
+            tool_call_count=len(result.tool_calls) if result.tool_calls else 0,
+        )
+        return result
 
     raise ValueError("No response received from model stream")
 
@@ -297,12 +437,11 @@ def _create_success_state(state: AgentState, response: BaseMessage) -> AgentStat
     Returns:
         Updated AgentState with response added to messages.
     """
-    # Return only the new message - the add_messages reducer handles appending
-    return AgentState(
-        **state,
-        messages=[response],
-        last_error=None,  # Clear any previous error on success
-    )
+    # Copy to avoid duplicate keyword collisions (messages is already in state)
+    new_state = AgentState(**state)
+    new_state["messages"] = [response]
+    new_state["last_error"] = None  # Clear any previous error on success
+    return new_state
 
 
 # =============================================================================

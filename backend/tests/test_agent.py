@@ -3,10 +3,11 @@
 from typing import cast
 
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import BaseTool
 
 from src.agent.graph import get_registered_tools
+from src.agent.nodes import chat as chat_node_module
 from src.agent.state import (
     AgentState,
     add_tool_used,
@@ -143,3 +144,46 @@ async def test_get_registered_tools_contains_expected_tools() -> None:
     assert all(
         isinstance(tool, BaseTool) for tool in tools
     ), "All registered items must be LangChain tools."
+
+
+@pytest.mark.asyncio
+async def test_create_success_state_does_not_conflict_messages() -> None:
+    """Ensure success state creation overwrites messages without duplicate kw errors."""
+
+    state = create_initial_state(conversation_id="conv-123")
+    state["messages"] = [HumanMessage(content="hi")]
+    state["last_error"] = "previous"
+
+    updated = chat_node_module._create_success_state(state, AIMessage(content="ok"))  # type: ignore[attr-defined]
+
+    assert len(updated["messages"]) == 1
+    assert isinstance(updated["messages"][0], AIMessage)
+    assert updated["messages"][0].content == "ok"
+    assert updated["last_error"] is None
+
+
+@pytest.mark.asyncio
+async def test_chat_node_returns_friendly_error_when_models_fail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """chat_node should surface a user-friendly error when both models fail."""
+
+    call_count = {"n": 0}
+
+    async def failing_invoke_model(*args, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise RuntimeError("primary boom")
+        raise RuntimeError("fallback boom")
+
+    monkeypatch.setattr(chat_node_module, "_invoke_model", failing_invoke_model)
+
+    state = create_initial_state(conversation_id="conv-err")
+    state["messages"] = [HumanMessage(content="hello")]
+
+    result = await chat_node_module.chat_node(state)
+
+    assert result["last_error"], "Expected a user-facing error message"
+    assert "temporarily unavailable" in result["last_error"]
+    assert "primary boom" not in result["last_error"]
+    assert "fallback boom" not in result["last_error"]

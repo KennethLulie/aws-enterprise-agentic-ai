@@ -236,14 +236,13 @@ def update_state_metadata(
         )
     """
     current_metadata = state.get("metadata", {})
-    return AgentState(
-        **state,
-        metadata={
-            **current_metadata,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            **kwargs,
-        },
-    )
+    new_state = AgentState(**state)
+    new_state["metadata"] = {
+        **current_metadata,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        **kwargs,
+    }
+    return new_state
 
 
 def add_tool_used(state: AgentState, tool_name: str) -> AgentState:
@@ -265,10 +264,9 @@ def add_tool_used(state: AgentState, tool_name: str) -> AgentState:
     """
     current_tools = state.get("tools_used", [])
     if tool_name not in current_tools:
-        return AgentState(
-            **state,
-            tools_used=[*current_tools, tool_name],
-        )
+        new_state = AgentState(**state)
+        new_state["tools_used"] = [*current_tools, tool_name]
+        return new_state
     return state
 
 
@@ -288,10 +286,9 @@ def set_error(state: AgentState, error_message: str) -> AgentState:
     Example:
         state = set_error(state, "Tool execution failed: timeout")
     """
-    return AgentState(
-        **state,
-        last_error=error_message,
-    )
+    new_state = AgentState(**state)
+    new_state["last_error"] = error_message
+    return new_state
 
 
 def clear_error(state: AgentState) -> AgentState:
@@ -311,10 +308,9 @@ def clear_error(state: AgentState) -> AgentState:
         # After successful recovery
         state = clear_error(state)
     """
-    return AgentState(
-        **state,
-        last_error=None,
-    )
+    new_state = AgentState(**state)
+    new_state["last_error"] = None
+    return new_state
 
 
 # =============================================================================

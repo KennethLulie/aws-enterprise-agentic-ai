@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Loader2, Send, UserRound } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, Loader2, Send, Sparkles, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ interface UiMessage {
   id: string;
   role: ChatRole;
   content: string;
+  thinking?: string;  // Chain-of-thought reasoning from the model
   isStreaming?: boolean;
 }
 
@@ -49,10 +50,13 @@ export default function ChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [reconnectAttempt, setReconnectAttempt] = useState<number>(0);
+  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
 
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track if the last stream completed normally (to suppress "connection lost" errors)
+  const streamCompletedRef = useRef<boolean>(false);
 
   useEffect(() => {
     const verifySession = async () => {
@@ -92,6 +96,46 @@ export default function ChatPage() {
     });
   }, []);
 
+  const appendThinkingContent = useCallback((thinking: string) => {
+    setMessages((prev) => {
+      if (prev.length > 0) {
+        const last = prev[prev.length - 1];
+        if (last.role === "assistant") {
+          const updated: UiMessage = {
+            ...last,
+            thinking: last.thinking ? `${last.thinking}\n${thinking}` : thinking,
+            isStreaming: true,
+          };
+          return [...prev.slice(0, -1), updated];
+        }
+      }
+
+      // Create new assistant message with thinking content
+      return [
+        ...prev,
+        {
+          id: createMessageId("assistant"),
+          role: "assistant",
+          content: "",
+          thinking: thinking,
+          isStreaming: true,
+        },
+      ];
+    });
+  }, []);
+
+  const toggleThinking = useCallback((messageId: string) => {
+    setExpandedThinking((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  }, []);
+
   const finalizeAssistantMessage = useCallback(() => {
     setMessages((prev) => {
       if (prev.length === 0) {
@@ -119,14 +163,31 @@ export default function ChatPage() {
         case "open":
           setReconnectAttempt(0);
           return;
+        case "thinking":
+          // Chain-of-thought reasoning from the model
+          if (event.content) {
+            appendThinkingContent(event.content);
+          }
+          return;
+        case "tool_used":
+          // Tool was used - could show a subtle indicator, but don't show raw results
+          console.log(`Tool used: ${event.tool}`);
+          return;
         case "message":
-        case "tool_result":
           if (event.content) {
             appendAssistantChunk(event.content);
           }
           return;
         case "complete":
+          // Mark that this stream completed normally (suppress connection error toast)
+          streamCompletedRef.current = true;
           finalizeAssistantMessage();
+          // Close the EventSource gracefully to prevent error handler from firing
+          eventSourceRef.current?.close();
+          // Silently trigger reconnection for the next message after a brief delay
+          setTimeout(() => {
+            setReconnectAttempt((attempt) => attempt + 1);
+          }, 500);
           return;
         case "error":
           setIsLoading(false);
@@ -138,11 +199,18 @@ export default function ChatPage() {
           return;
       }
     },
-    [appendAssistantChunk, finalizeAssistantMessage]
+    [appendAssistantChunk, appendThinkingContent, finalizeAssistantMessage]
   );
 
   const handleSseError = useCallback(
     (event: Event) => {
+      // If the stream just completed normally, this is an expected closure - don't show error
+      if (streamCompletedRef.current) {
+        console.debug("SSE connection closed after stream completion (normal)");
+        streamCompletedRef.current = false;
+        return;
+      }
+
       console.warn("SSE connection error", event);
       eventSourceRef.current?.close();
       setIsLoading(false);
@@ -206,6 +274,8 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsLoading(true);
+    // Reset completion flag for new message
+    streamCompletedRef.current = false;
 
     try {
       const result = await sendMessage(trimmed, conversationId);
@@ -259,6 +329,9 @@ export default function ChatPage() {
       isUser ? "bg-primary text-primary-foreground" : "bg-slate-200 text-slate-800"
     );
 
+    const hasThinking = !isUser && message.thinking;
+    const isThinkingExpanded = expandedThinking.has(message.id);
+
     return (
       <div
         key={message.id}
@@ -276,8 +349,48 @@ export default function ChatPage() {
                 Assistant
               </p>
             )}
-            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-            {message.isStreaming ? (
+
+            {/* Thinking section (collapsible) */}
+            {hasThinking && (
+              <div className="mb-3">
+                <button
+                  type="button"
+                  onClick={() => toggleThinking(message.id)}
+                  className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-700 transition-colors"
+                >
+                  {isThinkingExpanded ? (
+                    <ChevronDown className="h-3 w-3" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3" />
+                  )}
+                  <Sparkles className="h-3 w-3" />
+                  <span className="font-medium">
+                    {isThinkingExpanded ? "Hide reasoning" : "Show reasoning"}
+                  </span>
+                </button>
+                {isThinkingExpanded && (
+                  <div className="mt-2 rounded-lg bg-violet-50 border border-violet-100 p-3 text-xs text-violet-800 dark:bg-violet-950/30 dark:border-violet-900 dark:text-violet-200">
+                    <p className="whitespace-pre-wrap leading-relaxed">{message.thinking}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Main message content */}
+            {message.content && (
+              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            )}
+
+            {/* Show thinking indicator while streaming if we only have thinking content */}
+            {message.isStreaming && !message.content && hasThinking && (
+              <span className="inline-flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Thinking...
+              </span>
+            )}
+
+            {/* Streaming indicator */}
+            {message.isStreaming && message.content ? (
               <span className="mt-2 inline-flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Streaming

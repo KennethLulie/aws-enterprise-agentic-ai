@@ -1393,7 +1393,7 @@ terraform {
   - Nova Pro: `amazon.nova-pro-v1:0`
   - Nova Lite: `amazon.nova-lite-v1:0`
   - Titan Embeddings: `amazon.titan-embed-text-v1`
-  - Claude Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0`
+  - Claude Fallback: `anthropic.claude-3-5-sonnet-20240620-v1:0`
 
 ### Neo4j AuraDB (Knowledge Graph)
 - **Tier:** Free (200K nodes, 400K relationships)
