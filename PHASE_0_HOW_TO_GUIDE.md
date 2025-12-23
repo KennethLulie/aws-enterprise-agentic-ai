@@ -570,7 +570,7 @@ Create `backend/requirements.txt`
 
 Requirements:
 - Core Framework: fastapi~=0.115.0, uvicorn[standard]~=0.32.0, pydantic~=2.9.0, pydantic-settings~=2.6.0
-- Agent Framework: langgraph~=0.2.50, langchain~=0.3.0, langchain-aws~=0.2.0
+- Agent Framework: langgraph~=0.2.50, langchain~=0.3.0, langchain-community~=0.3.0, langchain-aws~=0.2.0
 - AWS SDK: boto3~=1.35.0, botocore~=1.35.0
 - Database: sqlalchemy~=2.0.35, alembic~=1.13.0, psycopg2-binary~=2.9.9
 - Vector Store: pinecone-client~=5.0.0, chromadb~=0.5.15
@@ -739,7 +739,118 @@ ls backend/src/api/routes/health.py
 
 **Note:** Full endpoint testing will happen after Docker Compose setup (Section 7.5)
 
-#### 3.5 Note: Dependencies Will Be Installed via Docker
+#### 3.5 Create Auth Routes
+
+**Agent Prompt:**
+```
+Create `backend/src/api/routes/auth.py`
+
+Requirements:
+1. POST /api/login endpoint for password authentication
+2. GET /api/me endpoint for session validation
+3. POST /api/logout endpoint for session cleanup
+4. Use HttpOnly cookies for secure session management
+5. Integrate with settings.demo_password validation
+6. Return appropriate HTTP status codes (200, 401, 204)
+7. Include authentication middleware/dependencies
+
+Key Features:
+- Password validation against settings.demo_password
+- Session token generation and validation
+- Secure cookie configuration (HttpOnly, SameSite)
+- Proper error messages without exposing sensitive info
+
+Reference: FastAPI router patterns, cookie-based authentication.
+Verify: Test login/logout flow and session persistence.
+```
+
+**Verification:**
+```bash
+# Check auth routes exist
+ls backend/src/api/routes/auth.py
+
+# Full testing after Docker setup (Section 7.5)
+```
+
+#### 3.6 Create Chat API Streaming Endpoint
+
+**Agent Prompt:**
+```
+Create `backend/src/api/routes/chat.py`
+
+Requirements:
+1. POST /api/chat endpoint with Server-Sent Events streaming
+2. GET /api/chat endpoint for SSE connection establishment
+3. Integrate LangGraph astream() for real-time streaming
+4. Parse Nova Pro thinking content (<thinking>...</thinking>)
+5. Handle tool call events separately from messages
+6. Implement conversation queue management with asyncio.Queue
+7. Support authentication via session validation
+8. Handle reconnection and error scenarios gracefully
+
+Key Features:
+- Async processing with LangGraph.astream() integration
+- Thinking content extraction and separate event streaming
+- Tool execution event handling (tool_call, tool_used, tool_result)
+- Conversation persistence across reconnections
+- Keepalive mechanism for SSE connections
+- Proper error handling with user-friendly messages
+
+LangChain Integration:
+- Use graph.astream() with stream_mode="values"
+- Extract messages, errors, and metadata from each state update
+- Handle AIMessage with tool_calls for tool execution
+- Support conversation_id for multi-turn conversations
+
+Reference: FastAPI streaming responses, LangGraph astream(), Server-Sent Events spec.
+Verify: Test streaming conversation flow with thinking display and tool calls.
+```
+
+**Verification:**
+```bash
+# Check chat API exists
+ls backend/src/api/routes/chat.py
+
+# Full testing after Docker setup (Section 7.5)
+```
+
+#### 3.8 Update API Route Registration
+
+**Agent Prompt:**
+```
+Update `backend/src/api/routes/__init__.py` and `backend/src/api/main.py`
+
+Requirements:
+1. Add auth_router, chat_router exports to routes/__init__.py
+2. Register all routers in main.py with proper prefixes and tags
+3. Apply authentication middleware to protected routes
+4. Configure CORS for frontend origin (localhost:3000)
+5. Add session validation dependencies where needed
+6. Structure for future API versioning (/api/v1/*)
+
+Router Configuration:
+- auth_router: prefix="/api", tags=["Auth"]
+- chat_router: prefix="/api", tags=["Chat"]
+- health_router: prefix="", tags=["Health"]
+
+Authentication:
+- Apply require_session dependency to chat routes
+- Auth routes handle their own authentication logic
+- Health endpoint remains public
+
+Reference: FastAPI router registration, CORS middleware, dependency injection.
+Verify: All endpoints accessible and properly authenticated.
+```
+
+**Verification:**
+```bash
+# Check route registrations
+grep -n "include_router" backend/src/api/main.py
+
+# Full testing after Docker setup (Section 7.5)
+```
+
+#### 3.9 Note: Dependencies Will Be Installed via Docker
 
 **Important:** Following the Docker-first approach, Python dependencies will be installed automatically when Docker containers are built (Section 7). 
 
@@ -837,9 +948,9 @@ Verify: Check for linter errors.
 Create `backend/src/agent/nodes/chat.py`
 
 Requirements:
-1. Import ChatBedrock from langchain_aws
+1. Import ChatBedrockConverse from langchain_aws (Converse API)
 2. Create async chat node function:
-   - Signature: async def chat_node(state: AgentState) -> AgentState
+   - Signature: async def chat_node(state: AgentState, tools: Sequence[BaseTool]) -> AgentState
    - Get messages from state
    - Invoke Bedrock model with tool binding
    - Return updated state with new message
@@ -848,6 +959,13 @@ Requirements:
 5. Log errors with structlog
 6. Use type hints throughout and add docstrings
 
+LangChain 0.3.x Compatibility Notes:
+- Use ChatBedrockConverse (not ChatBedrock) for Nova Pro
+- AIMessageChunk does NOT have to_message() method in 0.3.x
+- Combine chunks with + operator, extract content directly
+- Nova Pro returns content as [{'type': 'text', 'text': '...'}] list
+- Tool calling works differently with Converse API
+
 Configuration (from settings):
 - Primary: amazon.nova-pro-v1:0
 - Fallback: anthropic.claude-3-5-sonnet-20240620-v1:0
@@ -855,8 +973,13 @@ Configuration (from settings):
 - Max tokens: 4096
 - Region: us-east-1
 
-Reference: agentic-ai.mdc node patterns, LangChain ChatBedrock docs.
-Verify: Check for linter errors and proper async handling.
+Streaming Implementation:
+- Use model.astream() for UI streaming support
+- Handle AIMessageChunk accumulation and content extraction
+- Support tool calls in streaming responses
+
+Reference: agentic-ai.mdc node patterns, LangChain 0.3.x ChatBedrockConverse docs.
+Verify: Check for linter errors and proper async streaming handling.
 ```
 
 **Verification**
@@ -1159,7 +1282,7 @@ Setting up the Next.js frontend with TypeScript, shadcn/ui, and basic chat inter
 
 #### 6.1 Initialize Next.js Project
 
-**Note:** This initial setup step runs in your WSL terminal (not in Docker) because it creates the initial project structure. All subsequent development will happen in Docker containers.
+**Note:** This initial setup step runs in your WSL terminal (not in Docker) because it creates the initial project structure. Uses Next.js 16 and React 19 (see DEVELOPMENT_REFERENCE.md "Technology Version Reference" for exact versions). All subsequent development will happen in Docker containers.
 
 **Pre-check (avoid conflicts):**
 - Run `ls -A frontend`. If you see existing files (e.g., `Dockerfile.dev`, `src/`, `package.json`), the Next.js scaffold already exists—skip this step and proceed to the configuration steps below.
@@ -1304,27 +1427,39 @@ ls frontend/src/app/login/page.tsx
 Create `frontend/src/lib/api.ts`
 
 Requirements:
-1. TypeScript types for API requests/responses
+1. TypeScript types for API requests/responses and event handling
 2. SSE connection using native EventSource API
-3. Message sending using fetch
-4. Proper error handling for SSE and fetch
+3. Message sending using fetch with proper error handling
+4. Advanced SSE event processing for LangGraph integration
 5. Base URL from NEXT_PUBLIC_API_URL (default: http://localhost:8000)
 
 Functions:
 - connectSSE(conversationId, onMessage, onError): EventSource (with credentials)
-- sendMessage(message, conversationId): Promise<Response> (credentials included)
+- sendMessage(message, conversationId): Promise<SendMessageResponse> (credentials included)
 - getHealth(): Promise<HealthResponse> (credentials included)
 - login(password): Promise<void> (sets HttpOnly session cookie)
-- getSession(): Promise<void> (validates session)
+- getSession(): Promise<SessionResponse> (validates session)
 - logout(): Promise<void> (clears session cookie)
 
-SSE handling:
-- Parse JSON messages from event.data
-- Handle 'message', 'error', 'open' events
-- Reconnection logic on disconnect (EventSource native retry)
+SSE Event Types (for LangGraph integration):
+- 'open': Connection established
+- 'thinking': Chain-of-thought content from model (display separately)
+- 'message': Regular chat message content
+- 'tool_call': Tool execution started (show indicator)
+- 'tool_used': Tool execution completed (update status)
+- 'tool_result': Raw tool results (deprecated - not displayed)
+- 'complete': Stream finished successfully
+- 'error': Stream failed with error details
 
-Reference: Native EventSource API (no Vercel AI SDK per project rules).
-Verify: Check for TypeScript errors.
+Advanced SSE Features:
+- Parse complex event payloads with conversationId, content, tool info
+- Handle thinking content extraction and collapsible display
+- Implement exponential backoff reconnection logic
+- Support conversation persistence across page refreshes
+- Proper error differentiation (recoverable vs fatal)
+
+Reference: Native EventSource API (no Vercel AI SDK per project rules), Server-Sent Events spec.
+Verify: Check for TypeScript errors and test SSE event handling.
 ```
 
 **Verification:**
@@ -1398,11 +1533,9 @@ Verify: Check for TypeScript errors.
 cat frontend/src/app/layout.tsx | head -20
 ```
 
-#### 6.8 Note: Frontend Dependencies Will Be Installed via Docker
+#### 6.8 Frontend Dependencies
 
-**Important:** Following the Docker-first approach, Node.js dependencies will be installed automatically when Docker containers are built (Section 7).
-
-**No local installation needed:** Do NOT run `npm install` directly on your host machine. All development happens inside Docker containers.
+**Note:** Frontend dependencies are installed automatically via Docker (same Docker-first approach as backend dependencies in Section 3.9). Do NOT run `npm install` locally - all development happens in containers.
 
 **Verification:** Dependencies will be verified after Docker Compose setup (Section 7.5).
 
@@ -2142,6 +2275,7 @@ Tool Configuration:
 - Use TavilySearchResults from langchain_community.tools
 - Max results: 5 (configurable)
 - Search depth: "basic" for free tier
+- Note: Requires langchain-community~=0.3.0 (rebuild backend if ModuleNotFoundError)
 
 Reference:
 - agentic-ai.mdc "Tool Definition Pattern"
