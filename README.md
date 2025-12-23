@@ -84,6 +84,8 @@ Phase 0 establishes a fully working local development environment with:
 docker-compose build backend && docker-compose up -d backend
 ```
 
+**Next Phase (1a):** Cloud Deployment - When Phase 0 is complete, Phase 1a deploys the working system to AWS using Terraform (App Runner backend + CloudFront frontend). This provides a publicly accessible demo while maintaining local development for rapid iteration.
+
 ## 📚 Documentation
 
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
@@ -288,8 +290,8 @@ docker compose up
 ### Development Phases
 
 - **Phase 0:** Local development environment (real Tavily search, FMP market data; SQL/RAG stubbed)
-- **Phase 1a:** Minimal MVP (basic chat interface)
-- **Phase 1b:** Production hardening (persistent state, CI/CD)
+- **Phase 1a:** Minimal MVP - AWS Cloud Deployment (App Runner + CloudFront)
+- **Phase 1b:** Production hardening (persistent state, Aurora DB, CI/CD)
 - **Phase 2:** Core agent tools (real SQL with Aurora, real RAG with Pinecone)
 - **Phase 3+:** Advanced features (verification, caching, observability, evaluation)
 

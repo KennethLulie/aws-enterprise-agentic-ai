@@ -1222,12 +1222,13 @@ Requirements:
 2. Create Pydantic input schema (MarketDataInput) with tickers list
 3. Return mock data when FMP_API_KEY not set, live data when available
 4. Support multiple tickers in one call
-5. Fields: ticker, price, change, change_percent, open, previous_close, 
+5. Fields: ticker, price, change, change_percent, open, previous_close,
    day_high, day_low, volume, currency, exchange, timestamp, source
 6. Tool name: "market_data"
 7. Tool description: "Get market data for one or more tickers via Financial Modeling Prep"
 8. Use httpx for async HTTP calls to FMP API
 9. Use type hints and docstrings
+10. Add get_market_data_mode() function for testing graceful degradation
 
 Mock result format:
 {
@@ -1236,8 +1237,12 @@ Mock result format:
     "source": "financialmodelingprep"
 }
 
+Additional Functions:
+- get_market_data_mode(): Return "live" if FMP_API_KEY set, else "mock"
+- Export both market_data_tool and get_market_data_mode in __all__
+
 Reference: DEVELOPMENT_REFERENCE.md FMP configuration.
-Verify: Check for linter errors.
+Verify: Check for linter errors and test get_market_data_mode() function.
 ```
 
 **Verification:** See consolidated Docker verification checklist in Section 7.6 once services are running.
@@ -2051,7 +2056,6 @@ Run the below to verify tests are working
 
 
 
-#### START HERE PLACE HOLDER - all code should be created and checked at this point.
 docker-compose up -d
 docker-compose exec backend pytest
 docker-compose down
@@ -2143,7 +2147,7 @@ docker-compose stop backend
 pre-commit validate-config
 ```
 
-**Note this is a good time to committ for safety sake as pre-commit hooks may impact the functionality of committing until resolved**
+**Note this is a good time to commit for safety sake as pre-commit hooks may impact the functionality of committing until resolved**
 **only for a demo project, otherwise we would actually want to move this to the top of the development process for enterprise workflows**
 
 #### 10.3 Install Pre-commit Hooks
@@ -2332,9 +2336,10 @@ Changes:
 6. Log whether using real API or mock mode
 
 API Configuration:
-- Base URL: https://financialmodelingprep.com/api/v3
-- Endpoint: /quote/{symbol} or /quote-short/{symbol}
-- Batch: /quote/{symbol1,symbol2,...} for multiple tickers
+- Base URL: https://financialmodelingprep.com/stable
+- Endpoint: /quote?symbol={symbol}
+- Batch: /quote?symbol={symbol1},{symbol2},... for multiple tickers
+- Response includes: symbol, name, price, change, changePercentage, volume, etc.
 
 Reference:
 - DEVELOPMENT_REFERENCE.md "Financial Modeling Prep" section

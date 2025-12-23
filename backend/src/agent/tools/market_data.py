@@ -148,10 +148,12 @@ async def _call_fmp_api(
 ) -> List[Dict[str, Any]]:
     """Call FMP quote endpoint for tickers."""
     tickers_param = ",".join(tickers)
-    url = f"{str(settings.fmp_base_url).rstrip('/')}/quote/{tickers_param}"
+    url = f"{str(settings.fmp_base_url).rstrip('/')}/quote"
 
     async with httpx.AsyncClient(timeout=settings.fmp_timeout_seconds) as client:
-        response = await client.get(url, params={"apikey": api_key})
+        response = await client.get(
+            url, params={"symbol": tickers_param, "apikey": api_key}
+        )
         response.raise_for_status()
         payload: Any = response.json()
 
@@ -167,7 +169,7 @@ async def _call_fmp_api(
                 "ticker": entry.get("symbol") or entry.get("name"),
                 "price": entry.get("price"),
                 "change": entry.get("change"),
-                "change_percent": entry.get("changesPercentage"),
+                "change_percent": entry.get("changePercentage"),
                 "volume": entry.get("volume"),
                 "timestamp": _coerce_timestamp(entry.get("timestamp")),
                 "source": "financialmodelingprep",
@@ -246,9 +248,29 @@ async def fetch_market_data(
             error=str(exc),
         )
         if status_code in (401, 403):
-            raise ValueError(
-                "Invalid or missing market data API key. Please update configuration."
-            ) from exc
+            logger.warning(
+                "market_data_fallback_to_mock",
+                tickers=cleaned_tickers,
+                reason="invalid_or_legacy_api_key",
+            )
+            return {
+                "data": _build_mock_quotes(cleaned_tickers),
+                "mode": "mock",
+                "mode_reason": "invalid_api_key",
+                "source": "financialmodelingprep",
+            }
+        if status_code == 402:
+            logger.warning(
+                "market_data_fallback_to_mock",
+                tickers=cleaned_tickers,
+                reason="payment_required",
+            )
+            return {
+                "data": _build_mock_quotes(cleaned_tickers),
+                "mode": "mock",
+                "mode_reason": "payment_required",
+                "source": "financialmodelingprep",
+            }
         if status_code == 429:
             retry_after = (
                 exc.response.headers.get("Retry-After") if exc.response else None
@@ -297,9 +319,17 @@ async def market_data_tool(tickers: List[str]) -> Dict[str, Any]:
     return await fetch_market_data(tickers)
 
 
+def get_market_data_mode(settings: Optional[Settings] = None) -> str:
+    """Return 'live' when FMP API key is set, else 'mock'."""
+
+    active_settings = settings or Settings()
+    return "live" if active_settings.fmp_api_key else "mock"
+
+
 __all__ = [
     "market_data_tool",
     "fetch_market_data",
+    "get_market_data_mode",
     "MarketDataInput",
     "reset_market_data_circuit",
 ]

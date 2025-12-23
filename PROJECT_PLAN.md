@@ -419,8 +419,8 @@ docker-compose up
 
 ---
 
-### Phase 1a: Minimal MVP - Basic Chat Interface
-**Goal:** Deployed chatbot accessible via password-protected website with streaming responses (simplified for easy debugging)
+### Phase 1a: Minimal MVP - AWS Cloud Deployment
+**Goal:** Deployed chatbot to AWS accessible via password-protected website with streaming responses (simplified for easy debugging)
 
 **Why Split Phase 1:** Phase 1a focuses on getting a working demo quickly with minimal complexity. Phase 1b adds production hardening. This makes debugging much easier - if something breaks, fewer moving parts to check.
 

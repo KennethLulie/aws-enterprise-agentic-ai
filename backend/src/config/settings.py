@@ -226,7 +226,7 @@ class Settings(BaseSettings):
     )
 
     fmp_base_url: AnyHttpUrl = Field(
-        default="https://financialmodelingprep.com/api/v3",
+        default="https://financialmodelingprep.com/stable",
         description="Base URL for Financial Modeling Prep API.",
     )
 
