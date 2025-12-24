@@ -191,9 +191,19 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?c
 **Expected Output:** Should list Nova Pro, Nova Lite, and Claude models.
 
 **If access denied:** You need to request model access in AWS Console:
-1. Go to AWS Console → Bedrock → Model access
-2. Request access to: Amazon Nova Pro, Amazon Nova Lite, Claude 3.5 Sonnet
-3. Wait for approval (can take up to 24 hours)
+
+**Navigate in AWS Console:**
+1. Sign in to AWS Console: https://console.aws.amazon.com
+2. In the search bar at the top, type **"Bedrock"** and click **Amazon Bedrock**
+3. In the left sidebar, scroll down and click **Model access** (under "Bedrock configurations")
+4. Click **Modify model access** button (orange button, top right)
+5. Find and check these models:
+   - ✅ Amazon → **Amazon Nova Pro**
+   - ✅ Amazon → **Amazon Nova Lite**
+   - ✅ Anthropic → **Claude 3.5 Sonnet** (for fallback)
+6. Scroll to bottom, click **Next**
+7. Review and click **Submit**
+8. Wait for "Access granted" status (can take up to 24 hours, usually faster)
 
 ### 1.5 Verify IAM Permissions
 
@@ -248,21 +258,40 @@ Setting up billing alerts to monitor costs and ensuring your AWS account is prop
 
 **Navigate in AWS Console:**
 1. Sign in to AWS Console: https://console.aws.amazon.com
-2. Click on your account name (top right) → **Billing and Cost Management**
-3. In left sidebar, click **Budgets**
-4. Click **Create budget**
+2. Click on your **account name** (top right corner, shows your name or account alias)
+3. In the dropdown menu, click **Billing and Cost Management**
+4. In the left sidebar, scroll down to "Budgets and Planning" section
+5. Click **Budgets**
+6. Click the **Create budget** button (orange button)
 
-**Budget Configuration:**
-- Budget type: **Cost budget**
-- Name: `enterprise-agentic-ai-demo`
-- Period: **Monthly**
-- Budget amount: **$50** (our target ceiling)
+**Step 1 - Budget Setup:**
+- Choose budget type: Select **Customize (advanced)**
+- Budget type: Select **Cost budget - Recommended**
 - Click **Next**
 
-**Alert Configuration:**
-- Threshold: **80%** of budgeted amount ($40)
-- Notification: Your email address
-- Click **Next** → **Create budget**
+**Step 2 - Set Budget:**
+- Budget name: `enterprise-agentic-ai-demo`
+- Period: **Monthly**
+- Budget renewal type: **Recurring budget**
+- Start month: (current month)
+- Budgeting method: **Fixed**
+- Enter your budgeted amount: **50.00** (USD)
+- All other settings: leave as default
+- Click **Next**
+
+**Step 3 - Configure Alerts:**
+- Click **Add an alert threshold**
+- Alert #1 settings:
+  - Threshold: **80** % of budgeted amount (Actual)
+  - Notification preferences: **Email**
+  - Email recipients: Enter your email address
+- Click **Next**
+
+**Step 4 - Review and Create:**
+- Review settings
+- Click **Create budget**
+
+**Verification:** You should see your budget in the list with "Current vs. budgeted" showing $0.00 / $50.00
 
 ### 2.2 Verify Cost Explorer Access
 
@@ -290,10 +319,27 @@ For Phase 1a deployment, your IAM user needs these AWS managed policies (or equi
 **Note:** These are broad permissions for development. Production would use more restrictive custom policies.
 
 **To add policies to your IAM user:**
-1. AWS Console → IAM → Users → Select your user
-2. **Permissions** tab → **Add permissions** → **Attach policies directly**
-3. Search and select each policy above
-4. Click **Next** → **Add permissions**
+
+**Navigate in AWS Console:**
+1. Sign in to AWS Console: https://console.aws.amazon.com
+2. In the search bar at the top, type **"IAM"** and click **IAM**
+3. In the left sidebar, click **Users**
+4. Click on your username in the list
+5. Click the **Permissions** tab
+6. Click **Add permissions** button → Select **Add permissions**
+7. Select **Attach policies directly** (third option)
+8. In the search box, search for each policy name and check the box:
+   - Type `EC2Full` → check **AmazonEC2FullAccess**
+   - Type `S3Full` → check **AmazonS3FullAccess**
+   - Type `CloudFront` → check **CloudFrontFullAccess**
+   - Type `AppRunner` → check **AWSAppRunnerFullAccess**
+   - Type `ContainerRegistry` → check **AmazonEC2ContainerRegistryFullAccess**
+   - Type `SecretsManager` → check **SecretsManagerReadWrite**
+   - Type `IAMFull` → check **IAMFullAccess**
+   - Type `DynamoDB` → check **AmazonDynamoDBFullAccess**
+   - Type `CloudWatchLogs` → check **CloudWatchLogsFullAccess**
+   - Type `Bedrock` → check **AmazonBedrockFullAccess**
+9. Click **Next** → Review → **Add permissions**
 
 ### 2.4 AWS Setup Checklist
 
@@ -526,7 +572,7 @@ Writing and applying Terraform configurations to create the AWS infrastructure: 
 
 ### 5.1 Terraform Module Structure
 
-We'll use the existing directory structure:
+We'll create this directory structure:
 
 ```
 terraform/
@@ -545,237 +591,398 @@ terraform/
     └── secrets/              # IAM for Secrets Manager
 ```
 
-### 5.2 Create Backend Configuration
+**Create the directory structure:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai
 
-**Agent Prompt - Create Terraform Backend Configuration:**
+# Create all Terraform directories
+mkdir -p terraform/environments/dev
+mkdir -p terraform/modules/networking
+mkdir -p terraform/modules/ecr
+mkdir -p terraform/modules/app-runner
+mkdir -p terraform/modules/s3-cloudfront
+mkdir -p terraform/modules/secrets
 
-> Create the Terraform backend configuration file at `terraform/environments/dev/backend.tf` that:
-> 
-> 1. Configures the S3 backend for state storage with these settings:
->    - Bucket: Use a variable or placeholder that I'll replace with my actual bucket name
->    - Key: `dev/terraform.tfstate`
->    - Region: `us-east-1`
->    - DynamoDB table for locking: `enterprise-agentic-ai-tflock`
->    - Encrypt: true
-> 
-> 2. Specifies required Terraform version >= 1.5.0
-> 
-> 3. Specifies required providers:
->    - AWS provider ~> 5.0
->    - Random provider ~> 3.0 (for generating unique names)
-> 
-> Follow Terraform best practices as of December 2025. Include comments explaining each section.
+# Verify structure
+find terraform -type d | sort
+```
 
-**After running the prompt:** Replace the placeholder bucket name with your actual bucket name from Section 3.
+**Expected Output:**
+```
+terraform
+terraform/environments
+terraform/environments/dev
+terraform/modules
+terraform/modules/app-runner
+terraform/modules/ecr
+terraform/modules/networking
+terraform/modules/s3-cloudfront
+terraform/modules/secrets
+```
+
+### 5.2 Create State Backend Configuration
+
+**Agent Prompt:**
+```
+Create `terraform/environments/dev/backend.tf`
+
+Contents:
+1. Terraform block with required_version >= 1.5.0
+2. Required providers: hashicorp/aws ~> 5.0, hashicorp/random ~> 3.0
+3. S3 backend configuration (inside terraform block):
+   - bucket = "REPLACE_WITH_YOUR_BUCKET_NAME"
+   - key = "dev/terraform.tfstate"
+   - region = "us-east-1"
+   - dynamodb_table = "enterprise-agentic-ai-tflock"
+   - encrypt = true
+4. AWS provider with region us-east-1 and default_tags:
+   - Project = "enterprise-agentic-ai"
+   - Environment = "dev"
+   - ManagedBy = "terraform"
+
+Configuration:
+- Backend block goes INSIDE the terraform block (not separate)
+- Use Terraform HCL syntax, not JSON
+- Include comments explaining each section
+
+Reference:
+- Terraform S3 backend docs: https://developer.hashicorp.com/terraform/language/settings/backends/s3
+- AWS provider docs: https://registry.terraform.io/providers/hashicorp/aws/latest/docs
+
+Verify: cd terraform/environments/dev && terraform validate
+```
+
+**After running the prompt:** Replace `REPLACE_WITH_YOUR_BUCKET_NAME` with your actual bucket name from Section 3 (e.g., `enterprise-agentic-ai-tfstate-jd`)
 
 ### 5.3 Create Networking Module
 
-**Agent Prompt - Create Networking Module:**
+**Agent Prompt:**
+```
+Create Terraform networking module at `terraform/modules/networking/`
 
-> Create the Terraform networking module at `terraform/modules/networking/` with these files:
-> 
-> **main.tf:**
-> - VPC with CIDR 10.0.0.0/16 and DNS hostnames enabled
-> - Two public subnets in different AZs (us-east-1a, us-east-1b) with CIDRs 10.0.1.0/24 and 10.0.2.0/24
-> - Internet Gateway attached to VPC
-> - Route table for public subnets with route to Internet Gateway
-> - Security group for App Runner VPC connector (if needed later for Aurora in Phase 1b)
-> 
-> **variables.tf:**
-> - project_name (string)
-> - environment (string, default "dev")
-> - vpc_cidr (string, default "10.0.0.0/16")
-> - tags (map of strings)
-> 
-> **outputs.tf:**
-> - vpc_id
-> - public_subnet_ids (list)
-> - security_group_id
-> 
-> Follow AWS and Terraform best practices as of December 2025. Use proper tagging. Include comments.
-> 
-> Note: Phase 1a uses public subnets only (no NAT Gateway to save costs). App Runner doesn't need VPC connector yet - that's added in Phase 1b for Aurora access.
+Files to create: main.tf, variables.tf, outputs.tf
+
+Resources in main.tf:
+1. aws_vpc - CIDR var.vpc_cidr (default 10.0.0.0/16), enable DNS hostnames/support
+2. aws_internet_gateway - attach to VPC
+3. aws_subnet (x2) - public subnets in us-east-1a (10.0.1.0/24) and us-east-1b (10.0.2.0/24), map_public_ip_on_launch = true
+4. aws_route_table - route 0.0.0.0/0 to IGW
+5. aws_route_table_association (x2) - associate subnets with route table
+6. aws_security_group - for future VPC connector, egress-only (all outbound allowed)
+
+Variables in variables.tf:
+- project_name (string, required)
+- environment (string, default "dev")
+- vpc_cidr (string, default "10.0.0.0/16")
+- tags (map(string), default {})
+
+Outputs in outputs.tf:
+- vpc_id
+- public_subnet_ids (list)
+- security_group_id
+
+Configuration:
+- Tag all resources with: Name = "${var.project_name}-${var.environment}-<resource>"
+- Merge var.tags into all resource tags
+- No NAT Gateway (cost optimization - Phase 1b adds if needed)
+
+Reference:
+- AWS VPC Terraform docs
+- Phase 1a uses public subnets only (App Runner has public internet access by default)
+
+Verify: cd terraform/environments/dev && terraform validate
+```
 
 ### 5.4 Create ECR Module
 
-**Agent Prompt - Create ECR Module:**
+**Agent Prompt:**
+```
+Create Terraform ECR module at `terraform/modules/ecr/`
 
-> Create the Terraform ECR module at `terraform/modules/ecr/` with these files:
-> 
-> **main.tf:**
-> - ECR repository for the backend application
-> - Image scanning on push enabled
-> - Image tag mutability: MUTABLE (allows reusing tags during development)
-> - Lifecycle policy to keep only last 10 images (cost optimization)
-> 
-> **variables.tf:**
-> - repository_name (string)
-> - tags (map of strings)
-> 
-> **outputs.tf:**
-> - repository_url
-> - repository_arn
-> - registry_id
-> 
-> Follow AWS and Terraform best practices as of December 2025. Include the lifecycle policy as a JSON document.
+Files to create: main.tf, variables.tf, outputs.tf
+
+Resources in main.tf:
+1. aws_ecr_repository
+   - name = var.repository_name
+   - image_tag_mutability = "MUTABLE" (allows :latest overwrites)
+   - image_scanning_configuration { scan_on_push = true }
+2. aws_ecr_lifecycle_policy
+   - Expire untagged images after 1 day
+   - Keep only last 10 tagged images
+   - Use jsonencode() for policy document
+
+Variables in variables.tf:
+- repository_name (string, required)
+- tags (map(string), default {})
+
+Outputs in outputs.tf:
+- repository_url (for docker push)
+- repository_arn
+- registry_id
+
+Configuration:
+- Lifecycle policy keeps costs low by cleaning old images
+- MUTABLE tags for development (can overwrite :latest)
+- Scan on push for security
+
+Reference:
+- AWS ECR Terraform: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecr_repository
+- Cost: ~$0.10/GB/month storage
+
+Verify: cd terraform/environments/dev && terraform validate
+```
 
 ### 5.5 Create Secrets Module
 
-**Agent Prompt - Create Secrets Module:**
+**Agent Prompt:**
+```
+Create Terraform secrets module at `terraform/modules/secrets/`
 
-> Create the Terraform secrets module at `terraform/modules/secrets/` with these files:
-> 
-> **main.tf:**
-> - Data sources to reference existing Secrets Manager secrets (we created them manually):
->   - enterprise-agentic-ai/demo-password
->   - enterprise-agentic-ai/auth-token-secret
->   - enterprise-agentic-ai/tavily-api-key
->   - enterprise-agentic-ai/fmp-api-key
-> - IAM policy document allowing secretsmanager:GetSecretValue for these secrets
-> - IAM policy resource using the policy document
-> 
-> **variables.tf:**
-> - project_name (string)
-> - environment (string)
-> - tags (map of strings)
-> 
-> **outputs.tf:**
-> - secret_arns (map of secret name to ARN)
-> - secrets_access_policy_arn (the IAM policy ARN)
-> 
-> Follow AWS and Terraform best practices as of December 2025. We're referencing existing secrets, not creating new ones.
+Files to create: main.tf, variables.tf, outputs.tf
+
+Resources in main.tf:
+1. Data sources (reference EXISTING secrets, don't create):
+   - data "aws_secretsmanager_secret" "demo_password" { name = "enterprise-agentic-ai/demo-password" }
+   - data "aws_secretsmanager_secret" "auth_token_secret" { name = "enterprise-agentic-ai/auth-token-secret" }
+   - data "aws_secretsmanager_secret" "tavily_api_key" { name = "enterprise-agentic-ai/tavily-api-key" }
+   - data "aws_secretsmanager_secret" "fmp_api_key" { name = "enterprise-agentic-ai/fmp-api-key" }
+
+2. IAM policy document allowing:
+   - Actions: secretsmanager:GetSecretValue, secretsmanager:DescribeSecret
+   - Resources: ARNs of all four secrets
+
+3. aws_iam_policy using the policy document
+
+Variables in variables.tf:
+- project_name (string, required)
+- environment (string, default "dev")
+- tags (map(string), default {})
+
+Outputs in outputs.tf:
+- secret_arns = { demo_password = ..., auth_token_secret = ..., tavily_api_key = ..., fmp_api_key = ... }
+- secrets_access_policy_arn
+
+Configuration:
+- Secrets were created manually in Section 4 - we're only referencing them
+- IAM policy allows App Runner to read these secrets
+- Use data sources, not resources (secrets already exist)
+
+Reference:
+- security.mdc "Secrets Management"
+- Secrets created in Section 4 of this guide
+
+Verify: cd terraform/environments/dev && terraform validate
+```
 
 ### 5.6 Create App Runner Module
 
-**Agent Prompt - Create App Runner Module:**
+**Agent Prompt:**
+```
+Create Terraform App Runner module at `terraform/modules/app-runner/`
 
-> Create the Terraform App Runner module at `terraform/modules/app-runner/` with these files:
-> 
-> **main.tf:**
-> - IAM role for App Runner service with trust policy for apprunner.amazonaws.com
-> - IAM role for App Runner ECR access with trust policy for build.apprunner.amazonaws.com
-> - Policy attachments:
->   - ECR access role gets AmazonEC2ContainerRegistryReadOnly
->   - Service role gets the secrets access policy (passed as variable)
->   - Service role gets CloudWatch Logs write access
->   - Service role gets Bedrock invoke access
-> - App Runner service configuration:
->   - Source: ECR image (passed as variable)
->   - Instance: 1 vCPU, 2 GB memory
->   - Auto scaling: min 0, max 10 (scale to zero when idle)
->   - Health check: path /health, interval 10s
->   - Environment variables from Secrets Manager references:
->     - DEMO_PASSWORD
->     - AUTH_TOKEN_SECRET
->     - TAVILY_API_KEY
->     - FMP_API_KEY
->   - Regular environment variables:
->     - ENVIRONMENT=aws
->     - AWS_REGION=us-east-1
->     - LOG_LEVEL=INFO
-> 
-> **variables.tf:**
-> - service_name (string)
-> - ecr_repository_url (string)
-> - image_tag (string, default "latest")
-> - secrets_policy_arn (string)
-> - secret_arns (map of string to string)
-> - cpu (string, default "1024")
-> - memory (string, default "2048")
-> - tags (map of strings)
-> 
-> **outputs.tf:**
-> - service_url
-> - service_arn
-> - service_id
-> 
-> Follow AWS and Terraform best practices as of December 2025. Use the newer App Runner API features for secrets integration. Set connection_drain_timeout to 900 seconds for SSE streaming support.
+Files to create: main.tf, variables.tf, outputs.tf
+
+Resources in main.tf:
+1. aws_iam_role for ECR access:
+   - Trust: build.apprunner.amazonaws.com
+   - Attach: AmazonEC2ContainerRegistryReadOnly (managed policy)
+
+2. aws_iam_role for instance:
+   - Trust: tasks.apprunner.amazonaws.com
+   - Attach: var.secrets_policy_arn (passed from secrets module)
+   - Inline policy for Bedrock: bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream on resource "*"
+   - Inline policy for CloudWatch Logs: logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents
+
+3. aws_apprunner_service:
+   - source_configuration.authentication_configuration.access_role_arn = ECR role
+   - source_configuration.auto_deployments_enabled = false
+   - source_configuration.image_repository:
+     - image_identifier = "${var.ecr_repository_url}:${var.image_tag}"
+     - image_repository_type = "ECR"
+     - image_configuration.port = "8000"
+   - instance_configuration: cpu = var.cpu, memory = var.memory, instance_role_arn = instance role
+   - health_check_configuration: protocol = "HTTP", path = "/health", interval = 10
+   - network_configuration.egress_configuration.egress_type = "DEFAULT"
+
+Environment variables (in image_configuration):
+- runtime_environment_variables:
+  - ENVIRONMENT = "aws"
+  - AWS_REGION = "us-east-1"
+  - LOG_LEVEL = "INFO"
+  - ALLOWED_ORIGINS = var.allowed_origins
+
+- runtime_environment_secrets (CRITICAL FORMAT - ARN:jsonKey::):
+  - DEMO_PASSWORD = "${var.secret_arns["demo_password"]}:password::"
+  - AUTH_TOKEN_SECRET = "${var.secret_arns["auth_token_secret"]}:secret::"
+  - TAVILY_API_KEY = "${var.secret_arns["tavily_api_key"]}:api_key::"
+  - FMP_API_KEY = "${var.secret_arns["fmp_api_key"]}:api_key::"
+
+Variables in variables.tf:
+- service_name (string, required)
+- ecr_repository_url (string, required)
+- image_tag (string, default "latest")
+- secrets_policy_arn (string, required)
+- secret_arns (map(string), required)
+- allowed_origins (string, required)
+- cpu (string, default "1024")
+- memory (string, default "2048")
+- tags (map(string), default {})
+
+Outputs in outputs.tf:
+- service_url (the https://... URL)
+- service_arn
+- service_id
+
+Configuration:
+- Secret format is ARN:jsonKey:: (the trailing colons are required)
+- CPU 1024 = 1 vCPU, memory 2048 = 2 GB
+- Health check on /health endpoint
+
+Reference:
+- App Runner Terraform: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/apprunner_service
+- App Runner secrets: https://docs.aws.amazon.com/apprunner/latest/dg/manage-configure-secrets.html
+- Cost: ~$0.007/vCPU-hour when running, scales to zero when idle
+
+Verify: cd terraform/environments/dev && terraform validate
+```
 
 ### 5.7 Create S3-CloudFront Module
 
-**Agent Prompt - Create S3-CloudFront Module:**
+**Agent Prompt:**
+```
+Create Terraform S3-CloudFront module at `terraform/modules/s3-cloudfront/`
 
-> Create the Terraform S3 and CloudFront module at `terraform/modules/s3-cloudfront/` with these files:
-> 
-> **main.tf:**
-> - S3 bucket for frontend static files:
->   - Block all public access
->   - Bucket ownership controls (BucketOwnerEnforced)
->   - Versioning enabled
-> - S3 bucket policy allowing CloudFront OAC access only
-> - CloudFront Origin Access Control (OAC) - use OAC not OAI (OAI is legacy)
-> - CloudFront distribution:
->   - Origin: S3 bucket with OAC
->   - Default root object: index.html
->   - Price class: PriceClass_100 (US, Canada, Europe only - cost optimization)
->   - Viewer protocol policy: redirect-to-https
->   - Default cache behavior: CachingOptimized managed policy
->   - Custom error responses: 403 and 404 return /index.html with 200 (for SPA routing)
->   - Enabled: true
->   - HTTP/2 and HTTP/3 enabled
-> 
-> **variables.tf:**
-> - bucket_name (string)
-> - project_name (string)
-> - environment (string)
-> - tags (map of strings)
-> 
-> **outputs.tf:**
-> - bucket_name
-> - bucket_arn
-> - cloudfront_distribution_id
-> - cloudfront_domain_name
-> - cloudfront_url (formatted as https://...)
-> 
-> Follow AWS and Terraform best practices as of December 2025. Use CloudFront Origin Access Control (OAC), not the legacy Origin Access Identity (OAI).
+Files to create: main.tf, variables.tf, outputs.tf
+
+Resources in main.tf:
+1. aws_s3_bucket - bucket name from var.bucket_name
+2. aws_s3_bucket_versioning - enabled
+3. aws_s3_bucket_ownership_controls - BucketOwnerEnforced
+4. aws_s3_bucket_public_access_block - block ALL public access (all 4 = true)
+5. aws_cloudfront_origin_access_control (OAC, NOT legacy OAI):
+   - origin_access_control_origin_type = "s3"
+   - signing_behavior = "always"
+   - signing_protocol = "sigv4"
+6. aws_s3_bucket_policy:
+   - Allow s3:GetObject from CloudFront service principal
+   - Condition: AWS:SourceArn = CloudFront distribution ARN
+7. aws_cloudfront_distribution:
+   - origin: S3 bucket_regional_domain_name with OAC
+   - default_root_object = "index.html"
+   - price_class = "PriceClass_100" (US/Canada/Europe only - cost opt)
+   - http_version = "http2and3"
+   - default_cache_behavior:
+     - viewer_protocol_policy = "redirect-to-https"
+     - cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6" (CachingOptimized)
+     - compress = true
+   - custom_error_response for 403 and 404 → /index.html with 200 (SPA routing)
+   - viewer_certificate: cloudfront_default_certificate = true
+
+Variables in variables.tf:
+- bucket_name (string, required)
+- project_name (string, required)
+- environment (string, default "dev")
+- tags (map(string), default {})
+
+Outputs in outputs.tf:
+- bucket_name
+- bucket_arn
+- cloudfront_distribution_id (for cache invalidation)
+- cloudfront_domain_name (e.g., d1234.cloudfront.net)
+- cloudfront_url (https://... full URL)
+
+Configuration:
+- Use OAC (Origin Access Control), NOT OAI (deprecated)
+- Use bucket_regional_domain_name, not bucket_domain_name
+- SPA routing: 403/404 errors return /index.html with 200
+
+Reference:
+- CloudFront OAC docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html
+- Cache policy IDs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html
+- Cost: ~$0.085/GB data transfer, minimal for demo
+
+Verify: cd terraform/environments/dev && terraform validate
+```
 
 ### 5.8 Create Dev Environment Main Configuration
 
-**Agent Prompt - Create Dev Environment Main Configuration:**
+**Agent Prompt:**
+```
+Create Terraform dev environment at `terraform/environments/dev/`
 
-> Create the main Terraform configuration at `terraform/environments/dev/main.tf` that:
-> 
-> 1. Calls all modules in the correct order:
->    - networking (VPC, subnets)
->    - ecr (container registry)
->    - secrets (IAM policy for secrets access)
->    - app-runner (backend service)
->    - s3-cloudfront (frontend hosting)
-> 
-> 2. Passes outputs between modules appropriately:
->    - ECR URL to App Runner
->    - Secrets policy ARN and secret ARNs to App Runner
-> 
-> 3. Uses local values for:
->    - project_name = "enterprise-agentic-ai"
->    - environment = "dev"
->    - common_tags (project, environment, managed_by = "terraform")
-> 
-> 4. Sets up any data sources needed (e.g., aws_region, aws_caller_identity)
-> 
-> Also create `terraform/environments/dev/variables.tf` with any required input variables.
-> 
-> And create `terraform/environments/dev/outputs.tf` that outputs:
-> - app_runner_url
-> - cloudfront_url
-> - ecr_repository_url
-> - s3_bucket_name
-> 
-> Follow Terraform best practices as of December 2025.
+Files to create: main.tf, variables.tf, outputs.tf
 
-### 5.9 Create terraform.tfvars (gitignored)
+Contents of main.tf:
+1. locals block:
+   - project_name = "enterprise-agentic-ai"
+   - environment = "dev"
+   - common_tags = { Project, Environment, ManagedBy = "terraform" }
 
-**Agent Prompt - Create tfvars and Update Gitignore:**
+2. Data sources:
+   - data "aws_region" "current" {}
+   - data "aws_caller_identity" "current" {}
 
-> Create the terraform.tfvars file at `terraform/environments/dev/terraform.tfvars` with placeholder values for any required variables. This file should be gitignored since it may contain sensitive values.
-> 
-> Also verify that `.gitignore` includes patterns to ignore:
-> - `*.tfvars` (except examples)
-> - `.terraform/`
-> - `*.tfstate*`
-> - `.terraform.lock.hcl` (optional, some teams commit this)
-> 
-> Add a `terraform.tfvars.example` file showing the expected variables with placeholder values.
+3. random_string for unique S3 bucket name (length=8, special=false, upper=false)
+
+4. Module calls (order matters):
+   a. module "networking" - source = "../../modules/networking"
+   b. module "ecr" - repository_name = "${local.project_name}-backend"
+   c. module "secrets" - references existing secrets
+   d. module "s3_cloudfront" - bucket_name with random suffix
+   e. module "app_runner" - uses outputs from ecr, secrets, s3_cloudfront
+      - allowed_origins = "https://${module.s3_cloudfront.cloudfront_domain_name},http://localhost:3000"
+      - depends_on = [module.ecr, module.secrets, module.s3_cloudfront]
+
+Contents of variables.tf:
+- Empty or placeholder comment (we use locals for this environment)
+
+Contents of outputs.tf:
+- app_runner_url = module.app_runner.service_url
+- cloudfront_url = module.s3_cloudfront.cloudfront_url
+- cloudfront_distribution_id = module.s3_cloudfront.cloudfront_distribution_id
+- ecr_repository_url = module.ecr.repository_url
+- s3_bucket_name = module.s3_cloudfront.bucket_name
+
+Configuration:
+- Pass local.common_tags to all modules
+- App Runner depends on other modules for their outputs
+- allowed_origins includes both CloudFront (prod) and localhost (dev)
+
+Reference:
+- Terraform module sources use relative paths
+- All modules defined in terraform/modules/
+
+Verify: cd terraform/environments/dev && terraform validate
+```
+
+### 5.9 Update .gitignore for Terraform
+
+**Agent Prompt:**
+```
+Update `.gitignore` to include Terraform patterns
+
+Add these patterns if not already present:
+- .terraform/
+- *.tfstate
+- *.tfstate.*
+- *.tfvars
+- !*.tfvars.example
+- .terraform.lock.hcl
+- crash.log
+- override.tf
+- override.tf.json
+- *_override.tf
+- *_override.tf.json
+
+Also create `terraform/environments/dev/terraform.tfvars.example`:
+- Empty file with comment: "# No required variables - using locals in main.tf"
+
+Reference:
+- Terraform gitignore best practices
+- tfvars files may contain secrets, always gitignore
+
+Verify: grep -q "tfstate" .gitignore && echo "OK"
+```
 
 ### 5.10 Initialize and Validate Terraform
 
@@ -843,104 +1050,128 @@ Updating the FastAPI backend to work in AWS: environment detection, CORS configu
 
 ### 6.1 Update Settings for AWS
 
-**Agent Prompt - Update Settings for AWS Environment:**
+**Agent Prompt:**
+```
+Review and update `backend/src/config/settings.py` for AWS environment
 
-> Review and update `backend/src/config/settings.py` to ensure it properly handles the AWS environment:
-> 
-> 1. Environment detection:
->    - When `ENVIRONMENT=aws`, load secrets from AWS Secrets Manager
->    - Use the secret names: `enterprise-agentic-ai/demo-password`, etc.
->    - Cache secrets in memory after loading (don't fetch on every request)
-> 
-> 2. Secrets Manager integration:
->    - Create a function to load secrets from Secrets Manager
->    - Handle the JSON structure (each secret has a key like "password" or "api_key")
->    - Fallback gracefully if secrets aren't available (for local dev)
-> 
-> 3. Ensure these settings work in both local (.env) and AWS (Secrets Manager) modes:
->    - DEMO_PASSWORD
->    - AUTH_TOKEN_SECRET
->    - TAVILY_API_KEY
->    - FMP_API_KEY
-> 
-> Check the existing settings.py implementation and only add what's missing. Follow the existing code patterns and style. Include proper error handling and logging.
+Changes:
+1. Add Secrets Manager integration when ENVIRONMENT=aws
+2. Load secrets from these secret names:
+   - enterprise-agentic-ai/demo-password (key: "password")
+   - enterprise-agentic-ai/auth-token-secret (key: "secret")
+   - enterprise-agentic-ai/tavily-api-key (key: "api_key")
+   - enterprise-agentic-ai/fmp-api-key (key: "api_key")
+3. Cache secrets in memory (don't fetch on every request)
+4. Fallback to env vars when ENVIRONMENT=local
+
+Configuration:
+- Use boto3 secretsmanager client
+- Parse JSON response to extract the specific key
+- Add ALLOWED_ORIGINS setting (comma-separated string, default "http://localhost:3000")
+- Handle errors gracefully with logging
+
+Reference:
+- security.mdc "Secrets Management"
+- Existing settings.py patterns (Pydantic Settings)
+- boto3 docs: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/secretsmanager.html
+
+Verify: docker-compose exec backend python -c "from src.config.settings import Settings; s = Settings(); print(s.environment)"
+```
 
 ### 6.2 Update CORS Configuration
 
-**Agent Prompt - Update CORS for CloudFront:**
+**Agent Prompt:**
+```
+Review and update `backend/src/api/main.py` CORS configuration
 
-> Review and update `backend/src/api/main.py` CORS configuration to:
-> 
-> 1. Allow requests from CloudFront domains:
->    - Pattern: `https://*.cloudfront.net`
->    - Also keep localhost for development
-> 
-> 2. Read allowed origins from environment variable `ALLOWED_ORIGINS`:
->    - Format: comma-separated list
->    - Default: `http://localhost:3000`
->    - In AWS: set to CloudFront URL
-> 
-> 3. Ensure CORS allows:
->    - Methods: GET, POST, OPTIONS
->    - Headers: Content-Type, Authorization
->    - Credentials: true (for cookies)
-> 
-> 4. Handle preflight OPTIONS requests properly
-> 
-> Check the existing CORS setup and update as needed. Don't break existing local development functionality.
+Changes:
+1. Read ALLOWED_ORIGINS from settings (comma-separated string)
+2. Split into list for CORSMiddleware allow_origins parameter
+3. Keep defaults working for local dev (http://localhost:3000)
+4. Support CloudFront URLs (https://xxxxx.cloudfront.net)
 
-### 6.3 Add CloudWatch Logging Configuration
+Configuration:
+- allow_methods: ["GET", "POST", "OPTIONS"]
+- allow_headers: ["Content-Type", "Authorization", "Cookie"]
+- allow_credentials: True (for cookies/auth)
+- expose_headers: ["Content-Type"]
 
-**Agent Prompt - Add CloudWatch Logging:**
+Reference:
+- FastAPI CORS docs: https://fastapi.tiangolo.com/tutorial/cors/
+- Existing main.py CORS setup
+- App Runner passes ALLOWED_ORIGINS env var
 
-> Review the logging configuration in the backend and ensure it works well with CloudWatch:
-> 
-> 1. Check that structlog is configured to output JSON format (CloudWatch-friendly)
-> 
-> 2. Ensure log levels are configurable via LOG_LEVEL environment variable
-> 
-> 3. Verify that:
->    - Logs include conversation_id for tracing
->    - Error logs include full context
->    - No sensitive data (passwords, keys) in logs
-> 
-> 4. Add a note in settings.py about the LOG_LEVEL variable (default: INFO in production, DEBUG in development)
-> 
-> Check existing logging setup in the backend and only add what's missing. The goal is CloudWatch compatibility without breaking local development.
+Verify: docker-compose exec backend python -c "from src.api.main import app; print('CORS configured')"
+```
+
+### 6.3 Verify CloudWatch-Compatible Logging
+
+**Agent Prompt:**
+```
+Review logging configuration in `backend/src/` for CloudWatch compatibility
+
+Verify these are in place (add if missing):
+1. structlog configured for JSON output (already done in Phase 0)
+2. LOG_LEVEL env var respected (default: INFO for aws, DEBUG for local)
+3. conversation_id included in log context
+4. No sensitive data logged (passwords, API keys)
+
+Configuration:
+- JSON logs work best with CloudWatch Logs Insights
+- LOG_LEVEL set via App Runner environment variable
+- Existing structlog setup should already handle this
+
+Reference:
+- backend.mdc "Logging Configuration"
+- CloudWatch Logs Insights query syntax
+
+Verify: docker-compose logs backend 2>&1 | head -5  # Should see JSON formatted logs
+```
+
+**Note:** If Phase 0 logging is already JSON-formatted with structlog, this step may require no changes. Just verify.
 
 ### 6.4 Create Production Dockerfile
 
-**Agent Prompt - Create Production Dockerfile:**
+**Agent Prompt:**
+```
+Create `backend/Dockerfile` (production, not Dockerfile.dev)
 
-> Create `backend/Dockerfile` (production version, not Dockerfile.dev) that:
-> 
-> 1. Uses multi-stage build for smaller image:
->    - Builder stage: Install dependencies
->    - Production stage: Copy only what's needed
-> 
-> 2. Uses Python 3.11-slim as base image
-> 
-> 3. Sets appropriate environment variables:
->    - PYTHONUNBUFFERED=1
->    - PYTHONDONTWRITEBYTECODE=1
-> 
-> 4. Installs dependencies from requirements.txt without dev dependencies
-> 
-> 5. Copies only the src/ directory (not tests, dev files)
-> 
-> 6. Exposes port 8000
-> 
-> 7. Runs uvicorn WITHOUT --reload (production mode):
->    - Command: `uvicorn src.api.main:app --host 0.0.0.0 --port 8000`
->    - Workers: 1 (App Runner handles scaling via instances)
-> 
-> 8. Creates a non-root user for security
-> 
-> 9. Sets proper WORKDIR
-> 
-> 10. Includes health check instruction
-> 
-> Follow Docker best practices as of December 2025. Optimize for layer caching and small image size.
+Structure:
+1. Multi-stage build (builder + production stages)
+2. Base image: python:3.11-slim
+3. Non-root user for security
+
+Builder stage:
+- Install build dependencies
+- Copy and install requirements.txt
+- Use pip wheel for faster installs
+
+Production stage:
+- Copy wheels from builder
+- Copy only src/ directory (not tests, scripts)
+- Create non-root user (appuser)
+- Set WORKDIR /app
+
+Environment variables:
+- PYTHONUNBUFFERED=1
+- PYTHONDONTWRITEBYTECODE=1
+
+Startup command:
+- CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+- NO --reload flag (production)
+- Workers: 1 (App Runner scales instances, not workers)
+
+Configuration:
+- EXPOSE 8000
+- HEALTHCHECK CMD curl -f http://localhost:8000/health || exit 1
+
+Reference:
+- Docker multi-stage build best practices
+- backend.mdc "Docker Configuration"
+- Existing Dockerfile.dev for reference
+
+Verify: docker build -t test-prod -f backend/Dockerfile backend/ && docker run --rm test-prod python --version
+```
 
 ### 6.5 Test Production Docker Build Locally
 
@@ -1177,21 +1408,30 @@ Building the Next.js static export and uploading it to S3 for CloudFront distrib
 
 ### 10.1 Update Frontend API Configuration
 
-**Agent Prompt - Update Frontend for Production API:**
+**Agent Prompt:**
+```
+Review and update `frontend/src/lib/api.ts` for production API URL
 
-> Update the frontend to use the App Runner URL in production:
-> 
-> 1. In `frontend/src/lib/api.ts`:
->    - Read API URL from `NEXT_PUBLIC_API_URL` environment variable
->    - Default to `http://localhost:8000` for local development
->    - Ensure all API calls use this base URL
-> 
-> 2. Verify the environment variable is already in `next.config.ts` or add it:
->    - `NEXT_PUBLIC_API_URL` should be passed through to the client bundle
-> 
-> 3. No changes to the SSE/streaming logic - it should already work
-> 
-> Check existing implementation and only modify what's needed.
+Changes:
+1. Read API URL from NEXT_PUBLIC_API_URL environment variable
+2. Default to "http://localhost:8000" when not set
+3. Ensure all fetch/EventSource calls use this base URL
+4. No changes to SSE/streaming logic needed
+
+Configuration:
+- NEXT_PUBLIC_ prefix required for client-side env vars in Next.js
+- Build command will pass: NEXT_PUBLIC_API_URL=${APP_RUNNER_URL} npm run build
+- Verify next.config.ts passes env vars through (should already work)
+
+Reference:
+- frontend.mdc "API Configuration"
+- Next.js env vars: https://nextjs.org/docs/app/building-your-application/configuring/environment-variables
+- Existing api.ts implementation
+
+Verify: grep -r "NEXT_PUBLIC_API_URL" frontend/src/
+```
+
+**Note:** If Phase 0 already uses `NEXT_PUBLIC_API_URL`, this step may require no changes. Just verify.
 
 ### 10.2 Build Frontend for Production
 
