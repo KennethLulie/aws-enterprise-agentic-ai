@@ -98,10 +98,14 @@ async def test_tavily_search_live_formats_results(
     """Formats live Tavily results into structured shape."""
 
     class _StubTavilyTool:
+        """Stub Tavily tool that returns a fixed successful response."""
+
         def __init__(self, *args: object, **kwargs: object) -> None:
+            """Initialize stub (ignores all arguments)."""
             return None
 
         async def ainvoke(self, _: dict[str, str]) -> list[dict[str, str]]:
+            """Return a fixed search result for testing."""
             return [
                 {
                     "title": "Result One",
@@ -134,10 +138,14 @@ async def test_tavily_search_live_handles_rate_limit(
     error = requests.HTTPError("rate limited", response=response)
 
     class _FailingTavilyTool:
+        """Stub Tavily tool that raises a rate limit error."""
+
         def __init__(self, *args: object, **kwargs: object) -> None:
+            """Initialize stub (ignores all arguments)."""
             return None
 
         async def ainvoke(self, _: dict[str, str]) -> list[dict[str, str]]:
+            """Raise a rate limit error to test error handling."""
             raise error
 
     monkeypatch.setattr(search, "get_settings", lambda: _TavilySettings())

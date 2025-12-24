@@ -33,7 +33,7 @@ LangChain Version Notes (langchain-aws~=0.2.0, langchain~=0.3.0):
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence, cast
 
 import structlog
 from langchain_aws import ChatBedrockConverse
@@ -369,7 +369,10 @@ async def _stream_response(
 
         # Accumulate chunks - AIMessageChunk supports + operator for combining
         if isinstance(chunk, AIMessageChunk):
-            combined_chunk = chunk if combined_chunk is None else combined_chunk + chunk
+            if combined_chunk is None:
+                combined_chunk = chunk
+            else:
+                combined_chunk = cast(AIMessageChunk, combined_chunk + chunk)
 
     log.debug(
         "Stream completed",

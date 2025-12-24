@@ -170,7 +170,8 @@ async def test_chat_node_returns_friendly_error_when_models_fail(
 
     call_count = {"n": 0}
 
-    async def failing_invoke_model(*args, **kwargs):
+    async def failing_invoke_model(*args: object, **kwargs: object) -> None:
+        """Stub that fails on invocation to simulate model errors."""
         call_count["n"] += 1
         if call_count["n"] == 1:
             raise RuntimeError("primary boom")
