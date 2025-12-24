@@ -8,7 +8,7 @@ alwaysApply: true
 
 Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestration, RAG, streaming.
 
-**Current Phase:** Phase 0 (Local Development)
+**Current Phase:** Phase 1a (AWS Cloud Deployment)
 **AWS Region:** us-east-1 (ALWAYS - never hardcode, use from settings)
 **Cost Target:** $20-50/month for demo workloads
 **Last Updated:** December 2025
@@ -135,7 +135,7 @@ docker-compose down                  # Stop services
 
 | Phase | Checkpointing | API | Tools |
 |-------|--------------|-----|-------|
-| 0 (Current) | MemorySaver | `/api/chat` | Stubs |
+| 0-1a (Current) | MemorySaver | `/api/chat` | Stubs |
 | 1b+ | PostgresSaver | `/api/v1/` | Real |
 
 ## Workflow Guidelines
@@ -258,7 +258,8 @@ docker-compose down                  # Stop services
 
 ## Key Files
 
-- PHASE_0_HOW_TO_GUIDE.md - Implementation steps
+- PHASE_1A_HOW_TO_GUIDE.md - Current phase implementation steps
+- docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md - Completed Phase 0 guide (archived)
 - DEVELOPMENT_REFERENCE.md - Specs and versions
 - REPO_STATE.md - What files exist
 

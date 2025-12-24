@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2025-12-22 (Synchronized with current Phase 0 implementation - complete backend and frontend structure)
+**Last Updated:** 2025-12-24 (Phase 0 complete, Phase 1a guide added, docs reorganized)
 
 ---
 
@@ -14,7 +14,7 @@
 | README.md | Project overview and quick start |
 | PROJECT_PLAN.md | Complete project plan with all phases |
 | DEVELOPMENT_REFERENCE.md | Phase-specific implementation details |
-| PHASE_0_HOW_TO_GUIDE.md | Step-by-step Phase 0 guide |
+| PHASE_1A_HOW_TO_GUIDE.md | Step-by-step Phase 1a guide (AWS deployment) |
 | REPO_STATE.md | This file - tracks repository state |
 
 ### Project Root - Configuration
@@ -102,8 +102,10 @@
 ### Documentation Directory
 | File | Purpose |
 |------|---------|
+| docs/README.md | Documentation directory overview |
 | docs/SECURITY.md | Security and secrets management guide |
 | docs/integration-test-checklist.md | Phase 0 end-to-end test checklist |
+| docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md | Completed Phase 0 guide (archived) |
 
 ### Scripts Directory
 | File | Purpose |
