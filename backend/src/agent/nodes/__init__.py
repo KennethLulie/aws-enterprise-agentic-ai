@@ -49,7 +49,7 @@ Usage:
     graph.add_node("error_recovery", error_recovery_node)
 
 Reference:
-    - agentic-ai.mdc for node patterns
+    - agent.mdc for node patterns
     - LangGraph docs: https://langchain-ai.github.io/langgraph/
 """
 

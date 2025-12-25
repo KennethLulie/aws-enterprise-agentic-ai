@@ -31,12 +31,15 @@
 ### Cursor Rules Directory (.cursor/rules/)
 | File | Purpose |
 |------|---------|
-| .cursor/rules/general.mdc | Core project rules, Docker-first, phase tracking |
+| .cursor/rules/_project.mdc | Project context, sources of truth, phase-specific patterns (alwaysApply: true) |
+| .cursor/rules/_security.mdc | Secrets, SQL safety, validation, authentication (alwaysApply: true) |
+| .cursor/rules/_workflow.mdc | Docker-first development, research-first, verification (alwaysApply: true) |
+| .cursor/rules/agent.mdc | LangGraph agent patterns, tool calling, orchestration (globs: backend/src/agent/**) |
+| .cursor/rules/aws.mdc | AWS configuration, region, credentials, Secrets Manager (alwaysApply: true) |
 | .cursor/rules/backend.mdc | Python development rules (globs: backend/**) |
-| .cursor/rules/frontend.mdc | TypeScript/React rules (globs: frontend/**) |
-| .cursor/rules/security.mdc | Secrets, SQL safety, validation rules |
 | .cursor/rules/docs.mdc | Documentation rules (globs: docs/**, *.md) |
-| .cursor/rules/agentic-ai.mdc | Agentic AI patterns - LangGraph, tool orchestration (globs: backend/src/agent/**) |
+| .cursor/rules/frontend.mdc | TypeScript/React rules (globs: frontend/**) |
+| .cursor/rules/infrastructure.mdc | Terraform and AWS infrastructure patterns (globs: terraform/**) |
 
 ### Backend Directory
 | File | Purpose |

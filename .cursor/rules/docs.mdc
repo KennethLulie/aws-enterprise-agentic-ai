@@ -8,17 +8,28 @@ alwaysApply: false
 
 # Documentation Rules
 
+## Key Documentation Files
+
+| Document | Purpose | Update When |
+|----------|---------|-------------|
+| PROJECT_PLAN.md | Project roadmap, phases, architecture | Phase scope changes, major decisions |
+| DEVELOPMENT_REFERENCE.md | Package versions, API specs | Adding/updating dependencies |
+| REPO_STATE.md | File inventory | Creating/deleting any file |
+| PHASE_*_HOW_TO_GUIDE.md | Implementation steps for each phase | Phase completion, process improvements |
+
 ## File References
 
 - Verify file exists before linking: check REPO_STATE.md
 - Non-existent files: use backticks `filename.ext` with note "(created in Phase X)"
 - Never use markdown links `[text](path)` to non-existent files
+- Reference PROJECT_PLAN.md for phase scope and feature planning
 
 ## When Creating Files
 
 1. Add to "Currently Existing Files" in REPO_STATE.md
 2. Remove from "Planned Files" if listed
 3. Update any documentation that referenced it as planned
+4. If file adds new capability, verify it aligns with PROJECT_PLAN.md current phase
 
 ## When Deleting Files
 
@@ -34,6 +45,13 @@ alwaysApply: false
 4. Update frontend/package.json (if Node packages changed)
 5. Run `pre-commit run --all-files` to verify
 6. Update REPO_STATE.md if files added/removed
+
+## Following the Project Plan
+
+- Check PROJECT_PLAN.md to understand current phase scope
+- Follow the current phase's how-to guide for implementation order
+- Don't implement features from future phases without consultation
+- Reference completed phase guides in `docs/completed-phases/` for past decisions
 
 ## Documenting Agentic AI Patterns
 
@@ -83,9 +101,9 @@ alwaysApply: false
 **Cost:** ~$0.001 per search (Tavily free tier: 1,000/month)
 ```
 
-## Agent Prompt Format (PHASE_0_HOW_TO_GUIDE.md)
+## Agent Prompt Format (How-To Guides)
 
-When writing prompts in PHASE_0_HOW_TO_GUIDE.md, use this concise format:
+When writing prompts in PHASE_*_HOW_TO_GUIDE.md, use this format:
 
 ```
 Create `path/to/file.py`
@@ -94,16 +112,19 @@ Requirements:
 1. [Specific requirement]
 2. [Specific requirement]
 
-Reference: [Relevant docs, rules, or existing files]
+Reference:
+- [cursor-rule.mdc] "[Section]" for patterns
+- [existing-file.py] for similar implementation
+
 Verify: [How to check correctness]
 ```
 
 **Guidelines:**
 - Use backticks for file paths: `backend/src/agent/state.py`
 - Keep requirements specific and actionable
+- **Always reference relevant cursor rules** (e.g., `backend.mdc`, `agent.mdc`)
 - Reference existing patterns: "Follow patterns in src/config/__init__.py"
 - Include specific verification: "Check for linter errors"
-- Avoid verbose boilerplate - be concise
 
 **For updates to existing files:**
 ```
@@ -132,3 +153,7 @@ Verify: [How to check correctness]
 - Document module purpose
 - List main exports
 - Include usage examples if helpful
+
+→ See [_project.mdc] for sources of truth
+→ See [backend.mdc] for Python docstring format
+→ See [agent.mdc] for agent documentation patterns

@@ -69,9 +69,9 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 ## 📋 Project Status
 
-**Current Phase:** Phase 0 (Local Development)
+**Current Phase:** Phase 1a (AWS Cloud Deployment)
 
-Phase 0 establishes a fully working local development environment with:
+Phase 0 (completed) established a fully working local development environment with:
 - LangGraph agent with Bedrock (Nova Pro) and streaming responses
 - Tavily search running in mock mode by default; live path enabled only when `TAVILY_API_KEY` is set
 - Financial Modeling Prep (FMP) market data tool running in mock mode by default; live path enabled when `FMP_API_KEY` is set
@@ -90,7 +90,8 @@ docker-compose build backend && docker-compose up -d backend
 
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
 - **[DEVELOPMENT_REFERENCE.md](./DEVELOPMENT_REFERENCE.md)** - Detailed implementation reference for each phase
-- **[PHASE_0_HOW_TO_GUIDE.md](./PHASE_0_HOW_TO_GUIDE.md)** - Step-by-step guide for Phase 0 implementation
+- **[PHASE_1A_HOW_TO_GUIDE.md](./PHASE_1A_HOW_TO_GUIDE.md)** - Step-by-step guide for Phase 1a (current) implementation
+- **[docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md)** - Completed Phase 0 guide (archived)
 - **[docs/SECURITY.md](./docs/SECURITY.md)** - Security and secrets management guide
 
 ## 🧭 LangGraph Flow (Planned Graph)

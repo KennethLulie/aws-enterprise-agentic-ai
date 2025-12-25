@@ -1,0 +1,178 @@
+---
+description: LangGraph agent patterns - orchestration, tool calling, multi-tool coordination
+globs:
+  - backend/src/agent/**
+alwaysApply: false
+---
+
+# Agent Development Rules
+
+## LangGraph 0.2.x Patterns
+
+This project uses LangGraph 0.2.x which has these key differences from 0.1.x:
+- `StateGraph` is the primary graph builder (not `MessageGraph`)
+- State uses `TypedDict` (not Pydantic models)
+- Checkpointing via `MemorySaver` (dev) or `PostgresSaver` (prod)
+- Native streaming with `astream()` and `astream_events()`
+- Tool binding via `bind_tools()` on the LLM
+
+## LangGraph State Schema
+
+Use TypedDict (NOT Pydantic) for state - LangGraph 0.2.x requirement.
+
+```python
+from typing import TypedDict, List, Optional, Dict, Any
+from langchain_core.messages import BaseMessage
+
+class AgentState(TypedDict):
+    messages: List[BaseMessage]
+    conversation_id: Optional[str]
+    tools_used: List[str]
+    last_error: Optional[str]
+    metadata: Dict[str, Any]
+```
+
+**Location:** `backend/src/agent/state.py`
+
+## Node Functions
+
+```python
+from src.agent.state import AgentState
+
+async def chat_node(state: AgentState) -> AgentState:
+    """Process user message with LLM."""
+    # Always return new state (don't mutate)
+    return {**state, "messages": new_messages}
+```
+
+**Rules:**
+- Signature: `async def node_name(state: AgentState) -> AgentState`
+- Always return updated state (immutable pattern)
+- One responsibility per node
+- Type hints required
+
+## Graph Definition
+
+```python
+from langgraph.graph import StateGraph
+
+graph = StateGraph(AgentState)
+graph.add_node("chat", chat_node)
+graph.add_node("tools", tools_node)
+graph.add_edge("chat", "tools")
+graph.add_conditional_edges("tools", should_continue)
+graph.set_entry_point("chat")
+agent = graph.compile(checkpointer=checkpointer)
+```
+
+**Location:** `backend/src/agent/graph.py`
+
+## Tool Definition Pattern
+
+```python
+from langchain.tools import tool
+from pydantic import BaseModel, Field
+
+class SearchInput(BaseModel):
+    query: str = Field(..., description="Search query")
+
+@tool(args_schema=SearchInput)
+async def search_tool(query: str) -> str:
+    """Search the web for information."""
+    return results
+```
+
+**Rules:**
+- Use `@tool` decorator with `args_schema`
+- Clear descriptions for LLM to understand
+- Tools in separate node from chat
+
+## Multi-Tool Orchestration
+
+**Available Tools:**
+| Tool | Source | Phase |
+|------|--------|-------|
+| Search | Tavily API | 0+ (real if key set) |
+| Market Data | FMP API | 0+ (real if key set) |
+| SQL Query | Aurora | 2+ |
+| RAG Retrieval | Pinecone | 2+ |
+
+**Example Flow:** User asks about market + internal data
+1. Market Data API → get stock prices
+2. SQL Query → get customer portfolio
+3. Synthesize → combine results
+
+**Design:**
+- LLM decides tool selection (don't hardcode)
+- Limit to 4-5 tools max for clarity
+- Track `tools_used` in state for observability
+
+## Error Recovery
+
+```python
+async def error_recovery_node(state: AgentState) -> AgentState:
+    """Handle errors gracefully."""
+    if state.get("last_error"):
+        return {
+            **state,
+            "messages": state["messages"] + [
+                AIMessage(content="I encountered an issue. Let me try another approach.")
+            ],
+            "last_error": None
+        }
+    return state
+```
+
+**Patterns:**
+- Tool fails → Try alternative or return partial answer
+- LLM fails → Fallback to Claude
+- All tools fail → LLM-only answer
+
+## Streaming Events
+
+```python
+async for chunk in agent.astream(state):
+    yield {
+        "type": chunk.get("type", "message"),
+        "content": chunk.get("content"),
+        "tool": chunk.get("tool_name")
+    }
+```
+
+**Event types:**
+- `message`: LLM token chunks
+- `tool_call`: Agent using a tool
+- `tool_result`: Tool completed
+- `error`: User-friendly error
+- `complete`: Processing finished
+
+## Checkpointing
+
+| Phase | Checkpointer | Notes |
+|-------|--------------|-------|
+| 0-1a | MemorySaver | In-memory, no DB needed |
+| 1b+ | PostgresSaver | Persistent, requires Aurora |
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+
+checkpointer = MemorySaver()
+agent = graph.compile(checkpointer=checkpointer)
+```
+
+## Testing Agents
+
+```python
+@pytest.mark.asyncio
+async def test_chat_node_tool_selection(mocker):
+    mock_llm = mocker.patch("src.agent.nodes.chat.bedrock_client")
+    mock_llm.return_value = {"tool_calls": [...]}
+
+    state = AgentState(messages=[...])
+    result = await chat_node(state)
+
+    assert "tool_calls" in result
+```
+
+→ See [backend.mdc] for Python standards and error handling
+→ See [_security.mdc] for input/output verification

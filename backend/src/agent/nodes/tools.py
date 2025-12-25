@@ -19,7 +19,7 @@ Usage:
     graph.add_node("tools", tool_execution_node)
 
 Reference:
-    - agentic-ai.mdc for tool execution patterns
+    - agent.mdc for tool execution patterns
     - LangChain ToolMessage docs
 """
 

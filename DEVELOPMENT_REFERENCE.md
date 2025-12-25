@@ -103,6 +103,7 @@ Fully working agent locally before any AWS deployment.
   - `frontend`: Next.js dev server on port 3000
 - **No local database/vector/KG services in Phase 0** (SQL and RAG tools return mock data)
 - **External APIs:** Tavily (search) and FMP (market data) are real API calls to external managed services
+- **Vector Store:** Pinecone Serverless (external managed service, not local)
 - **Volume Mounts:** `./backend:/app`, `./frontend:/app` (hot reload)
 - **Startup Time Target:** 5-10 seconds
 
@@ -212,10 +213,9 @@ Configure Cursor/VS Code to use `.venv/bin/python` as the Python interpreter. Th
 1. **docker-compose.yml**
    - Backend service (FastAPI)
    - Frontend service (Next.js)
-   - PostgreSQL service
-   - Chroma service (optional)
    - Volume mounts for hot reload
    - Environment variables
+   - Note: No database services in Phase 0 (SQL/RAG tools return mock data)
 
 2. **Backend Dockerfile.dev**
    - Multi-stage build
@@ -1404,7 +1404,7 @@ terraform {
   - Nova Pro: `amazon.nova-pro-v1:0`
   - Nova Lite: `amazon.nova-lite-v1:0`
   - Titan Embeddings: `amazon.titan-embed-text-v1`
-  - Claude Fallback: `anthropic.claude-3-5-sonnet-20240620-v1:0`
+  - Claude Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0`
 
 ### Neo4j AuraDB (Knowledge Graph)
 - **Tier:** Free (200K nodes, 400K relationships)

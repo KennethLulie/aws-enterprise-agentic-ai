@@ -1,0 +1,84 @@
+---
+description: Project context, sources of truth, phase-specific patterns
+globs:
+alwaysApply: true
+---
+
+# Enterprise Agentic AI Project
+
+Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestration, RAG, streaming.
+
+## Current Context
+
+| Setting | Value |
+|---------|-------|
+| **Phase** | 1a (AWS Cloud Deployment) |
+| **Guide** | PHASE_1A_HOW_TO_GUIDE.md |
+| **Cost Target** | $20-50/month for demo |
+| **AWS Region** | us-east-1 (always) |
+
+## Sources of Truth
+
+| Information | Source | When to Check |
+|-------------|--------|---------------|
+| Project roadmap | PROJECT_PLAN.md | Planning features, understanding scope |
+| Current phase steps | PHASE_1A_HOW_TO_GUIDE.md | Implementation |
+| Package versions | DEVELOPMENT_REFERENCE.md | Adding/updating dependencies |
+| File inventory | REPO_STATE.md | Before referencing files |
+| Environment vars | .env.example | Adding new config |
+| Ports/services | docker-compose.yml | Local development |
+
+**RULE:** Always follow the current phase's how-to guide for implementation steps.
+
+## Phase-Specific Patterns
+
+| Phase | Database | Checkpointing | API | Tools |
+|-------|----------|---------------|-----|-------|
+| 0 | None | MemorySaver | `/api/chat` | Mock (Search/Market real if keys) |
+| 1a | None | MemorySaver | `/api/chat` | Mock (Search/Market real if keys) |
+| 1b+ | Aurora | PostgresSaver | `/api/v1/` | Real |
+| 4+ | Aurora | PostgresSaver | `/api/v1/` | Real + Cached |
+
+## Technology Stack
+
+**Backend:** Python 3.11+, FastAPI, LangGraph, LangChain-AWS, Bedrock
+**Frontend:** Next.js 16 (App Router), React 19, TypeScript, shadcn/ui, Tailwind 4
+**Infrastructure:** Terraform, Docker Compose, GitHub Actions
+**AWS:** App Runner, Aurora Serverless v2, S3, CloudFront, Secrets Manager
+
+→ See DEVELOPMENT_REFERENCE.md for exact versions
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| PROJECT_PLAN.md | Roadmap, phase definitions, architecture |
+| PHASE_*_HOW_TO_GUIDE.md | Step-by-step implementation |
+| DEVELOPMENT_REFERENCE.md | Package versions, API specs |
+| REPO_STATE.md | File inventory |
+| docs/completed-phases/ | Archived phase guides |
+
+## Cursor Rules Naming Convention
+
+| Prefix | Meaning | Example |
+|--------|---------|---------|
+| `_` prefix | Always applied to all files | `_project.mdc`, `_security.mdc`, `_workflow.mdc` |
+| No prefix | Applied only to matching globs | `agent.mdc` (backend/src/agent/**), `frontend.mdc` (frontend/**) |
+
+## After Creating/Modifying Files
+
+1. Update REPO_STATE.md with new/changed files
+2. Update DEVELOPMENT_REFERENCE.md if versions changed
+3. Verify changes align with current phase guide
+
+## Demo Requirements
+
+- Password-protected access (simple password, no OAuth)
+- Smooth, responsive UI (no lag during demo)
+- Real-time streaming visible
+- Cold start acceptable (up to 30s with loading indicator)
+- Graceful error handling (never show stack traces)
+
+→ See [_workflow.mdc] for development process
+→ See [_security.mdc] for security requirements
+→ See [aws.mdc] for AWS configuration

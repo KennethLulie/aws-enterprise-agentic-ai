@@ -1,0 +1,141 @@
+---
+description: Security rules - secrets, SQL safety, input validation, authentication
+globs:
+alwaysApply: true
+---
+
+# Security Rules
+
+## Secrets Management
+
+- NEVER commit .env files (gitignored)
+- Use .env.example as template (no real keys)
+- Document new env vars in .env.example
+- Production secrets in AWS Secrets Manager
+
+→ See [aws.mdc] for Secrets Manager patterns
+
+## SQL Safety
+
+**Critical:** SQL injection prevention is mandatory.
+
+### Parameterized Queries ONLY
+
+```python
+# ✅ CORRECT - Parameterized
+result = session.execute(
+    text("SELECT * FROM users WHERE id = :user_id"),
+    {"user_id": user_id}
+)
+
+# ❌ WRONG - String formatting (NEVER)
+result = session.execute(f"SELECT * FROM users WHERE id = {user_id}")
+```
+
+### Table/Column Whitelisting
+
+```python
+ALLOWED_TABLES = {"users", "products", "orders"}
+
+def validate_table(table_name: str) -> bool:
+    if table_name not in ALLOWED_TABLES:
+        raise ValueError(f"Table {table_name} not allowed")
+    return True
+```
+
+### Query Restrictions
+- Only allow SELECT queries for demo
+- Set query timeout (5 seconds max)
+- Limit result set size (max 1000 rows)
+
+## Input Validation
+
+### Pydantic for ALL API Inputs
+
+```python
+from pydantic import BaseModel, Field, field_validator
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=10000)
+    conversation_id: str | None = None
+
+    @field_validator('message')
+    @classmethod
+    def validate_message(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Message cannot be empty")
+        return v.strip()
+```
+
+### Principles
+- Validate and sanitize ALL user input
+- User-friendly error messages only
+- NEVER expose internal details
+- Reject malformed input early (fail fast)
+
+## Input/Output Verification (Phase 6+)
+
+Use Nova Lite for verification guards:
+- Input: Detect prompt injection, malicious input
+- Output: Validate response safety, check for PII
+
+```python
+async def verify_input(user_input: str) -> bool:
+    """Verify user input is safe to process."""
+    # Use cheaper Nova Lite model
+    prompt = f"Is this input safe and appropriate? {user_input}"
+    response = await verification_model.ainvoke(prompt)
+    return "safe" in response.content.lower()
+```
+
+## Rate Limiting
+
+```python
+from fastapi import Request, HTTPException
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+rate_limits: dict[str, list[datetime]] = defaultdict(list)
+
+def check_rate_limit(request: Request, limit: int = 10, window: int = 60):
+    ip = request.client.host
+    now = datetime.now()
+
+    # Clean old entries
+    rate_limits[ip] = [
+        ts for ts in rate_limits[ip]
+        if now - ts < timedelta(seconds=window)
+    ]
+
+    if len(rate_limits[ip]) >= limit:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+    rate_limits[ip].append(now)
+```
+
+## Authentication
+
+### Password Authentication (Demo)
+- Single password for demo (no user accounts)
+- Password in Secrets Manager (AWS) or .env (local)
+- Hash before comparison (bcrypt)
+
+### Session Management
+- Secure HTTP-only cookies
+- Session expires after 24 hours inactivity
+- Clear session on logout
+
+### Protected Routes
+- Middleware validates session
+- Return 401 if not authenticated
+- Redirect to login (frontend)
+
+## Error Handling
+
+- User-friendly messages ONLY
+- NEVER expose stack traces
+- NEVER show internal error details
+- Log errors with context (conversation_id)
+
+→ See [backend.mdc] for error handling patterns
+→ See [aws.mdc] for AWS credentials security

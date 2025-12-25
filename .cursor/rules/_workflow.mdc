@@ -1,0 +1,119 @@
+---
+description: Development workflow - Docker-first, research-first, verification, anti-patterns
+globs:
+alwaysApply: true
+---
+
+# Development Workflow
+
+## Docker-First Development
+
+**ALWAYS use Docker Compose** - never run services on host.
+
+```bash
+docker-compose up                    # Start all services
+docker-compose exec backend bash     # Backend shell
+docker-compose exec frontend sh      # Frontend shell
+docker-compose exec backend pytest   # Run tests
+docker-compose exec backend mypy src/ # Type check
+docker-compose logs -f backend       # View logs
+docker-compose down                  # Stop services
+```
+
+## Research-First Development
+
+**Critical:** Understand before implementing. Stable patterns over bleeding-edge.
+
+### Before Writing Code
+
+1. **Search codebase first:**
+   - `grep` for similar patterns
+   - Check how similar features are implemented
+   - Identify reusable utilities
+
+2. **Verify versions:**
+   - Check DEVELOPMENT_REFERENCE.md before adding packages
+   - Use stable versions (2-3 months old, not bleeding-edge)
+
+3. **Read documentation:**
+   - Official docs for libraries (LangChain, FastAPI, Next.js)
+   - Verify API signatures haven't changed
+
+### Research Depth by Task
+
+| Task | Research Depth |
+|------|----------------|
+| Bug fix | Read surrounding code, understand root cause |
+| New feature | Search for patterns, read related modules |
+| Refactoring | Understand all callers, check side effects |
+| Dependency update | Check changelog, breaking changes |
+
+## Before Making Changes
+
+- Check REPO_STATE.md to verify files exist
+- Verify versions in DEVELOPMENT_REFERENCE.md
+- If unsure on destructive steps, ask user first
+- Keep changes small and reversible
+
+## When to Consult User
+
+- Design decisions affecting cost or complexity
+- Breaking changes to APIs or data models
+- Adding new dependencies
+- Infrastructure changes (new AWS services)
+- Security-related changes
+
+## Integration Verification
+
+Before finalizing:
+
+1. **Trace data flow:** Where does data come from? Where does it go?
+2. **Check interfaces:** Function signatures match callers
+3. **Verify imports:** All dependencies exist
+4. **Run tests:**
+   ```bash
+   docker-compose exec backend pytest
+   docker-compose exec backend mypy src/
+   docker-compose exec frontend npm run lint
+   ```
+
+## Code Review Checklist
+
+- [ ] Versions match DEVELOPMENT_REFERENCE.md
+- [ ] File references exist (check REPO_STATE.md)
+- [ ] No hardcoded secrets, regions, or versions
+- [ ] Proper error handling and logging
+- [ ] Tests updated for new functionality
+
+## Cost vs Complexity Tradeoffs
+
+**When making decisions that affect cost or complexity, consult user with:**
+- Cost impact (monthly, per-request)
+- Complexity impact (maintenance, learning curve)
+- Tradeoff analysis (pros/cons)
+- Recommendation with rationale
+
+## Anti-Patterns (NEVER DO)
+
+- ❌ Run Python/npm on host instead of Docker
+- ❌ Hardcode region/secrets/versions
+- ❌ Update versions without updating DEVELOPMENT_REFERENCE.md
+- ❌ Link to non-existent files (check REPO_STATE.md)
+- ❌ Skip error handling or user-friendly messages
+- ❌ Expose internal errors to users
+- ❌ Commit .env files or API keys
+- ❌ Use `any` type in TypeScript
+- ❌ Skip type hints in Python
+- ❌ Skip docstrings
+
+## Core Component Changes
+
+When changing core components (database, LLM, auth, caching):
+
+1. Search codebase: `grep -r "component" backend/ frontend/ terraform/`
+2. Update all references (code, .env.example, docker-compose, terraform)
+3. Update REPO_STATE.md if files added/removed
+4. Security review: No secrets exposed, proper validation
+
+→ See [_project.mdc] for sources of truth
+→ See [_security.mdc] for security requirements

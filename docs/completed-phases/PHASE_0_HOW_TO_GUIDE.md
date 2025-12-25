@@ -903,7 +903,7 @@ Requirements:
 - Add validation utility: validate_agent_config()
 - Add module docstring with architecture overview and usage examples
 
-Reference: Follow patterns in src/config/__init__.py, agentic-ai.mdc rules.
+Reference: Follow patterns in src/config/__init__.py, agent.mdc rules.
 Verify: Check for linter errors and circular import issues.
 ```
 
@@ -925,7 +925,7 @@ Requirements:
 6. Add state helpers: add_tool_used(), set_error(), clear_error()
 7. Use proper type hints and comprehensive docstrings
 
-Reference: agentic-ai.mdc rules, LangGraph add_messages reducer pattern.
+Reference: agent.mdc rules, LangGraph add_messages reducer pattern.
 Verify: Check for linter errors and type safety.
 ```
 
@@ -949,7 +949,7 @@ Requirements:
 - Export node functions: chat_node, tools_node, error_recovery_node
 - Add module docstring explaining node architecture
 
-Reference: agentic-ai.mdc node function patterns.
+Reference: agent.mdc node function patterns.
 Verify: Check for linter errors.
 ```
 
@@ -988,7 +988,7 @@ Streaming Implementation:
 - Handle AIMessageChunk accumulation and content extraction
 - Support tool calls in streaming responses
 
-Reference: agentic-ai.mdc node patterns, LangChain 0.3.x ChatBedrockConverse docs.
+Reference: agent.mdc node patterns, LangChain 0.3.x ChatBedrockConverse docs.
 Verify: Check for linter errors and proper async streaming handling.
 ```
 
@@ -1023,7 +1023,7 @@ Phase 0 notes:
 - Focus on execution flow, not real implementations
 - Log which tools are being called
 
-Reference: agentic-ai.mdc tool execution patterns.
+Reference: agent.mdc tool execution patterns.
 Verify: Check for linter errors.
 ```
 
@@ -1049,7 +1049,7 @@ Error message guidelines:
 - Actionable (suggest what user can do)
 - Internal: Log full technical details
 
-Reference: agentic-ai.mdc error recovery patterns.
+Reference: agent.mdc error recovery patterns.
 Verify: Check for linter errors.
 ```
 
@@ -1086,7 +1086,7 @@ Checkpointing:
 - MemorySaver() for Phase 0 (in-memory, no DB)
 - Phase 1b+ will use PostgresSaver
 
-Reference: agentic-ai.mdc graph patterns, LangGraph StateGraph docs.
+Reference: agent.mdc graph patterns, LangGraph StateGraph docs.
 Verify: Check for linter errors and proper edge configuration.
 ```
 
@@ -1126,7 +1126,7 @@ Requirements:
 
 Note: Tools use LangChain @tool decorator pattern, not base class.
 
-Reference: agentic-ai.mdc tool definition patterns.
+Reference: agent.mdc tool definition patterns.
 Verify: Check for linter errors.
 ```
 
@@ -1154,7 +1154,7 @@ Mock result format:
     "source": "mock"
 }
 
-Reference: agentic-ai.mdc tool definition pattern.
+Reference: agent.mdc tool definition pattern.
 Verify: Check for linter errors.
 ```
 
@@ -1184,7 +1184,7 @@ Mock result format:
     "source": "mock"
 }
 
-Reference: agentic-ai.mdc tool definition pattern.
+Reference: agent.mdc tool definition pattern.
 Verify: Check for linter errors.
 ```
 
@@ -1215,7 +1215,7 @@ Mock result format:
     "source": "mock"
 }
 
-Reference: agentic-ai.mdc tool definition pattern.
+Reference: agent.mdc tool definition pattern.
 Verify: Check for linter errors.
 ```
 
@@ -2007,7 +2007,7 @@ Requirements:
 - Proper assertions with clear messages
 - Docstrings on test functions
 
-Reference: agentic-ai.mdc testing patterns.
+Reference: agent.mdc testing patterns.
 Verify: Tests pass with pytest.
 ```
 
@@ -2246,7 +2246,7 @@ Model IDs (from DEVELOPMENT_REFERENCE.md):
 - Nova Lite: amazon.nova-lite-v1:0 (verification/cheaper tasks)
 - Claude: anthropic.claude-3-5-sonnet-20240620-v1:0 (fallback)
 
-Reference: agentic-ai.mdc "Tool Binding" and "Cost Optimization" sections
+Reference: agent.mdc "Tool Binding" and "Cost Optimization" sections
 Verify: docker-compose exec backend pytest tests/test_agent.py -v
 ```
 
@@ -2292,8 +2292,8 @@ Tool Configuration:
 - Note: Requires langchain-community~=0.3.0 (rebuild backend if ModuleNotFoundError)
 
 Reference:
-- agentic-ai.mdc "Tool Definition Pattern"
-- security.mdc "Input Validation"
+- agent.mdc "Tool Definition Pattern"
+- _security.mdc "Input Validation"
 - Cost: Free tier 1,000 searches/month
 
 Verify: docker-compose exec backend pytest tests/test_tools.py -k search -v
@@ -2353,7 +2353,7 @@ API Configuration:
 
 Reference:
 - DEVELOPMENT_REFERENCE.md "Financial Modeling Prep" section
-- agentic-ai.mdc "Tool Definition Pattern"
+- agent.mdc "Tool Definition Pattern"
 
 Verify: docker-compose exec backend pytest tests/test_tools.py -k market -v
 ```

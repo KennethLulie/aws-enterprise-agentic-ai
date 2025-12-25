@@ -1,0 +1,124 @@
+---
+description: Terraform and AWS infrastructure patterns - IaC standards, cost safety, deployment
+globs:
+  - terraform/**
+alwaysApply: false
+---
+
+# Infrastructure Rules
+
+## Terraform Module Structure
+
+```
+terraform/
+├── environments/
+│   └── dev/
+│       ├── main.tf        # Module calls
+│       ├── variables.tf   # Input variables
+│       ├── outputs.tf     # Output values
+│       └── backend.tf     # State configuration
+└── modules/
+    ├── networking/        # VPC, subnets, IGW
+    ├── ecr/               # Container registry
+    ├── app-runner/        # Backend service
+    ├── s3-cloudfront/     # Frontend hosting
+    └── secrets/           # IAM for Secrets Manager
+```
+
+## Naming Conventions
+
+| Resource Type | Pattern | Example |
+|---------------|---------|---------|
+| General | `${project}-${env}-${resource}` | `enterprise-agentic-ai-dev-vpc` |
+| S3 Buckets | `${project}-${purpose}-${random}` | `enterprise-agentic-ai-frontend-a1b2c3` |
+| Secrets | `${project}/${secret-name}` | `enterprise-agentic-ai/demo-password` |
+
+**Tags (required on all resources):**
+```hcl
+tags = {
+  Project     = "enterprise-agentic-ai"
+  Environment = var.environment
+  ManagedBy   = "terraform"
+}
+```
+
+## State Management
+
+**Bootstrap resources (created manually, NOT by Terraform):**
+- S3 bucket for state: `enterprise-agentic-ai-tfstate-{initials}`
+- DynamoDB table: `enterprise-agentic-ai-tflock` (partition key: `LockID`)
+
+**Why manual?** Terraform needs its backend to exist before it can manage anything.
+
+## Cost Safety Checklist
+
+**Before `terraform apply`:**
+1. Run `terraform plan` and review output
+2. Check resource count matches expectations
+3. Verify no expensive resources appear unexpectedly
+4. Use staged apply for safety
+
+**Staged Apply Strategy:**
+```bash
+# Stage 1: Free resources
+terraform apply -target=module.networking
+
+# Stage 2: Near-free
+terraform apply -target=module.ecr
+
+# Stage 3: Low-cost
+terraform apply -target=module.s3_cloudfront
+
+# Stage 4: Running costs (after Docker image pushed)
+terraform apply -target=module.app_runner
+```
+
+## Red Flags - STOP If You See
+
+| Resource | Why It's Bad | Monthly Cost |
+|----------|--------------|--------------|
+| `aws_nat_gateway` | Not needed Phase 1a | ~$32 + data |
+| `aws_db_instance` | Use Aurora Serverless | ~$15-50 |
+| `aws_eip` (unattached) | Orphaned resource | $3.60 |
+| Multiple `aws_apprunner_service` | Should only be 1 | ~$25 each |
+
+## Module Patterns
+
+**Variables (every module):**
+```hcl
+variable "project_name" {
+  type        = string
+  description = "Project name for resource naming"
+}
+
+variable "environment" {
+  type        = string
+  default     = "dev"
+}
+
+variable "tags" {
+  type        = map(string)
+  default     = {}
+}
+```
+
+**Outputs (every module):**
+- Always output resource IDs and ARNs
+- Use descriptive names: `vpc_id`, `repository_url`, `service_arn`
+
+## Emergency Rollback
+
+```bash
+# Destroy specific module
+terraform destroy -target=module.app_runner
+
+# Destroy everything (careful!)
+terraform destroy
+
+# Check for orphaned resources after destroy
+aws ec2 describe-vpcs --filters "Name=tag:Project,Values=enterprise-agentic-ai"
+aws apprunner list-services --region us-east-1
+```
+
+→ See [aws.mdc] for AWS configuration
+→ See [_project.mdc] for current phase requirements

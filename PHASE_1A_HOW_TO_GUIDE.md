@@ -205,42 +205,68 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?c
 7. Review and click **Submit**
 8. Wait for "Access granted" status (can take up to 24 hours, usually faster)
 
-### 1.5 Verify IAM Permissions
+### 1.5 Check Current IAM Permissions (Quick Test)
 
-Your IAM user/role needs permissions for:
-- ECR (container registry)
-- App Runner (compute)
-- S3 (storage)
-- CloudFront (CDN)
-- Secrets Manager (secrets)
-- IAM (role creation)
-- VPC (networking)
-- CloudWatch (logging)
+Phase 1a requires permissions for multiple AWS services. This section does a **quick check** to see if you already have the necessary permissions. If any tests fail, **don't worry** - Section 2.3 will walk you through adding the required policies.
 
-**Command to test basic permissions:**
+**Required services:**
+- S3 (storage) - for frontend and Terraform state
+- ECR (container registry) - for Docker images
+- App Runner (compute) - for backend
+- CloudFront (CDN) - for frontend distribution
+- Secrets Manager - for passwords and API keys
+- IAM - for creating roles
+- VPC/EC2 - for networking
+- CloudWatch - for logging
+- DynamoDB - for Terraform state locking
+- Bedrock - for LLM access
+
+**Quick permission test (tests a subset of services):**
 ```bash
-# Test S3 access
+# Test 1: S3 access (for frontend hosting and Terraform state)
 aws s3 ls
+# Expected: List of buckets (or empty list if no buckets exist)
 
-# Test ECR access
+# Test 2: ECR access (for Docker images)
 aws ecr describe-repositories --region us-east-1
+# Expected: List of repositories (or empty list)
 
-# Test Secrets Manager access
+# Test 3: Secrets Manager access
 aws secretsmanager list-secrets --region us-east-1
+# Expected: List of secrets (or empty list)
+
+# Test 4: VPC/EC2 access (for networking)
+aws ec2 describe-vpcs --region us-east-1
+# Expected: List of VPCs (should have at least the default VPC)
+
+# Test 5: IAM access (for creating roles)
+aws iam get-user
+# Expected: Your IAM user details
 ```
 
-**If any fail with AccessDenied:** You need to add permissions to your IAM user. See Section 2 for required policies.
+**Interpreting results:**
+
+| Result | Meaning | Action |
+|--------|---------|--------|
+| Commands return data (or empty lists) | ✅ You have basic permissions | Continue to Section 1.6 |
+| "AccessDenied" error | ❌ Missing permissions | Continue anyway - Section 2.3 will add them |
+| "InvalidClientTokenId" error | ❌ AWS CLI not configured | Go back to Section 1.2 |
+
+**Note:** These tests only check a subset of permissions. Even if all pass, you may still need to add policies in Section 2.3. The full permission set will be configured there.
 
 ### 1.6 Prerequisites Checklist
 
-Before proceeding, verify all items:
+Before proceeding to Section 2, verify these items:
 
 - [ ] Phase 0 services start and work locally
-- [ ] AWS CLI v2 installed and configured
-- [ ] AWS region set to us-east-1
-- [ ] Terraform 1.5.0+ installed
-- [ ] AWS Bedrock model access approved
-- [ ] IAM permissions verified (S3, ECR, App Runner, etc.)
+- [ ] AWS CLI v2 installed and configured (`aws --version`)
+- [ ] AWS credentials working (`aws sts get-caller-identity`)
+- [ ] AWS region set to us-east-1 (`aws configure get region`)
+- [ ] Terraform 1.5.0+ installed (`terraform --version`)
+- [ ] AWS Bedrock model access approved (or request submitted)
+- [ ] Quick permission test run (Section 1.5) - failures OK, will fix in Section 2.3
+
+**Note:** If the permission tests in Section 1.5 failed, that's expected for new AWS accounts. Section 2.3 will walk you through adding all required permissions.
 
 ---
 
@@ -299,47 +325,79 @@ Setting up billing alerts to monitor costs and ensuring your AWS account is prop
 1. Billing and Cost Management → **Cost Explorer**
 2. If prompted, click **Enable Cost Explorer** (takes up to 24 hours to populate)
 
-### 2.3 Review Required IAM Permissions
+### 2.3 Add Required IAM Permissions
 
-For Phase 1a deployment, your IAM user needs these AWS managed policies (or equivalent custom permissions):
+This section ensures your IAM user has all the permissions needed for Phase 1a. Even if the quick test in Section 1.5 passed, you should still review and add any missing policies here.
 
-| Policy | Purpose |
-|--------|---------|
-| `AmazonEC2FullAccess` | VPC, subnets, security groups |
-| `AmazonS3FullAccess` | Frontend hosting, Terraform state |
-| `CloudFrontFullAccess` | CDN distribution |
-| `AWSAppRunnerFullAccess` | Backend deployment |
-| `AmazonEC2ContainerRegistryFullAccess` | Docker image storage |
-| `SecretsManagerReadWrite` | Password and API key storage |
-| `IAMFullAccess` | Create roles for App Runner |
-| `AmazonDynamoDBFullAccess` | Terraform state locking |
-| `CloudWatchLogsFullAccess` | Application logging |
-| `AmazonBedrockFullAccess` | LLM access |
+**Required AWS managed policies:**
 
-**Note:** These are broad permissions for development. Production would use more restrictive custom policies.
+| Policy | Purpose | Why Needed |
+|--------|---------|------------|
+| `AmazonEC2FullAccess` | VPC, subnets, security groups | Terraform creates networking |
+| `AmazonS3FullAccess` | Frontend hosting, Terraform state | S3 buckets for frontend and state |
+| `CloudFrontFullAccess` | CDN distribution | CloudFront for frontend |
+| `AWSAppRunnerFullAccess` | Backend deployment | App Runner for backend |
+| `AmazonEC2ContainerRegistryFullAccess` | Docker image storage | ECR for Docker images |
+| `SecretsManagerReadWrite` | Password and API key storage | Secrets for auth and API keys |
+| `IAMFullAccess` | Create roles for App Runner | IAM roles for App Runner |
+| `AmazonDynamoDBFullAccess` | Terraform state locking | DynamoDB for TF state lock |
+| `CloudWatchLogsFullAccess` | Application logging | Logs from App Runner |
+| `AmazonBedrockFullAccess` | LLM access | AI model access |
 
-**To add policies to your IAM user:**
+**⚠️ Security Note:** These are broad permissions suitable for development/demo. Production environments should use more restrictive custom policies with least-privilege access.
 
-**Navigate in AWS Console:**
-1. Sign in to AWS Console: https://console.aws.amazon.com
-2. In the search bar at the top, type **"IAM"** and click **IAM**
-3. In the left sidebar, click **Users**
-4. Click on your username in the list
-5. Click the **Permissions** tab
-6. Click **Add permissions** button → Select **Add permissions**
-7. Select **Attach policies directly** (third option)
-8. In the search box, search for each policy name and check the box:
-   - Type `EC2Full` → check **AmazonEC2FullAccess**
-   - Type `S3Full` → check **AmazonS3FullAccess**
-   - Type `CloudFront` → check **CloudFrontFullAccess**
-   - Type `AppRunner` → check **AWSAppRunnerFullAccess**
-   - Type `ContainerRegistry` → check **AmazonEC2ContainerRegistryFullAccess**
-   - Type `SecretsManager` → check **SecretsManagerReadWrite**
-   - Type `IAMFull` → check **IAMFullAccess**
-   - Type `DynamoDB` → check **AmazonDynamoDBFullAccess**
-   - Type `CloudWatchLogs` → check **CloudWatchLogsFullAccess**
-   - Type `Bedrock` → check **AmazonBedrockFullAccess**
-9. Click **Next** → Review → **Add permissions**
+**Step-by-step: Add policies to your IAM user**
+
+1. **Open IAM Console:**
+   - Sign in to AWS Console: https://console.aws.amazon.com
+   - In the search bar, type **"IAM"** and click **IAM**
+
+2. **Find your user:**
+   - In the left sidebar, click **Users**
+   - Click on your username in the list
+
+3. **Check existing policies:**
+   - Click the **Permissions** tab
+   - Review the "Permissions policies" list
+   - Note which policies you already have (skip those below)
+
+4. **Add missing policies:**
+   - Click **Add permissions** button → Select **Add permissions**
+   - Select **Attach policies directly** (third option)
+   - Search for and check each missing policy:
+
+   | Search for | Check this policy |
+   |------------|-------------------|
+   | `EC2Full` | AmazonEC2FullAccess |
+   | `S3Full` | AmazonS3FullAccess |
+   | `CloudFront` | CloudFrontFullAccess |
+   | `AppRunner` | AWSAppRunnerFullAccess |
+   | `ContainerRegistry` | AmazonEC2ContainerRegistryFullAccess |
+   | `SecretsManager` | SecretsManagerReadWrite |
+   | `IAMFull` | IAMFullAccess |
+   | `DynamoDB` | AmazonDynamoDBFullAccess |
+   | `CloudWatchLogs` | CloudWatchLogsFullAccess |
+   | `Bedrock` | AmazonBedrockFullAccess |
+
+5. **Apply permissions:**
+   - Click **Next** → Review → **Add permissions**
+
+**Verify permissions were added:**
+```bash
+# Re-run the permission tests from Section 1.5
+aws s3 ls
+aws ecr describe-repositories --region us-east-1
+aws secretsmanager list-secrets --region us-east-1
+aws ec2 describe-vpcs --region us-east-1
+aws iam get-user
+
+# Additional tests for newly added permissions
+aws apprunner list-services --region us-east-1
+aws cloudfront list-distributions --max-items 1
+aws dynamodb list-tables --region us-east-1
+```
+
+All commands should complete without "AccessDenied" errors. Empty lists are fine - that just means no resources exist yet.
 
 ### 2.4 AWS Setup Checklist
 
@@ -360,6 +418,22 @@ Creating an S3 bucket and DynamoDB table to store Terraform state remotely. This
 - **Locking:** DynamoDB prevents concurrent modifications
 - **Team Collaboration:** Multiple developers can run Terraform
 - **Best Practice:** Never use local state for real infrastructure
+
+### Why We Create These Manually (Not with Terraform)
+
+You might wonder: "Why aren't we using Terraform to create these resources?"
+
+**The chicken-and-egg problem:** Terraform stores its state (a record of all resources it manages) in a "backend." We're using S3 for state storage and DynamoDB for state locking. But Terraform needs its backend to exist BEFORE it can manage any infrastructure.
+
+You can't use Terraform to create the place where Terraform stores its data - that place has to exist first!
+
+**These "bootstrap" resources:**
+- Are created once and rarely modified
+- Cost almost nothing (~$0-1/month with minimal usage)
+- Are intentionally NOT managed by Terraform
+- Should NOT be deleted unless you're completely done with the project
+
+Everything AFTER this section will be managed by Terraform. This is the only manual AWS setup (besides Secrets Manager in Section 4).
 
 ### 3.1 Choose Unique Names
 
@@ -406,20 +480,66 @@ aws s3 ls | grep tfstate
 ### 3.3 Create DynamoDB Table for Locking
 
 **Navigate in AWS Console:**
-1. AWS Console → **DynamoDB**
-2. Click **Create table**
+1. Sign in to AWS Console: https://console.aws.amazon.com
+2. Ensure region is **US East (N. Virginia) us-east-1** (top right dropdown)
+3. In the search bar, type **"DynamoDB"** and click **DynamoDB**
+4. Click **Create table** (orange button)
 
-**Table Configuration:**
-- **Table name:** `enterprise-agentic-ai-tflock`
-- **Partition key:** `LockID` (String) - **MUST be exactly this name**
-- **Table settings:** Default settings (on-demand capacity)
+**Table Details (Step 1):**
 
-Click **Create table**
+| Setting | Value | Notes |
+|---------|-------|-------|
+| **Table name** | `enterprise-agentic-ai-tflock` | Exact name required |
+| **Partition key** | `LockID` | ⚠️ **Case-sensitive!** Must be exactly `LockID` |
+| **Partition key type** | `String` | Select from dropdown |
+| **Sort key** | ❌ **Leave unchecked** | Do NOT add a sort key |
+
+**Table Settings (Step 2):**
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| **Table settings** | ✅ **Default settings** | Select this option |
+
+When "Default settings" is selected, AWS uses sensible defaults:
+- Table class: DynamoDB Standard
+- Capacity mode: On-demand (pay per request)
+- Encryption: AWS owned key
+
+**⚠️ Do NOT select "Customize settings"** unless you specifically need to change something. The defaults are correct for Terraform state locking.
+
+<details>
+<summary>📋 What "Default settings" includes (click to expand)</summary>
+
+If you're curious, here's what the defaults set:
+- **Table class:** DynamoDB Standard (not Standard-IA)
+- **Read/write capacity:** On-demand (no provisioned capacity to manage)
+- **Encryption at rest:** Owned by Amazon DynamoDB (free)
+- **Deletion protection:** Disabled
+- **Resource-based policy:** None
+
+All of these are appropriate for a Terraform state lock table with minimal usage.
+</details>
+
+**Create the table:**
+1. Review your settings:
+   - Table name: `enterprise-agentic-ai-tflock`
+   - Partition key: `LockID` (String)
+   - No sort key
+   - Default settings selected
+2. Click **Create table** (orange button at bottom)
+3. Wait for status to change from "Creating" to "Active" (usually 10-30 seconds)
 
 **Verification:**
 ```bash
+# Check table was created and is active
 aws dynamodb describe-table --table-name enterprise-agentic-ai-tflock --query 'Table.TableStatus'
 ```
+
+**Expected output:** `"ACTIVE"`
+
+**If you get an error:**
+- `ResourceNotFoundException`: Table wasn't created - go back and create it
+- `AccessDeniedException`: Missing DynamoDB permissions - see Section 2.3
 
 Expected output: `"ACTIVE"`
 
@@ -768,7 +888,7 @@ Configuration:
 - Use data sources, not resources (secrets already exist)
 
 Reference:
-- security.mdc "Secrets Management"
+- _security.mdc "Secrets Management"
 - Secrets created in Section 4 of this guide
 
 Verify: cd terraform/environments/dev && terraform validate
@@ -984,7 +1104,7 @@ Reference:
 Verify: grep -q "tfstate" .gitignore && echo "OK"
 ```
 
-### 5.10 Initialize and Validate Terraform
+### 5.10 Initialize, Validate, and Review Terraform Plan
 
 **Commands:**
 ```bash
@@ -996,33 +1116,218 @@ terraform init
 # Validate configuration syntax
 terraform validate
 
-# Preview what will be created
-terraform plan
+# Generate and save plan for review
+terraform plan -out=tfplan.out
 ```
 
 **Expected Output:**
 - `terraform init`: "Terraform has been successfully initialized!"
 - `terraform validate`: "Success! The configuration is valid."
-- `terraform plan`: Shows resources to be created (VPC, subnets, ECR, S3, CloudFront, App Runner)
+- `terraform plan`: Shows resources to be created
 
-### 5.11 Apply Terraform (Partial - ECR First)
+**⚠️ CRITICAL: Review Plan Before Applying**
 
-We'll apply in stages to catch issues early. First, just create ECR:
+Before typing `yes` on any apply, carefully review the plan output:
 
-**Commands:**
+| Check | Expected | If Wrong - STOP |
+|-------|----------|-----------------|
+| Resources to add | 18-25 resources | If >30: may have duplicates or errors |
+| Resources to destroy | 0 (first apply) | Should never destroy on fresh apply |
+| Resources to change | 0 (first apply) | Nothing should change yet |
+| Region | us-east-1 | Wrong region = duplicate infrastructure |
+
+**Expected Resources (Phase 1a Full Apply):**
+
+| Module | Resources | Approximate Count |
+|--------|-----------|-------------------|
+| networking | VPC, IGW, 2 Subnets, Route Table, 2 Associations, Security Group | 8 |
+| ecr | Repository, Lifecycle Policy | 2 |
+| secrets | Data sources (no resources created), IAM Policy | 1 |
+| s3_cloudfront | S3 Bucket + settings, CloudFront Distribution, OAC, Bucket Policy | 6-8 |
+| app_runner | Service, 2 IAM Roles, Role Policies | 4-6 |
+| other | Random string for bucket naming | 1 |
+| **Total** | | **18-25** |
+
+**🚨 RED FLAGS - Stop Immediately If You See:**
+
+| Unexpected Resource | Why It's Bad | Monthly Cost |
+|---------------------|--------------|--------------|
+| `aws_nat_gateway` | Not needed for Phase 1a | ~$32 + data |
+| `aws_db_instance` (RDS) | Database is Phase 1b | ~$15-50 |
+| `aws_eip` (Elastic IP) | Not needed | $3.60 if unattached |
+| `aws_ecs_cluster` | Wrong compute service | Varies |
+| `aws_lambda_function` | Not in Phase 1a | Varies |
+| Multiple `aws_apprunner_service` | Should only be 1 | ~$25 each |
+| Resources in wrong region | Duplicates | 2x cost |
+
+**If you see any red flags:** Do NOT apply. Review your Terraform code for errors.
+
+### 5.11 Staged Apply Strategy (Recommended)
+
+Apply in stages to catch issues early and limit blast radius. This approach is safer than applying everything at once.
+
+**Why Staged Apply:**
+- Catches configuration errors before creating expensive resources
+- Easier to debug issues when fewer resources change
+- Allows verification at each step
+- Limits cost exposure if something goes wrong
+
+**Stage 1: Networking (Free resources)**
 ```bash
-# Apply only ECR module first
-terraform apply -target=module.ecr
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
 
-# Verify ECR was created
-aws ecr describe-repositories --region us-east-1 --query 'repositories[].repositoryName'
+terraform apply -target=module.networking
 ```
 
-**Expected Output:** ECR repository appears in the list.
+When prompted, review the plan:
+- Expected: ~8 resources (VPC, subnets, IGW, route tables, security group)
+- Cost: $0/month (VPC resources are free)
 
-**Checkpoint:** Stop here and proceed to Section 6 (Backend Updates) before applying remaining infrastructure. We need to push a Docker image to ECR before App Runner can start.
+Type `yes` only if the plan looks correct.
 
-### 5.12 Terraform Infrastructure Checklist
+**Verify Stage 1:**
+```bash
+aws ec2 describe-vpcs --region us-east-1 \
+  --filters "Name=tag:Project,Values=enterprise-agentic-ai" \
+  --query 'Vpcs[].VpcId'
+```
+
+**Stage 2: ECR (Near-free)**
+```bash
+terraform apply -target=module.ecr
+```
+
+- Expected: 2 resources (repository, lifecycle policy)
+- Cost: ~$0.10/GB/month (only pay for stored images)
+
+**Verify Stage 2:**
+```bash
+aws ecr describe-repositories --region us-east-1 \
+  --query 'repositories[?contains(repositoryName, `enterprise-agentic-ai`)].repositoryName'
+```
+
+**Stage 3: S3 + CloudFront**
+```bash
+terraform apply -target=module.s3_cloudfront
+```
+
+- Expected: 6-8 resources (S3 bucket, policies, CloudFront distribution, OAC)
+- Cost: ~$0-5/month (request-based)
+
+**Verify Stage 3:**
+```bash
+# Check S3 bucket
+aws s3 ls | grep enterprise-agentic-ai
+
+# Check CloudFront (may take a few minutes to deploy)
+aws cloudfront list-distributions \
+  --query 'DistributionList.Items[?contains(Origins.Items[0].DomainName, `enterprise-agentic-ai`)].DomainName'
+```
+
+**⏸️ CHECKPOINT: Stop Here**
+
+At this point, stop and proceed to:
+1. **Section 6:** Update backend code for AWS
+2. **Section 7:** Build production Docker image
+3. **Section 8:** Push image to ECR
+
+**Why stop?** App Runner needs a Docker image in ECR before it can start. If we create App Runner now, it will fail because there's no image to pull.
+
+**Stage 4: App Runner (After ECR has image - Section 9)**
+
+This stage is completed in Section 9 after the Docker image is pushed to ECR.
+
+### 5.12 Verify Resource Count
+
+After each stage, verify only expected resources were created:
+
+**Command:**
+```bash
+# Count all Terraform-managed resources
+terraform state list | wc -l
+
+# List all resources (review for unexpected items)
+terraform state list
+```
+
+**Expected counts after each stage:**
+
+| After Stage | Expected Count | If Higher |
+|-------------|----------------|-----------|
+| Stage 1 (networking) | 8-10 | Review for duplicates |
+| Stage 2 (+ecr) | 10-12 | Check for extra repos |
+| Stage 3 (+s3_cloudfront) | 16-20 | Check for extra distributions |
+| Stage 4 (+app_runner) | 20-26 | Check for extra services |
+
+**Check for Runaway Resources (should all be empty for Phase 1a):**
+```bash
+# These should return empty results:
+aws rds describe-db-instances --region us-east-1 --query 'DBInstances[].DBInstanceIdentifier'
+aws ec2 describe-nat-gateways --region us-east-1 --query 'NatGateways[?State!=`deleted`].NatGatewayId'
+aws ecs list-clusters --region us-east-1
+```
+
+If any return results, investigate immediately - you may have unexpected resources incurring costs.
+
+### 5.13 Emergency Rollback
+
+If something goes wrong during Terraform apply, here's how to recover:
+
+**Scenario 1: Cancel Mid-Apply**
+```bash
+# Press Ctrl+C during apply
+# Some resources may be partially created
+
+# Check current state
+terraform plan
+
+# Either complete the apply or destroy
+terraform apply   # Complete what was started
+# OR
+terraform destroy  # Remove everything
+```
+
+**Scenario 2: Destroy Specific Module**
+```bash
+# Remove only App Runner (keeps other resources)
+terraform destroy -target=module.app_runner
+
+# Remove only S3/CloudFront
+terraform destroy -target=module.s3_cloudfront
+```
+
+**Scenario 3: Full Destroy (Nuclear Option)**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
+
+# Destroy ALL Terraform-managed resources
+terraform destroy
+```
+
+Type `yes` to confirm. This removes everything Terraform created.
+
+**After Destroy - Verify Cleanup:**
+```bash
+# Check no resources remain
+aws ec2 describe-vpcs --region us-east-1 \
+  --filters "Name=tag:Project,Values=enterprise-agentic-ai" \
+  --query 'Vpcs[].VpcId'
+
+# Check App Runner
+aws apprunner list-services --region us-east-1
+
+# Check ECR
+aws ecr describe-repositories --region us-east-1 \
+  --query 'repositories[?contains(repositoryName, `enterprise-agentic-ai`)].repositoryName'
+```
+
+**Note:** These resources are NOT managed by Terraform and must be deleted manually if needed:
+- Terraform state S3 bucket (`enterprise-agentic-ai-tfstate-*`)
+- Terraform lock DynamoDB table (`enterprise-agentic-ai-tflock`)
+- Secrets Manager secrets (created manually in Section 4)
+- CloudWatch log groups (created automatically by AWS)
+
+### 5.14 Terraform Infrastructure Checklist
 
 - [ ] Backend configuration created with S3 state
 - [ ] Networking module created
@@ -1034,7 +1339,11 @@ aws ecr describe-repositories --region us-east-1 --query 'repositories[].reposit
 - [ ] terraform.tfvars created (gitignored)
 - [ ] `terraform init` successful
 - [ ] `terraform validate` passes
-- [ ] ECR repository created via `terraform apply -target=module.ecr`
+- [ ] Plan reviewed - no red flag resources
+- [ ] Stage 1 applied - networking resources created
+- [ ] Stage 2 applied - ECR repository created
+- [ ] Stage 3 applied - S3 bucket and CloudFront distribution created
+- [ ] Resource count matches expectations (16-20 after Stage 3)
 
 ---
 
@@ -1071,7 +1380,7 @@ Configuration:
 - Handle errors gracefully with logging
 
 Reference:
-- security.mdc "Secrets Management"
+- _security.mdc "Secrets Management"
 - Existing settings.py patterns (Pydantic Settings)
 - boto3 docs: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/secretsmanager.html
 
@@ -1210,7 +1519,48 @@ docker stop test-backend && docker rm test-backend
 - Health endpoint returns `{"status":"ok",...}`
 - Logs show startup messages without errors
 
-### 6.6 Backend Updates Checklist
+### 6.6 Verify Code Quality
+
+Before proceeding, run linting and type checking to catch any issues:
+
+**Commands:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai
+
+# Start dev containers if not running
+docker-compose up -d
+
+# Run type checking
+docker-compose exec backend mypy src/
+
+# Run linter
+docker-compose exec backend ruff check src/
+
+# Run formatter check (should pass if code is formatted)
+docker-compose exec backend ruff format --check src/
+
+# Run tests
+docker-compose exec backend pytest tests/ -v
+```
+
+**Expected Output:**
+- `mypy`: "Success: no issues found" (or only expected warnings)
+- `ruff check`: No errors (warnings are acceptable)
+- `ruff format`: "X files would be left unchanged" (all files formatted)
+- `pytest`: All tests pass
+
+**If there are errors:**
+```bash
+# Auto-fix formatting
+docker-compose exec backend ruff format src/
+
+# Auto-fix some linting issues
+docker-compose exec backend ruff check --fix src/
+
+# For type errors, manually fix in the code
+```
+
+### 6.7 Backend Updates Checklist
 
 - [ ] Settings.py updated for AWS Secrets Manager
 - [ ] CORS configuration updated for CloudFront
@@ -1218,6 +1568,9 @@ docker stop test-backend && docker rm test-backend
 - [ ] Production Dockerfile created
 - [ ] Production build tested locally
 - [ ] Health endpoint works in production build
+- [ ] Type checking passes (`mypy src/`)
+- [ ] Linting passes (`ruff check src/`)
+- [ ] Tests pass (`pytest tests/`)
 
 ---
 
@@ -1320,31 +1673,49 @@ aws ecr describe-images --repository-name enterprise-agentic-ai-backend --region
 ## 9. App Runner Deployment
 
 ### What We're Doing
-Deploying the backend service to AWS App Runner, which will pull the image from ECR and run it.
+Deploying the backend service to AWS App Runner (Stage 4 of staged apply). This is the final Terraform apply that creates the running backend service.
 
 ### Why This Matters
 - **Managed Compute:** App Runner handles scaling, load balancing, HTTPS
 - **Cost Optimization:** Scales to zero when idle
 - **Simplicity:** No Kubernetes or ECS complexity
 
-### 9.1 Apply Remaining Terraform
+### Prerequisites for This Section
+Before proceeding, verify:
+- [ ] ECR image pushed (Section 8 complete)
+- [ ] Stages 1-3 applied (networking, ECR, S3/CloudFront from Section 5)
+
+### 9.1 Apply App Runner (Stage 4)
+
+This is the final stage of the staged apply strategy from Section 5.11.
 
 **Commands:**
 ```bash
 cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
 
-# Apply all remaining infrastructure
+# Preview what will be created
+terraform plan
+
+# Apply App Runner and any remaining resources
 terraform apply
 ```
 
-**Review the plan carefully** before typing `yes`. You should see:
-- VPC and networking resources
-- App Runner service
-- S3 bucket
-- CloudFront distribution
-- IAM roles and policies
+**⚠️ Review the plan carefully before typing `yes`:**
 
-**Expected Duration:** 5-10 minutes (CloudFront takes the longest)
+| Check | Expected | If Wrong |
+|-------|----------|----------|
+| Resources to add | 4-8 (App Runner service, IAM roles) | Too many = investigate |
+| Resources to change | 0-2 (minor updates OK) | Many changes = review carefully |
+| Resources to destroy | 0 | STOP if destroying resources |
+
+**Expected new resources:**
+- `aws_apprunner_service` (1)
+- `aws_iam_role` (2 - ECR access role, instance role)
+- `aws_iam_role_policy` or `aws_iam_role_policy_attachment` (2-4)
+
+**🚨 If you see unexpected resources, do NOT apply.** Review your Terraform code.
+
+**Expected Duration:** 3-5 minutes for App Runner to provision
 
 ### 9.2 Get App Runner URL
 
@@ -1387,12 +1758,47 @@ curl ${APP_RUNNER_URL}/health
 aws logs tail /aws/apprunner/enterprise-agentic-ai-backend --follow --region us-east-1
 ```
 
-### 9.5 App Runner Deployment Checklist
+### 9.5 Verify Final Resource Count
+
+After App Runner deployment, verify total resource count:
+
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
+
+# Count all resources
+terraform state list | wc -l
+# Expected: 20-26 resources
+
+# List all resources for review
+terraform state list
+```
+
+**Final expected resources:**
+
+| Module | Resources |
+|--------|-----------|
+| networking | VPC, IGW, 2 subnets, route table, 2 associations, security group |
+| ecr | Repository, lifecycle policy |
+| secrets | IAM policy (data sources don't count) |
+| s3_cloudfront | S3 bucket + settings, CloudFront, OAC, bucket policy |
+| app_runner | Service, 2 IAM roles, role policies |
+| random | Random string |
+
+**Verify no unexpected expensive resources:**
+```bash
+# All should return empty:
+aws rds describe-db-instances --region us-east-1 --query 'DBInstances[].DBInstanceIdentifier'
+aws ec2 describe-nat-gateways --region us-east-1 --query 'NatGateways[?State!=`deleted`].NatGatewayId'
+```
+
+### 9.6 App Runner Deployment Checklist
 
 - [ ] `terraform apply` completed successfully
 - [ ] App Runner service running (green status in Console)
-- [ ] Health endpoint responds
+- [ ] Health endpoint responds (`curl ${APP_RUNNER_URL}/health`)
 - [ ] No errors in application logs
+- [ ] Resource count is 20-26 (no unexpected resources)
+- [ ] No NAT Gateways or RDS instances created
 
 ---
 
@@ -1630,52 +2036,80 @@ curl -X POST ${APP_RUNNER_URL}/api/chat \
 ## Phase 1a Completion Checklist
 
 ### Prerequisites
-- [x] Phase 0 complete and verified
-- [x] AWS CLI v2 configured
-- [x] Terraform 1.5.0+ installed
-- [x] Bedrock model access approved
+- [ ] Phase 0 complete and verified (services start, health endpoint works)
+- [ ] AWS CLI v2 configured (`aws sts get-caller-identity` works)
+- [ ] Terraform 1.5.0+ installed (`terraform --version`)
+- [ ] Bedrock model access approved (Nova Pro, Nova Lite, Claude)
+- [ ] IAM permissions verified (S3, ECR, App Runner, etc.)
 
-### AWS Setup
-- [ ] Billing alert configured ($50/month)
-- [ ] IAM permissions verified
-- [ ] Account ID noted
+### AWS Setup (Section 2)
+- [ ] Billing alert configured ($50/month threshold)
+- [ ] Cost Explorer enabled
+- [ ] Account ID noted for later use
 
-### Terraform State
-- [ ] S3 bucket created for state
-- [ ] DynamoDB table created for locking
-- [ ] Versioning enabled on bucket
+### Terraform State (Section 3)
+- [ ] S3 bucket created for state with versioning
+- [ ] DynamoDB table created with `LockID` partition key
+- [ ] Both resources in us-east-1 region
 
-### Secrets Manager
+### Secrets Manager (Section 4)
 - [ ] Demo password secret created
-- [ ] Auth token secret created
+- [ ] Auth token secret created (64-char random)
 - [ ] Tavily API key secret created
 - [ ] FMP API key secret created
+- [ ] All secrets verified via `aws secretsmanager list-secrets`
 
-### Terraform Infrastructure
-- [ ] All modules created (networking, ecr, secrets, app-runner, s3-cloudfront)
+### Terraform Infrastructure (Section 5)
+- [ ] All 5 modules created (networking, ecr, secrets, app-runner, s3-cloudfront)
 - [ ] `terraform init` successful
 - [ ] `terraform validate` passes
-- [ ] `terraform apply` completed
+- [ ] Plan reviewed - no unexpected resources (no NAT Gateway, RDS)
+- [ ] Stage 1 (networking) applied and verified
+- [ ] Stage 2 (ECR) applied and verified
+- [ ] Stage 3 (S3/CloudFront) applied and verified
 
-### Backend
-- [ ] Settings updated for AWS environment
-- [ ] CORS configured for CloudFront
-- [ ] Production Dockerfile created
-- [ ] Build tested locally
+### Backend Code (Section 6)
+- [ ] Settings.py updated for AWS Secrets Manager
+- [ ] CORS configured for CloudFront URLs
+- [ ] Logging compatible with CloudWatch (JSON format)
+- [ ] Production Dockerfile created (multi-stage, non-root user)
+- [ ] Production build tested locally (port 8001)
+- [ ] Code quality verified (mypy, ruff, pytest pass)
 
-### Deployment
-- [ ] Docker image pushed to ECR
-- [ ] App Runner service running
-- [ ] Health endpoint responds
-- [ ] S3 bucket has frontend files
-- [ ] CloudFront distribution active
+### Docker/ECR (Sections 7-8)
+- [ ] Production image builds successfully
+- [ ] Image tagged as `latest` and `v1.0.0`
+- [ ] Docker authenticated to ECR
+- [ ] Image pushed and visible in ECR
 
-### Verification
-- [ ] Login page accessible via CloudFront
-- [ ] Authentication works
-- [ ] Chat streaming works
-- [ ] Tools execute correctly
-- [ ] CloudWatch logs visible
+### App Runner (Section 9)
+- [ ] Stage 4 (App Runner) applied
+- [ ] Service shows "Running" in AWS Console
+- [ ] Health endpoint responds (`curl ${APP_RUNNER_URL}/health`)
+- [ ] No errors in application logs
+- [ ] Total resource count is 20-26
+
+### Frontend (Sections 10-11)
+- [ ] Frontend built with `NEXT_PUBLIC_API_URL` set
+- [ ] Files uploaded to S3 (`aws s3 sync`)
+- [ ] CloudFront cache invalidated
+- [ ] CloudFront URL accessible
+
+### Cost Verification
+- [ ] No NAT Gateways created
+- [ ] No RDS instances created
+- [ ] No unattached Elastic IPs
+- [ ] Cost Explorer shows only expected services
+
+### End-to-End Testing (Section 12)
+- [ ] Login page loads via CloudFront
+- [ ] No JavaScript errors in browser console
+- [ ] Login with password succeeds
+- [ ] Chat interface displays correctly
+- [ ] Message sends and receives streaming response
+- [ ] Tool usage works (search, market data)
+- [ ] CloudWatch logs show requests
+- [ ] Response time <2s after warmup
 
 ---
 
@@ -1801,24 +2235,66 @@ aws dynamodb delete-item \
 
 ## Cost Monitoring
 
-### Expected Costs (Approximate)
+### Expected Costs (Phase 1a)
 
-| Service | Cost | Notes |
-|---------|------|-------|
-| App Runner | $0-15/month | Scales to zero when idle |
-| ECR | $0.10/GB/month | ~100MB image = ~$0.01 |
-| S3 | $0.023/GB/month | Minimal for static files |
-| CloudFront | $0-5/month | Based on requests |
-| Secrets Manager | $1.60/month | 4 secrets × $0.40 |
-| CloudWatch Logs | $0-2/month | Based on log volume |
-| **Total** | **~$10-25/month** | When active, less when idle |
+| Service | Idle Cost | Active Cost | Notes |
+|---------|-----------|-------------|-------|
+| VPC/Networking | $0 | $0 | No NAT Gateway in Phase 1a |
+| App Runner | $0 | $5-15 | Scales to zero when idle |
+| ECR | $0.01 | $0.01 | ~100MB image storage |
+| S3 | $0.01 | $0.05 | Static files only |
+| CloudFront | $0 | $1-5 | Request-based pricing |
+| Secrets Manager | $1.60 | $1.60 | 4 secrets × $0.40/month |
+| DynamoDB (TF state) | $0 | $0.50 | On-demand, minimal usage |
+| CloudWatch Logs | $0 | $0.50-2 | Based on log volume |
+| **Total Idle** | **~$2-3** | | Demo not in use |
+| **Total Active** | | **~$10-25** | During active demo usage |
 
-### Monitor Costs
+### 🚨 Cost Red Flags
+
+If you see these charges, investigate immediately - you may have misconfigured resources:
+
+| Unexpected Charge | Likely Cause | Monthly Cost |
+|-------------------|--------------|--------------|
+| NAT Gateway | Terraform created NAT Gateway (not needed) | ~$32 + data |
+| RDS | Database instance running (Phase 1b only) | ~$15-50 |
+| Elastic IP (unattached) | Orphaned EIP | $3.60 |
+| App Runner running 24/7 | Not scaling to zero | ~$25-50 |
+| Multiple CloudFront distributions | Duplicate deployments | Varies |
+| Large S3 storage | Old/duplicate files | $0.023/GB |
+
+### Check Your Costs Immediately After Deploy
+
+**Within 24 hours of deployment:**
+
+1. AWS Console → Billing → Cost Explorer
+2. Filter by: 
+   - Date: Today
+   - Group by: Service
+3. Verify only expected services appear
+4. Set up daily cost alerts if not already done
+
+**Quick cost check command:**
+```bash
+# Check for expensive resources that shouldn't exist
+aws rds describe-db-instances --region us-east-1 --query 'DBInstances[].DBInstanceIdentifier'
+aws ec2 describe-nat-gateways --region us-east-1 --query 'NatGateways[?State!=`deleted`].NatGatewayId'
+aws ec2 describe-addresses --region us-east-1 --query 'Addresses[?AssociationId==null].PublicIp'
+```
+
+All three commands should return empty results (`[]`).
+
+### Monitor Ongoing Costs
 
 **Navigate in AWS Console:**
 1. Billing → Cost Explorer
 2. Filter by service to see breakdown
 3. Set up cost allocation tags for this project
+
+**Weekly cost review:**
+- Check Cost Explorer weekly during active development
+- Review any services with unexpected charges
+- Verify App Runner is scaling to zero when not in use
 
 ---
 
@@ -1900,6 +2376,82 @@ Note these values for future reference:
 | S3 Bucket | `enterprise-agentic-ai-frontend-xxxxx` |
 | ECR Repository | `enterprise-agentic-ai-backend` |
 | Terraform State Bucket | `enterprise-agentic-ai-tfstate-xxx` |
+
+---
+
+## Files Created/Modified in Phase 1a
+
+### New Files Created
+
+| File | Purpose |
+|------|---------|
+| `terraform/environments/dev/backend.tf` | Terraform state backend configuration (S3 + DynamoDB) |
+| `terraform/environments/dev/main.tf` | Main Terraform configuration with module calls |
+| `terraform/environments/dev/variables.tf` | Input variables for dev environment |
+| `terraform/environments/dev/outputs.tf` | Output values (URLs, IDs) |
+| `terraform/environments/dev/terraform.tfvars` | Variable values (gitignored) |
+| `terraform/modules/networking/main.tf` | VPC, subnets, IGW, route tables |
+| `terraform/modules/networking/variables.tf` | Networking module variables |
+| `terraform/modules/networking/outputs.tf` | VPC ID, subnet IDs |
+| `terraform/modules/ecr/main.tf` | ECR repository and lifecycle policy |
+| `terraform/modules/ecr/variables.tf` | ECR module variables |
+| `terraform/modules/ecr/outputs.tf` | Repository URL, ARN |
+| `terraform/modules/secrets/main.tf` | Secrets data sources and IAM policy |
+| `terraform/modules/secrets/variables.tf` | Secrets module variables |
+| `terraform/modules/secrets/outputs.tf` | Secret ARNs, policy ARN |
+| `terraform/modules/app-runner/main.tf` | App Runner service, IAM roles |
+| `terraform/modules/app-runner/variables.tf` | App Runner module variables |
+| `terraform/modules/app-runner/outputs.tf` | Service URL, ARN |
+| `terraform/modules/s3-cloudfront/main.tf` | S3 bucket, CloudFront distribution, OAC |
+| `terraform/modules/s3-cloudfront/variables.tf` | S3/CloudFront module variables |
+| `terraform/modules/s3-cloudfront/outputs.tf` | CloudFront URL, bucket name, distribution ID |
+| `backend/Dockerfile` | Production Docker image (multi-stage build) |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `backend/src/config/settings.py` | AWS Secrets Manager integration, ALLOWED_ORIGINS |
+| `backend/src/api/main.py` | CORS configuration for CloudFront |
+| `.gitignore` | Terraform patterns (*.tfstate, .terraform/, etc.) |
+
+### Files NOT Created (Exist from Phase 0)
+
+| File | Status |
+|------|--------|
+| `backend/Dockerfile.dev` | Development Dockerfile (Phase 0) |
+| `backend/requirements.txt` | Python dependencies (Phase 0) |
+| `frontend/package.json` | Node dependencies (Phase 0) |
+| `docker-compose.yml` | Local development (Phase 0) |
+| `.env.example` | Environment template (Phase 0) |
+
+### AWS Resources Created (via Terraform)
+
+| Resource Type | Count | Names/Details |
+|---------------|-------|---------------|
+| VPC | 1 | `enterprise-agentic-ai-dev-vpc` |
+| Subnets | 2 | Public subnets in us-east-1a, us-east-1b |
+| Internet Gateway | 1 | Attached to VPC |
+| Route Table | 1 | Routes 0.0.0.0/0 to IGW |
+| Security Group | 1 | Egress-only for future VPC connector |
+| ECR Repository | 1 | `enterprise-agentic-ai-backend` |
+| S3 Bucket | 1 | `enterprise-agentic-ai-frontend-<random>` |
+| CloudFront Distribution | 1 | Serves S3 bucket |
+| CloudFront OAC | 1 | Origin Access Control for S3 |
+| App Runner Service | 1 | Backend API |
+| IAM Roles | 2 | ECR access role, instance role |
+| IAM Policies | 2-4 | Secrets access, Bedrock access, CloudWatch |
+
+### AWS Resources Created Manually (Section 3-4)
+
+| Resource | Name |
+|----------|------|
+| S3 Bucket (TF state) | `enterprise-agentic-ai-tfstate-<initials>` |
+| DynamoDB Table | `enterprise-agentic-ai-tflock` |
+| Secret | `enterprise-agentic-ai/demo-password` |
+| Secret | `enterprise-agentic-ai/auth-token-secret` |
+| Secret | `enterprise-agentic-ai/tavily-api-key` |
+| Secret | `enterprise-agentic-ai/fmp-api-key` |
 
 ---
 

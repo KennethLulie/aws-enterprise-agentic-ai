@@ -7,6 +7,21 @@ alwaysApply: false
 
 # Frontend Development Rules
 
+## Technology Versions (December 2025)
+
+- **Next.js 16** with App Router (not Pages Router)
+- **React 19** with new hooks and features
+- **Tailwind CSS 4** with CSS-based configuration
+- **TypeScript 5** with strict mode
+
+## Tailwind 4 Conventions
+
+Tailwind 4 uses CSS-based configuration instead of JavaScript:
+- Config in `@theme` directive within CSS, not `tailwind.config.js`
+- Uses `@import "tailwindcss"` instead of `@tailwind` directives
+- PostCSS plugin: `@tailwindcss/postcss` (not `tailwindcss`)
+- Automatic content detection (no `content` array needed)
+
 ## Code Standards
 
 - Strict TypeScript mode enabled (`strict: true` in tsconfig.json)
@@ -14,7 +29,7 @@ alwaysApply: false
 - Functional components with interfaces/types
 - Use shadcn/ui + Tailwind conventions
 - Next.js App Router patterns (not Pages Router)
-- Static export configuration (`output: 'export'` in next.config.js)
+- Static export configuration (`output: 'export'` in next.config.ts)
 
 ## File Structure
 
@@ -29,7 +44,13 @@ frontend/src/
 
 ## Docker Commands
 
-**See general.mdc for Docker commands.** Always use Docker - never run npm on host.
+```bash
+docker-compose exec frontend sh       # Shell
+docker-compose exec frontend npm run lint  # Lint
+docker-compose exec frontend npm run build # Build
+```
+
+→ See [_workflow.mdc] for full Docker commands
 
 ## Demo UX Considerations
 
@@ -170,3 +191,7 @@ try {
 - Server errors: "Something went wrong. Please try again in a moment."
 - Timeout: "Request timed out. Please try again."
 - Never show: Stack traces, error codes, technical details
+
+→ See [_project.mdc] for demo requirements
+→ See [backend.mdc] for SSE event format
+→ See [_security.mdc] for authentication patterns

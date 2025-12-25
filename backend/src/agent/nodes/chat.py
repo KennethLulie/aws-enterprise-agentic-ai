@@ -21,7 +21,7 @@ Usage:
     graph.add_node("chat", chat_node)
 
 Reference:
-    - agentic-ai.mdc for node patterns
+    - agent.mdc for node patterns
     - LangChain ChatBedrockConverse docs (Converse API)
 
 LangChain Version Notes (langchain-aws~=0.2.0, langchain~=0.3.0):

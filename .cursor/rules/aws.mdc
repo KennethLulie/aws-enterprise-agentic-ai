@@ -1,0 +1,94 @@
+---
+description: AWS configuration - region, credentials, Secrets Manager, service settings
+globs:
+alwaysApply: true
+---
+
+# AWS Configuration
+
+## Region
+
+- **ALWAYS us-east-1** unless explicitly changed
+- Load from environment: `AWS_REGION` (default: us-east-1)
+- NEVER hardcode region in code
+- Verify: `aws configure get region`
+
+## Credentials
+
+| Environment | Method |
+|-------------|--------|
+| Local dev | `.env` file (gitignored) |
+| AWS production | IAM roles (App Runner, Lambda) |
+
+**Rules:**
+- NEVER hardcode credentials in code
+- NEVER commit credentials to repository
+- Use `aws sts get-caller-identity` to verify credentials
+
+## Secrets Manager
+
+**When to use:** `ENVIRONMENT=aws`
+
+**Secret naming:** `enterprise-agentic-ai/{secret-name}`
+
+| Secret | Key | Purpose |
+|--------|-----|---------|
+| `enterprise-agentic-ai/demo-password` | `password` | Demo login |
+| `enterprise-agentic-ai/auth-token-secret` | `secret` | Session signing |
+| `enterprise-agentic-ai/tavily-api-key` | `api_key` | Web search |
+| `enterprise-agentic-ai/fmp-api-key` | `api_key` | Market data |
+
+**Pattern:**
+```python
+import boto3
+import json
+
+def get_secret(secret_name: str, key: str) -> str:
+    client = boto3.client('secretsmanager', region_name='us-east-1')
+    response = client.get_secret_value(SecretId=secret_name)
+    return json.loads(response['SecretString'])[key]
+```
+
+**Best practices:**
+- Cache secrets in memory (don't fetch per request)
+- Fallback to `.env` for local development
+- Load secrets at application startup
+
+## AWS Services by Phase
+
+| Service | Phase | Purpose |
+|---------|-------|---------|
+| Bedrock | 0+ | Nova Pro (main), Nova Lite (guards), Claude (fallback) |
+| Secrets Manager | 1a+ | All secrets |
+| App Runner | 1a+ | Backend compute |
+| ECR | 1a+ | Container registry |
+| S3 | 1a+ | Frontend hosting, Terraform state |
+| CloudFront | 1a+ | CDN for frontend |
+| DynamoDB | 0+ (state), 7+ (cache) | TF lock, inference cache |
+| Aurora Serverless v2 | 1b+ | PostgreSQL database |
+| Pinecone | 2+ | Vector store (external service) |
+
+## Bedrock Model Configuration
+
+```python
+# Main chat model
+BEDROCK_MODEL_ID = "amazon.nova-pro-v1:0"
+
+# Verification/guards (cheaper)
+BEDROCK_VERIFICATION_MODEL_ID = "amazon.nova-lite-v1:0"
+
+# Fallback (more expensive)
+BEDROCK_FALLBACK_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+```
+
+## Cost Optimization
+
+| Strategy | Implementation |
+|----------|----------------|
+| Scale to zero | App Runner auto-scaling, Aurora min 0.5 ACU |
+| Use cheaper models | Nova Lite for verification |
+| Cache aggressively | DynamoDB for inference cache (Phase 4+) |
+| Monitor usage | CloudWatch dashboards, billing alerts |
+
+→ See [_security.mdc] for secrets handling security
+→ See [infrastructure.mdc] for Terraform patterns
