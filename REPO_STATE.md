@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2025-12-24 (Phase 0 complete, Phase 1a guide added, docs reorganized)
+**Last Updated:** 2025-12-24 (Phase 0 complete, Phase 1a guide added, docs reorganized, Phase 1a file inventory updated)
 
 ---
 
@@ -125,11 +125,27 @@
 ### Phase 1a - Infrastructure & Deployment
 | File | Purpose |
 |------|---------|
-| terraform/environments/dev/main.tf | Dev environment infrastructure |
-| terraform/environments/dev/backend.tf | Terraform state configuration |
-| terraform/modules/networking/main.tf | VPC and subnet configuration |
-| terraform/modules/app-runner/main.tf | App Runner service configuration |
-| terraform/modules/s3-cloudfront/main.tf | Frontend hosting infrastructure |
+| terraform/environments/dev/backend.tf | Terraform S3 backend configuration |
+| terraform/environments/dev/main.tf | Dev environment module calls |
+| terraform/environments/dev/variables.tf | Dev environment input variables |
+| terraform/environments/dev/outputs.tf | Dev environment output values |
+| terraform/environments/dev/terraform.tfvars | Dev environment variable values (gitignored) |
+| terraform/modules/networking/main.tf | VPC, subnets, IGW, route tables |
+| terraform/modules/networking/variables.tf | Networking module variables |
+| terraform/modules/networking/outputs.tf | Networking module outputs |
+| terraform/modules/ecr/main.tf | ECR repository and lifecycle policy |
+| terraform/modules/ecr/variables.tf | ECR module variables |
+| terraform/modules/ecr/outputs.tf | ECR module outputs |
+| terraform/modules/secrets/main.tf | Secrets Manager IAM policies |
+| terraform/modules/secrets/variables.tf | Secrets module variables |
+| terraform/modules/secrets/outputs.tf | Secrets module outputs |
+| terraform/modules/app-runner/main.tf | App Runner service and IAM roles |
+| terraform/modules/app-runner/variables.tf | App Runner module variables |
+| terraform/modules/app-runner/outputs.tf | App Runner module outputs |
+| terraform/modules/s3-cloudfront/main.tf | S3 bucket, CloudFront distribution, OAC |
+| terraform/modules/s3-cloudfront/variables.tf | S3/CloudFront module variables |
+| terraform/modules/s3-cloudfront/outputs.tf | S3/CloudFront module outputs |
+| backend/Dockerfile | Production Docker image (multi-stage build) |
 
 ### Phase 1b - Production Hardening
 | File | Purpose |
@@ -160,11 +176,27 @@
 ### Phase 1a - To Be Created
 | File | Purpose |
 |------|---------|
-| terraform/environments/dev/main.tf | Dev environment |
-| terraform/environments/dev/backend.tf | Terraform state |
-| terraform/modules/networking/main.tf | VPC and subnets |
-| terraform/modules/app-runner/main.tf | App Runner service |
-| terraform/modules/s3-cloudfront/main.tf | Frontend hosting |
+| terraform/environments/dev/backend.tf | Terraform S3 backend configuration |
+| terraform/environments/dev/main.tf | Dev environment module calls |
+| terraform/environments/dev/variables.tf | Dev environment input variables |
+| terraform/environments/dev/outputs.tf | Dev environment output values |
+| terraform/environments/dev/terraform.tfvars | Dev environment variable values (gitignored) |
+| terraform/modules/networking/main.tf | VPC, subnets, IGW, route tables |
+| terraform/modules/networking/variables.tf | Networking module variables |
+| terraform/modules/networking/outputs.tf | Networking module outputs |
+| terraform/modules/ecr/main.tf | ECR repository and lifecycle policy |
+| terraform/modules/ecr/variables.tf | ECR module variables |
+| terraform/modules/ecr/outputs.tf | ECR module outputs |
+| terraform/modules/secrets/main.tf | Secrets Manager IAM policies |
+| terraform/modules/secrets/variables.tf | Secrets module variables |
+| terraform/modules/secrets/outputs.tf | Secrets module outputs |
+| terraform/modules/app-runner/main.tf | App Runner service and IAM roles |
+| terraform/modules/app-runner/variables.tf | App Runner module variables |
+| terraform/modules/app-runner/outputs.tf | App Runner module outputs |
+| terraform/modules/s3-cloudfront/main.tf | S3 bucket, CloudFront distribution, OAC |
+| terraform/modules/s3-cloudfront/variables.tf | S3/CloudFront module variables |
+| terraform/modules/s3-cloudfront/outputs.tf | S3/CloudFront module outputs |
+| backend/Dockerfile | Production Docker image (multi-stage build) |
 
 ### Phase 1b - To Be Created
 | File | Purpose |

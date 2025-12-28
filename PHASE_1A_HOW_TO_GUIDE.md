@@ -19,11 +19,11 @@
 - [AWS Account Setup and Billing Alerts](#2-aws-account-setup-and-billing-alerts)
 - [Terraform State Backend Setup](#3-terraform-state-backend-setup)
 - [Secrets Manager Setup](#4-secrets-manager-setup)
-- [Terraform Infrastructure](#5-terraform-infrastructure)
+- [Terraform Infrastructure - Stages 1-3](#5-terraform-infrastructure---stages-1-3)
 - [Backend Updates for AWS](#6-backend-updates-for-aws)
 - [Production Docker Build](#7-production-docker-build)
 - [ECR Repository and Image Push](#8-ecr-repository-and-image-push)
-- [App Runner Deployment](#9-app-runner-deployment)
+- [App Runner Deployment (Terraform Stage 4)](#9-app-runner-deployment-terraform-stage-4)
 - [Frontend Build and S3 Upload](#10-frontend-build-and-s3-upload)
 - [CloudFront Distribution](#11-cloudfront-distribution)
 - [End-to-End Verification](#12-end-to-end-verification)
@@ -37,16 +37,18 @@
 
 ## Quick Start Workflow Summary
 
+**📋 This guide is designed to be followed linearly.** Complete each section in order (1→2→3→...→12). There is no jumping back and forth.
+
 **Overall Phase 1a Workflow:**
 1. **Prerequisites** (Section 1): Verify Phase 0 complete, AWS CLI configured
 2. **AWS Setup** (Section 2): Billing alerts, IAM permissions verification
 3. **Terraform State** (Section 3): Create S3 bucket and DynamoDB table for state
 4. **Secrets Manager** (Section 4): Store all secrets (password, API keys)
-5. **Terraform Infrastructure** (Section 5): Write and apply Terraform modules
+5. **Terraform Stages 1-3** (Section 5): Networking, ECR repository, S3/CloudFront
 6. **Backend Updates** (Section 6): CORS, environment detection, CloudWatch logging
 7. **Docker Build** (Section 7): Create production Dockerfile
 8. **ECR Push** (Section 8): Build and push Docker image to ECR
-9. **App Runner** (Section 9): Deploy backend service
+9. **Terraform Stage 4 + App Runner** (Section 9): Deploy backend (needs image from Section 8)
 10. **Frontend** (Section 10): Build static export, upload to S3
 11. **CloudFront** (Section 11): Configure distribution, test access
 12. **Verification** (Section 12): End-to-end testing
@@ -680,10 +682,41 @@ aws secretsmanager list-secrets --region us-east-1 \
 
 ---
 
-## 5. Terraform Infrastructure
+## 5. Terraform Infrastructure - Stages 1-3
 
 ### What We're Doing
-Writing and applying Terraform configurations to create the AWS infrastructure: VPC, ECR, App Runner, S3, CloudFront, and IAM roles.
+Writing and applying Terraform configurations for infrastructure that doesn't depend on your application code: VPC/networking, ECR repository (empty), S3/CloudFront (empty). 
+
+**Note:** This guide is designed to be followed linearly from start to finish. Terraform is split into two sections because of a real dependency:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         WHY TERRAFORM IS SPLIT                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Section 5 (here): Create infrastructure that CAN exist empty              │
+│  ┌────────────────────────────────────────────────────────────┐             │
+│  │ Stage 1: Networking (VPC, subnets) ✓                       │             │
+│  │ Stage 2: ECR Repository (empty, waiting for image) ✓       │             │
+│  │ Stage 3: S3 + CloudFront (empty, waiting for files) ✓      │             │
+│  └────────────────────────────────────────────────────────────┘             │
+│                              │                                              │
+│                              ▼                                              │
+│  Sections 6-8: Build what goes IN the infrastructure                        │
+│  ┌────────────────────────────────────────────────────────────┐             │
+│  │ Section 6: Update backend code for AWS                     │             │
+│  │ Section 7: Build production Docker image                   │             │
+│  │ Section 8: Push image to ECR (fills the empty repo) ───────┼──┐          │
+│  └────────────────────────────────────────────────────────────┘  │          │
+│                                                                  │          │
+│  Section 9: Create infrastructure that NEEDS the image          │          │
+│  ┌────────────────────────────────────────────────────────────┐  │          │
+│  │ Stage 4: App Runner (pulls image from ECR) ◀───────────────┼──┘          │
+│  └────────────────────────────────────────────────────────────┘             │
+│                                                                             │
+│  ✓ Follow sections 5 → 6 → 7 → 8 → 9 in order. No jumping around.          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Why This Matters
 - **Infrastructure as Code:** Reproducible, version-controlled infrastructure
@@ -1126,7 +1159,7 @@ terraform plan -out=tfplan.out
 - `terraform plan`: Shows resources to be created
 
 **⚠️ CRITICAL: Review Plan Before Applying**
-
+**Highly Recommended to have LLM additionally do a santity check!**
 Before typing `yes` on any apply, carefully review the plan output:
 
 | Check | Expected | If Wrong - STOP |
@@ -1162,9 +1195,9 @@ Before typing `yes` on any apply, carefully review the plan output:
 
 **If you see any red flags:** Do NOT apply. Review your Terraform code for errors.
 
-### 5.11 Staged Apply Strategy (Recommended)
+### 5.11 Staged Apply: Stages 1-3
 
-Apply in stages to catch issues early and limit blast radius. This approach is safer than applying everything at once.
+Apply Terraform in stages to catch issues early and limit blast radius. This section covers Stages 1-3. Stage 4 (App Runner) is applied in Section 9 after your Docker image is ready.
 
 **Why Staged Apply:**
 - Catches configuration errors before creating expensive resources
@@ -1179,11 +1212,39 @@ cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
 terraform apply -target=module.networking
 ```
 
-When prompted, review the plan:
-- Expected: ~8 resources (VPC, subnets, IGW, route tables, security group)
-- Cost: $0/month (VPC resources are free)
+When prompted, review the plan. You should see output like this:
 
-Type `yes` only if the plan looks correct.
+**Note I highly recommend using an LLM to double check all plan output! Terraform can be risky to use if it makes unneeded resources!**
+
+```terraform
+Terraform will perform the following actions:
+
+  # module.networking.aws_internet_gateway.main will be created
+  # module.networking.aws_route_table.main will be created
+  # module.networking.aws_route_table_association.public[0] will be created
+  # module.networking.aws_route_table_association.public[1] will be created
+  # module.networking.aws_security_group.default will be created
+  # module.networking.aws_subnet.public[0] will be created
+  # module.networking.aws_subnet.public[1] will be created
+  # module.networking.aws_vpc.main will be created
+
+
+Plan: 8 to add, 0 to change, 0 to destroy.
+
+─────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.
+```
+
+**What to check:**
+- **8 resources to add** (matches expected count)
+- **All resources have correct tags**: `Project=enterprise-agentic-ai`, `Environment=dev`, `ManagedBy=terraform`
+- **VPC CIDR**: `10.0.0.0/16` (standard private range)
+- **No costs shown** (VPC resources are free)
+- **No resources being destroyed** (fresh deployment)
+
+Type `yes` only if the plan shows ~8 resources to create with the correct project tags.
 
 **Verify Stage 1:**
 ```bash
@@ -1197,8 +1258,27 @@ aws ec2 describe-vpcs --region us-east-1 \
 terraform apply -target=module.ecr
 ```
 
-- Expected: 2 resources (repository, lifecycle policy)
-- Cost: ~$0.10/GB/month (only pay for stored images)
+When prompted, review the plan. You should see output like this:
+
+**again review the output in a LLM to be safe**
+
+```terraform
+Terraform will perform the following actions:
+
+  # module.ecr.aws_ecr_lifecycle_policy.main will be created
+  # module.ecr.aws_ecr_repository.backend will be created
+
+Plan: 2 to add, 0 to change, 0 to destroy.
+```
+
+**What to check:**
+- **2 resources to add** (ECR repository + lifecycle policy)
+- **Repository name**: `enterprise-agentic-ai/backend`
+- **Correct tags**: `Project=enterprise-agentic-ai`, `Environment=dev`, `ManagedBy=terraform`
+- **Scan on push enabled** for security
+- **Lifecycle policy** keeps last 10 images to control costs
+
+Type `yes` only if you see 2 resources with the correct repository name and tags.
 
 **Verify Stage 2:**
 ```bash
@@ -1211,8 +1291,30 @@ aws ecr describe-repositories --region us-east-1 \
 terraform apply -target=module.s3_cloudfront
 ```
 
-- Expected: 6-8 resources (S3 bucket, policies, CloudFront distribution, OAC)
-- Cost: ~$0-5/month (request-based)
+When prompted, review the plan. You should see output like this:
+
+**again review the plan to ensure it is correct in an LLM**
+
+```terraform
+Terraform will perform the following actions:
+
+  # module.s3_cloudfront.aws_cloudfront_distribution.main will be created
+  # module.s3_cloudfront.aws_cloudfront_origin_access_control.main will be created
+  # module.s3_cloudfront.aws_s3_bucket.frontend will be created
+  # module.s3_cloudfront.aws_s3_bucket_policy.frontend will be created
+  # module.s3_cloudfront.aws_s3_bucket_public_access_block.frontend will be created
+ 
+Plan: 6 to add, 0 to change, 0 to destroy.
+```
+
+**What to check:**
+- **6 resources to add** (S3 bucket, bucket policy, public access block, CloudFront distribution, OAC)
+- **S3 bucket region**: `us-east-1`
+- **CloudFront price class**: `PriceClass_100` (cheapest, US/Europe)
+- **Security**: Public access blocked, CloudFront-only access via OAC
+- **Correct tags** on all resources: `Project=enterprise-agentic-ai`, `Environment=dev`, `ManagedBy=terraform`
+
+Type `yes` only if you see 6 resources with secure CloudFront+S3 configuration.
 
 **Verify Stage 3:**
 ```bash
@@ -1224,18 +1326,23 @@ aws cloudfront list-distributions \
   --query 'DistributionList.Items[?contains(Origins.Items[0].DomainName, `enterprise-agentic-ai`)].DomainName'
 ```
 
-**⏸️ CHECKPOINT: Stop Here**
+**✅ CHECKPOINT: Terraform Stages 1-3 Complete**
 
-At this point, stop and proceed to:
-1. **Section 6:** Update backend code for AWS
-2. **Section 7:** Build production Docker image
-3. **Section 8:** Push image to ECR
+You've created the AWS infrastructure that can exist without your application code:
 
-**Why stop?** App Runner needs a Docker image in ECR before it can start. If we create App Runner now, it will fail because there's no image to pull.
+| What You Created | Status |
+|------------------|--------|
+| VPC and networking (Stage 1) | ✅ Ready |
+| ECR repository (Stage 2) | ✅ Created, empty - waiting for your Docker image |
+| S3 bucket + CloudFront (Stage 3) | ✅ Created, empty - waiting for frontend files |
 
-**Stage 4: App Runner (After ECR has image - Section 9)**
+**Continue to Section 6 below.** The next sections will:
+- Update your backend code for AWS (Section 6)
+- Build a production Docker image (Section 7)
+- Push that image to ECR (Section 8)
+- Then Section 9 applies the final Terraform stage (App Runner) which needs that image
 
-This stage is completed in Section 9 after the Docker image is pushed to ECR.
+**The guide is linear** - just keep following the sections in order.
 
 ### 5.12 Verify Resource Count
 
@@ -1252,12 +1359,12 @@ terraform state list
 
 **Expected counts after each stage:**
 
-| After Stage | Expected Count | If Higher |
+| After Terraform Stage | Expected Count | If Higher |
 |-------------|----------------|-----------|
 | Stage 1 (networking) | 8-10 | Review for duplicates |
 | Stage 2 (+ecr) | 10-12 | Check for extra repos |
 | Stage 3 (+s3_cloudfront) | 16-20 | Check for extra distributions |
-| Stage 4 (+app_runner) | 20-26 | Check for extra services |
+| Stage 4 (+app_runner) - Section 9 | 20-26 | Check for extra services |
 
 **Check for Runaway Resources (should all be empty for Phase 1a):**
 ```bash
@@ -1670,10 +1777,12 @@ aws ecr describe-images --repository-name enterprise-agentic-ai-backend --region
 
 ---
 
-## 9. App Runner Deployment
+## 9. App Runner Deployment (Terraform Stage 4)
 
 ### What We're Doing
-Deploying the backend service to AWS App Runner (Stage 4 of staged apply). This is the final Terraform apply that creates the running backend service.
+Applying the final Terraform stage to create App Runner, which deploys your backend as a running service.
+
+**Why is this a separate section?** App Runner needs to pull a Docker image from ECR. In Section 5, you created an empty ECR repository. In Section 8, you pushed your image to it. Now App Runner can be created because it has an image to pull.
 
 ### Why This Matters
 - **Managed Compute:** App Runner handles scaling, load balancing, HTTPS
@@ -1682,12 +1791,13 @@ Deploying the backend service to AWS App Runner (Stage 4 of staged apply). This 
 
 ### Prerequisites for This Section
 Before proceeding, verify:
-- [ ] ECR image pushed (Section 8 complete)
-- [ ] Stages 1-3 applied (networking, ECR, S3/CloudFront from Section 5)
+- [ ] Terraform Stages 1-3 applied (Section 5 complete)
+- [ ] Backend code updated for AWS (Section 6 complete)
+- [ ] Docker image pushed to ECR (Section 8 complete)
 
-### 9.1 Apply App Runner (Stage 4)
+### 9.1 Apply Terraform Stage 4 (App Runner)
 
-This is the final stage of the staged apply strategy from Section 5.11.
+This completes the Terraform deployment. Stages 1-3 were applied in Section 5.
 
 **Commands:**
 ```bash
@@ -1701,7 +1811,7 @@ terraform apply
 ```
 
 **⚠️ Review the plan carefully before typing `yes`:**
-
+**Again sanity check plan with LLM in addition to manual check**
 | Check | Expected | If Wrong |
 |-------|----------|----------|
 | Resources to add | 4-8 (App Runner service, IAM roles) | Too many = investigate |
