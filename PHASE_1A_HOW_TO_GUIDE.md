@@ -329,7 +329,19 @@ Setting up billing alerts to monitor costs and ensuring your AWS account is prop
 
 ### 2.3 Add Required IAM Permissions
 
-This section ensures your IAM user has all the permissions needed for Phase 1a. Even if the quick test in Section 1.5 passed, you should still review and add any missing policies here.
+This section ensures your IAM user has all the permissions needed for Phase 1a.
+
+**Quick Check: Do you already have AdministratorAccess?**
+
+If your IAM user already has `AdministratorAccess` attached (directly or via a group), you have all necessary permissions. Verify with:
+
+```bash
+aws iam list-attached-user-policies --user-name $(aws iam get-user --query User.UserName --output text)
+```
+
+**Note AWS best practices is least-priviledge which can be achieved by following the guide below if you don't want to simply use AdministratorAccess**
+
+If you see `AdministratorAccess` in the output, **skip to Section 2.4**. Otherwise, continue below.
 
 **Required AWS managed policies:**
 
@@ -348,25 +360,22 @@ This section ensures your IAM user has all the permissions needed for Phase 1a. 
 
 **⚠️ Security Note:** These are broad permissions suitable for development/demo. Production environments should use more restrictive custom policies with least-privilege access.
 
-**Step-by-step: Add policies to your IAM user**
+**⚠️ AWS Quota Limit:** IAM users can only have **10 managed policies** attached directly. We use IAM Groups to avoid this limit and follow AWS best practices.
+
+#### Step-by-step: Create IAM Group and Add Policies
 
 1. **Open IAM Console:**
    - Sign in to AWS Console: https://console.aws.amazon.com
    - In the search bar, type **"IAM"** and click **IAM**
 
-2. **Find your user:**
-   - In the left sidebar, click **Users**
-   - Click on your username in the list
+2. **Create a new group:**
+   - In the left sidebar, click **User groups**
+   - Click **Create group** (blue button, top right)
 
-3. **Check existing policies:**
-   - Click the **Permissions** tab
-   - Review the "Permissions policies" list
-   - Note which policies you already have (skip those below)
-
-4. **Add missing policies:**
-   - Click **Add permissions** button → Select **Add permissions**
-   - Select **Attach policies directly** (third option)
-   - Search for and check each missing policy:
+3. **Configure the group:**
+   - Group name: `enterprise-agentic-ai-developers`
+   - Scroll down to **Attach permissions policies**
+   - Search for and check each policy:
 
    | Search for | Check this policy |
    |------------|-------------------|
@@ -381,8 +390,15 @@ This section ensures your IAM user has all the permissions needed for Phase 1a. 
    | `CloudWatchLogs` | CloudWatchLogsFullAccess |
    | `Bedrock` | AmazonBedrockFullAccess |
 
-5. **Apply permissions:**
-   - Click **Next** → Review → **Add permissions**
+   - Click **Create group**
+
+4. **Add your user to the group:**
+   - In the left sidebar, click **Users**
+   - Click on your username
+   - Click the **Groups** tab
+   - Click **Add user to groups**
+   - Check `enterprise-agentic-ai-developers`
+   - Click **Add user to groups**
 
 **Verify permissions were added:**
 ```bash
@@ -441,7 +457,7 @@ Everything AFTER this section will be managed by Terraform. This is the only man
 
 Terraform state resources need globally unique names. Use your initials or a unique identifier.
 
-**Define your naming convention (replace `YOUR_INITIALS` with your actual initials):**
+**Define your naming convention (replace `YOUR_INITIALS` with your actual initials)  (must not contain uppercase letters):**
 ```bash
 # Example: if your name is John Doe, use "jd"
 export TF_STATE_BUCKET="enterprise-agentic-ai-tfstate-YOUR_INITIALS"
@@ -463,7 +479,7 @@ echo "Region: $AWS_REGION"
 2. Click **Create bucket**
 
 **Bucket Configuration:**
-- **Bucket name:** `enterprise-agentic-ai-tfstate-YOUR_INITIALS` (must be globally unique)
+- **Bucket name:** `enterprise-agentic-ai-tfstate-YOUR_INITIALS` (must be globally unique) (must not contain uppercase letters)
 - **AWS Region:** US East (N. Virginia) us-east-1
 - **Object Ownership:** ACLs disabled (recommended)
 - **Block Public Access:** ✅ Block ALL public access (keep all checked)
@@ -760,7 +776,7 @@ mkdir -p terraform/modules/secrets
 find terraform -type d | sort
 ```
 
-**Expected Output:**
+**Output must contain:**
 ```
 terraform
 terraform/environments
@@ -775,15 +791,21 @@ terraform/modules/secrets
 
 ### 5.2 Create State Backend Configuration
 
+**Before running:** Replace `[YOUR_BUCKET_NAME_HERE]` with your actual bucket name from Section 3 (e.g., `enterprise-agentic-ai-tfstate-jd`)
+
 **Agent Prompt:**
 ```
 Create `terraform/environments/dev/backend.tf`
 
+My S3 bucket name: [YOUR_BUCKET_NAME_HERE]
+
 Contents:
 1. Terraform block with required_version >= 1.5.0
-2. Required providers: hashicorp/aws ~> 5.0, hashicorp/random ~> 3.0
+2. Required providers (see DEVELOPMENT_REFERENCE.md for versions):
+   - hashicorp/aws ~> 5.0
+   - hashicorp/random ~> 3.0
 3. S3 backend configuration (inside terraform block):
-   - bucket = "REPLACE_WITH_YOUR_BUCKET_NAME"
+   - bucket = "[use my bucket name above]"
    - key = "dev/terraform.tfstate"
    - region = "us-east-1"
    - dynamodb_table = "enterprise-agentic-ai-tflock"
@@ -797,15 +819,28 @@ Configuration:
 - Backend block goes INSIDE the terraform block (not separate)
 - Use Terraform HCL syntax, not JSON
 - Include comments explaining each section
+- Reference DEVELOPMENT_REFERENCE.md for canonical provider versions
+
+Verification (run in order):
+1. terraform fmt -check (formatting)
+2. terraform init -backend=false (install providers without backend)
+3. terraform validate (syntax check)
+
+Post-creation:
+- Commit the generated .terraform.lock.hcl file (provider version lock)
+- Update REPO_STATE.md to move backend.tf from planned to existing files
 
 Reference:
 - Terraform S3 backend docs: https://developer.hashicorp.com/terraform/language/settings/backends/s3
 - AWS provider docs: https://registry.terraform.io/providers/hashicorp/aws/latest/docs
-
-Verify: cd terraform/environments/dev && terraform validate
+- See .cursor/rules/infrastructure.mdc for backend template
 ```
 
-**After running the prompt:** Replace `REPLACE_WITH_YOUR_BUCKET_NAME` with your actual bucket name from Section 3 (e.g., `enterprise-agentic-ai-tfstate-jd`)
+**Manual Validation Command:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
+terraform fmt -check && terraform init -backend=false && terraform validate
+```
 
 ### 5.3 Create Networking Module
 
@@ -823,8 +858,8 @@ Resources in main.tf:
 5. aws_route_table_association (x2) - associate subnets with route table
 6. aws_security_group - for future VPC connector, egress-only (all outbound allowed)
 
-Variables in variables.tf:
-- project_name (string, required)
+Variables in variables.tf (follow pattern in infrastructure.mdc):
+- project_name (string, required, description)
 - environment (string, default "dev")
 - vpc_cidr (string, default "10.0.0.0/16")
 - tags (map(string), default {})
@@ -835,15 +870,27 @@ Outputs in outputs.tf:
 - security_group_id
 
 Configuration:
-- Tag all resources with: Name = "${var.project_name}-${var.environment}-<resource>"
+- Follow naming convention from infrastructure.mdc: "${var.project_name}-${var.environment}-<resource>"
 - Merge var.tags into all resource tags
-- No NAT Gateway (cost optimization - Phase 1b adds if needed)
-
-Reference:
-- AWS VPC Terraform docs
+- NO NAT Gateway - see Red Flags in infrastructure.mdc (~$32/month)
 - Phase 1a uses public subnets only (App Runner has public internet access by default)
 
-Verify: cd terraform/environments/dev && terraform validate
+Verification:
+- terraform fmt -check (can run on module directory for formatting)
+- Full validation happens after step 5.8 when environment main.tf is created
+
+Post-creation:
+- Update REPO_STATE.md to move networking module files from planned to existing
+
+Reference:
+- AWS VPC Terraform: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc
+- See .cursor/rules/infrastructure.mdc for module patterns and cost safety
+```
+
+**Manual Validation Command: - Command should succeed silently**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/modules/networking
+terraform fmt -check
 ```
 
 ### 5.4 Create ECR Module
@@ -864,8 +911,8 @@ Resources in main.tf:
    - Keep only last 10 tagged images
    - Use jsonencode() for policy document
 
-Variables in variables.tf:
-- repository_name (string, required)
+Variables in variables.tf (follow pattern in infrastructure.mdc):
+- repository_name (string, required, description)
 - tags (map(string), default {})
 
 Outputs in outputs.tf:
@@ -878,11 +925,23 @@ Configuration:
 - MUTABLE tags for development (can overwrite :latest)
 - Scan on push for security
 
+Verification:
+- terraform fmt -check (can run on module directory for formatting)
+- Full validation happens after step 5.8 when environment main.tf is created
+
+Post-creation:
+- Update REPO_STATE.md to move ECR module files from planned to existing
+
 Reference:
 - AWS ECR Terraform: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecr_repository
 - Cost: ~$0.10/GB/month storage
+- See .cursor/rules/infrastructure.mdc for module patterns
+```
 
-Verify: cd terraform/environments/dev && terraform validate
+**Manual Validation Command:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/modules/ecr
+terraform fmt -check
 ```
 
 ### 5.5 Create Secrets Module
@@ -906,8 +965,8 @@ Resources in main.tf:
 
 3. aws_iam_policy using the policy document
 
-Variables in variables.tf:
-- project_name (string, required)
+Variables in variables.tf (follow pattern in infrastructure.mdc):
+- project_name (string, required, description)
 - environment (string, default "dev")
 - tags (map(string), default {})
 
@@ -920,11 +979,24 @@ Configuration:
 - IAM policy allows App Runner to read these secrets
 - Use data sources, not resources (secrets already exist)
 
-Reference:
-- _security.mdc "Secrets Management"
-- Secrets created in Section 4 of this guide
+Verification:
+- terraform fmt -check (can run on module directory for formatting)
+- Full validation happens after step 5.8 when environment main.tf is created
 
-Verify: cd terraform/environments/dev && terraform validate
+Post-creation:
+- Update REPO_STATE.md to move secrets module files from planned to existing
+
+Reference:
+- AWS Secrets Manager Terraform: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret
+- See .cursor/rules/_security.mdc for secrets management patterns
+- See .cursor/rules/infrastructure.mdc for module patterns
+- Secrets created in Section 4 of this guide
+```
+
+**Manual Validation Command:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/modules/secrets
+terraform fmt -check
 ```
 
 ### 5.6 Create App Runner Module
@@ -970,13 +1042,13 @@ Environment variables (in image_configuration):
   - TAVILY_API_KEY = "${var.secret_arns["tavily_api_key"]}:api_key::"
   - FMP_API_KEY = "${var.secret_arns["fmp_api_key"]}:api_key::"
 
-Variables in variables.tf:
-- service_name (string, required)
-- ecr_repository_url (string, required)
+Variables in variables.tf (follow pattern in infrastructure.mdc):
+- service_name (string, required, description)
+- ecr_repository_url (string, required, description)
 - image_tag (string, default "latest")
-- secrets_policy_arn (string, required)
-- secret_arns (map(string), required)
-- allowed_origins (string, required)
+- secrets_policy_arn (string, required, description)
+- secret_arns (map(string), required, description)
+- allowed_origins (string, required, description)
 - cpu (string, default "1024")
 - memory (string, default "2048")
 - tags (map(string), default {})
@@ -991,12 +1063,24 @@ Configuration:
 - CPU 1024 = 1 vCPU, memory 2048 = 2 GB
 - Health check on /health endpoint
 
+Verification:
+- terraform fmt -check (can run on module directory for formatting)
+- Full validation happens after step 5.8 when environment main.tf is created
+
+Post-creation:
+- Update REPO_STATE.md to move App Runner module files from planned to existing
+
 Reference:
 - App Runner Terraform: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/apprunner_service
 - App Runner secrets: https://docs.aws.amazon.com/apprunner/latest/dg/manage-configure-secrets.html
 - Cost: ~$0.007/vCPU-hour when running, scales to zero when idle
+- See .cursor/rules/infrastructure.mdc for module patterns
+```
 
-Verify: cd terraform/environments/dev && terraform validate
+**Manual Validation Command:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/modules/app-runner
+terraform fmt -check
 ```
 
 ### 5.7 Create S3-CloudFront Module
@@ -1031,9 +1115,9 @@ Resources in main.tf:
    - custom_error_response for 403 and 404 → /index.html with 200 (SPA routing)
    - viewer_certificate: cloudfront_default_certificate = true
 
-Variables in variables.tf:
-- bucket_name (string, required)
-- project_name (string, required)
+Variables in variables.tf (follow pattern in infrastructure.mdc):
+- bucket_name (string, required, description)
+- project_name (string, required, description)
 - environment (string, default "dev")
 - tags (map(string), default {})
 
@@ -1049,12 +1133,24 @@ Configuration:
 - Use bucket_regional_domain_name, not bucket_domain_name
 - SPA routing: 403/404 errors return /index.html with 200
 
+Verification:
+- terraform fmt -check (can run on module directory for formatting)
+- Full validation happens after step 5.8 when environment main.tf is created
+
+Post-creation:
+- Update REPO_STATE.md to move S3-CloudFront module files from planned to existing
+
 Reference:
 - CloudFront OAC docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html
 - Cache policy IDs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html
 - Cost: ~$0.085/GB data transfer, minimal for demo
+- See .cursor/rules/infrastructure.mdc for module patterns
+```
 
-Verify: cd terraform/environments/dev && terraform validate
+**Manual Validation Command:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/modules/s3-cloudfront
+terraform fmt -check
 ```
 
 ### 5.8 Create Dev Environment Main Configuration
@@ -1101,11 +1197,67 @@ Configuration:
 - App Runner depends on other modules for their outputs
 - allowed_origins includes both CloudFront (prod) and localhost (dev)
 
+Verification (run in order):
+1. terraform fmt -check -recursive (formatting)
+2. terraform init (if not already initialized)
+3. terraform validate (syntax check)
+
+Post-creation:
+- Update REPO_STATE.md to move main.tf, variables.tf, outputs.tf from planned to existing
+- Do NOT run terraform plan/apply yet - that happens in a dedicated deployment step
+
 Reference:
 - Terraform module sources use relative paths
 - All modules defined in terraform/modules/
+- See .cursor/rules/infrastructure.mdc for module patterns and staged apply strategy
+```
 
-Verify: cd terraform/environments/dev && terraform validate
+**Manual Validation Command:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
+terraform fmt -check -recursive && terraform init && terraform validate
+```
+
+**Troubleshooting: "No valid credential sources found" Error**
+
+If `terraform init` fails with this error but `aws sts get-caller-identity` works, your AWS CLI is using a credential method that Terraform's S3 backend can't access (e.g., SSO sessions, Windows credential helpers, or IAM Identity Center).
+
+**Solution: Create standard credentials file**
+
+1. Run `aws configure`:
+   ```bash
+   aws configure
+   ```
+
+2. When prompted, enter:
+   - **AWS Access Key ID**: Your IAM user access key
+   - **AWS Secret Access Key**: Your IAM user secret key
+   - **Default region**: `us-east-1`
+   - **Default output format**: `json` (or press Enter)
+
+3. If you don't have access keys saved:
+   - Go to AWS Console → IAM → Users → Your user
+   - Security credentials tab → Create access key
+   - Choose "Command Line Interface (CLI)"
+   - Copy the Access Key ID and Secret Access Key
+
+4. Verify credentials file was created:
+   ```bash
+   cat ~/.aws/credentials
+   # Should show [default] with aws_access_key_id and aws_secret_access_key
+   ```
+
+5. Retry terraform init:
+   ```bash
+   terraform init && terraform validate
+   ```
+
+**Alternative: Export credentials as environment variables** (temporary, current session only):
+```bash
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"  # pragma: allowlist secret
+export AWS_REGION="us-east-1"
+terraform init && terraform validate
 ```
 
 ### 5.9 Update .gitignore for Terraform
@@ -1120,12 +1272,14 @@ Add these patterns if not already present:
 - *.tfstate.*
 - *.tfvars
 - !*.tfvars.example
-- .terraform.lock.hcl
 - crash.log
 - override.tf
 - override.tf.json
 - *_override.tf
 - *_override.tf.json
+
+DO NOT ignore .terraform.lock.hcl - it should be committed to ensure consistent
+provider versions across team members (per HashiCorp best practices).
 
 Also create `terraform/environments/dev/terraform.tfvars.example`:
 - Empty file with comment: "# No required variables - using locals in main.tf"
@@ -1133,8 +1287,12 @@ Also create `terraform/environments/dev/terraform.tfvars.example`:
 Reference:
 - Terraform gitignore best practices
 - tfvars files may contain secrets, always gitignore
+- Lock file should be committed: https://developer.hashicorp.com/terraform/language/files/dependency-lock
 
-Verify: grep -q "tfstate" .gitignore && echo "OK"
+**Manual Validation Command:**
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai
+grep -q "tfstate" .gitignore && echo "OK"
 ```
 
 ### 5.10 Initialize, Validate, and Review Terraform Plan
@@ -1293,7 +1451,7 @@ terraform apply -target=module.s3_cloudfront
 
 When prompted, review the plan. You should see output like this:
 
-**again review the plan to ensure it is correct in an LLM**
+**Review the plan with a coding assistant to ensure it is correct**
 
 ```terraform
 Terraform will perform the following actions:
@@ -1541,7 +1699,26 @@ Reference:
 - backend.mdc "Logging Configuration"
 - CloudWatch Logs Insights query syntax
 
-Verify: docker-compose logs backend 2>&1 | head -5  # Should see JSON formatted logs
+Verify: docker-compose logs backend 2>&1 | grep "logging_configured"  # Should see structured logs
+
+# Test AWS JSON format:
+docker-compose exec backend python -c "
+import os; os.environ['ENVIRONMENT'] = 'aws'
+from src.api.middleware.logging import configure_logging
+configure_logging(environment='aws')
+import structlog
+logger = structlog.get_logger()
+logger.info('test_json', conversation_id='abc123')
+"
+
+# Test sensitive data redaction:
+docker-compose exec backend python -c "
+from src.api.middleware.logging import configure_logging
+configure_logging(environment='aws')
+import structlog
+logger = structlog.get_logger()
+logger.info('test_redaction', password='secret123', api_key='key456')  # pragma: allowlist secret
+"
 ```
 
 **Note:** If Phase 0 logging is already JSON-formatted with structlog, this step may require no changes. Just verify.

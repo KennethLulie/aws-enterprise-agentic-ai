@@ -348,7 +348,7 @@ async def test_handles_auth_error(
     monkeypatch: pytest.MonkeyPatch,
     make_settings: Callable[[str | None], _DummySettings],
 ) -> None:
-    """Returns friendly message for authentication/authorization failures."""
+    """Gracefully falls back to mock data for authentication/authorization failures."""
 
     response = httpx.Response(
         status_code=401,
@@ -363,10 +363,15 @@ async def test_handles_auth_error(
         AsyncMock(side_effect=error),
     )
 
-    with pytest.raises(ValueError) as exc_info:
-        await fetch_market_data(["AAPL"], settings=make_settings("test-key"))
+    # Should not raise an exception - gracefully falls back to mock data
+    result = await fetch_market_data(["AAPL"], settings=make_settings("test-key"))
 
-    assert "Invalid or missing market data API key" in str(exc_info.value)
+    # Verify it returned mock data
+    assert result["mode"] == "mock"
+    assert result["mode_reason"] == "invalid_api_key"
+    assert "data" in result
+    assert len(result["data"]) == 1  # One ticker requested
+    assert result["data"][0]["ticker"] == "AAPL"
 
 
 @pytest.mark.asyncio

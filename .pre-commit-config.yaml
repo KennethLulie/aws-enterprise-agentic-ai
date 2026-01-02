@@ -104,7 +104,7 @@ repos:
 # =============================================================================
 default_language_version:
   python: python3.12
-default_stages: [commit]
+default_stages: [pre-commit]
 
 # Files to exclude from all hooks
 exclude: |

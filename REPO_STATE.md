@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2025-12-24 (Phase 0 complete, Phase 1a guide added, docs reorganized, Phase 1a file inventory updated)
+**Last Updated:** 2026-01-02 (Phase 1a: AWS Secrets Manager, CORS, CloudWatch logging)
 
 ---
 
@@ -44,15 +44,17 @@
 ### Backend Directory
 | File | Purpose |
 |------|---------|
+| backend/Dockerfile | Production Docker image (multi-stage, non-root user) |
 | backend/Dockerfile.dev | Development Docker image |
 | backend/requirements.txt | Python dependencies |
 | backend/pytest.ini | Pytest configuration |
 | backend/src/__init__.py | Backend package marker |
 | backend/src/config/__init__.py | Configuration package |
-| backend/src/config/settings.py | Pydantic settings with environment and FMP config |
+| backend/src/config/settings.py | Pydantic settings with AWS Secrets Manager integration, ALLOWED_ORIGINS |
 | backend/src/api/__init__.py | API package marker |
-| backend/src/api/main.py | FastAPI application factory |
+| backend/src/api/main.py | FastAPI application factory with CORS for CloudFront |
 | backend/src/api/middleware/__init__.py | API middleware package |
+| backend/src/api/middleware/logging.py | CloudWatch-compatible structlog configuration |
 | backend/src/api/routes/__init__.py | API routes package |
 | backend/src/api/routes/auth.py | Demo password login route |
 | backend/src/api/routes/chat.py | Chat API endpoints with streaming |
@@ -118,25 +120,21 @@
 | scripts/dev.sh | Dev helper script (start/stop/logs/test/shell/clean) |
 | scripts/validate_setup.py | Prerequisites validation script |
 
----
-
-## Planned Files (Do Not Exist Yet)
-
-### Phase 1a - Infrastructure & Deployment
+### Terraform Directory
 | File | Purpose |
 |------|---------|
 | terraform/environments/dev/backend.tf | Terraform S3 backend configuration |
+| terraform/environments/dev/.terraform.lock.hcl | Provider version lock file (commit to VCS) |
 | terraform/environments/dev/main.tf | Dev environment module calls |
-| terraform/environments/dev/variables.tf | Dev environment input variables |
+| terraform/environments/dev/variables.tf | Dev environment variables (placeholder) |
 | terraform/environments/dev/outputs.tf | Dev environment output values |
-| terraform/environments/dev/terraform.tfvars | Dev environment variable values (gitignored) |
-| terraform/modules/networking/main.tf | VPC, subnets, IGW, route tables |
+| terraform/modules/networking/main.tf | VPC, subnets, IGW, route tables, security group |
 | terraform/modules/networking/variables.tf | Networking module variables |
 | terraform/modules/networking/outputs.tf | Networking module outputs |
 | terraform/modules/ecr/main.tf | ECR repository and lifecycle policy |
 | terraform/modules/ecr/variables.tf | ECR module variables |
 | terraform/modules/ecr/outputs.tf | ECR module outputs |
-| terraform/modules/secrets/main.tf | Secrets Manager IAM policies |
+| terraform/modules/secrets/main.tf | Secrets Manager data sources and IAM policy |
 | terraform/modules/secrets/variables.tf | Secrets module variables |
 | terraform/modules/secrets/outputs.tf | Secrets module outputs |
 | terraform/modules/app-runner/main.tf | App Runner service and IAM roles |
@@ -145,6 +143,14 @@
 | terraform/modules/s3-cloudfront/main.tf | S3 bucket, CloudFront distribution, OAC |
 | terraform/modules/s3-cloudfront/variables.tf | S3/CloudFront module variables |
 | terraform/modules/s3-cloudfront/outputs.tf | S3/CloudFront module outputs |
+
+---
+
+## Planned Files (Do Not Exist Yet)
+
+### Phase 1a - Infrastructure & Deployment
+| File | Purpose |
+|------|---------|
 | backend/Dockerfile | Production Docker image (multi-stage build) |
 
 ### Phase 1b - Production Hardening
@@ -176,26 +182,6 @@
 ### Phase 1a - To Be Created
 | File | Purpose |
 |------|---------|
-| terraform/environments/dev/backend.tf | Terraform S3 backend configuration |
-| terraform/environments/dev/main.tf | Dev environment module calls |
-| terraform/environments/dev/variables.tf | Dev environment input variables |
-| terraform/environments/dev/outputs.tf | Dev environment output values |
-| terraform/environments/dev/terraform.tfvars | Dev environment variable values (gitignored) |
-| terraform/modules/networking/main.tf | VPC, subnets, IGW, route tables |
-| terraform/modules/networking/variables.tf | Networking module variables |
-| terraform/modules/networking/outputs.tf | Networking module outputs |
-| terraform/modules/ecr/main.tf | ECR repository and lifecycle policy |
-| terraform/modules/ecr/variables.tf | ECR module variables |
-| terraform/modules/ecr/outputs.tf | ECR module outputs |
-| terraform/modules/secrets/main.tf | Secrets Manager IAM policies |
-| terraform/modules/secrets/variables.tf | Secrets module variables |
-| terraform/modules/secrets/outputs.tf | Secrets module outputs |
-| terraform/modules/app-runner/main.tf | App Runner service and IAM roles |
-| terraform/modules/app-runner/variables.tf | App Runner module variables |
-| terraform/modules/app-runner/outputs.tf | App Runner module outputs |
-| terraform/modules/s3-cloudfront/main.tf | S3 bucket, CloudFront distribution, OAC |
-| terraform/modules/s3-cloudfront/variables.tf | S3/CloudFront module variables |
-| terraform/modules/s3-cloudfront/outputs.tf | S3/CloudFront module outputs |
 | backend/Dockerfile | Production Docker image (multi-stage build) |
 
 ### Phase 1b - To Be Created

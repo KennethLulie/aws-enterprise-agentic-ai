@@ -84,25 +84,34 @@ def test_cors_headers(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") == origin
     assert response.headers.get("access-control-allow-credentials") == "true"
-    assert response.headers.get("access-control-expose-headers") == "X-Request-ID"
+    assert response.headers.get("access-control-expose-headers") == "Content-Type"
 
 
 def test_cors_preflight_options(client: TestClient) -> None:
-    """CORS preflight responds with allowed methods and credentials."""
+    """CORS preflight responds with allowed methods, headers, and credentials."""
     origin = "http://localhost:3000"
 
     response = client.options(
         "/health",
         headers={
             "Origin": origin,
-            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type",
         },
     )
 
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") == origin
-    assert "GET" in response.headers.get("access-control-allow-methods", "")
     assert response.headers.get("access-control-allow-credentials") == "true"
+
+    # Verify allowed methods (GET, POST, OPTIONS for Phase 1a)
+    allowed_methods = response.headers.get("access-control-allow-methods", "")
+    assert "GET" in allowed_methods
+    assert "POST" in allowed_methods
+
+    # Verify allowed headers (Content-Type, Authorization, Cookie for auth)
+    allowed_headers = response.headers.get("access-control-allow-headers", "")
+    assert "content-type" in allowed_headers.lower()
 
 
 def test_404_response(client: TestClient) -> None:

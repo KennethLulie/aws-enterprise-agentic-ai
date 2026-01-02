@@ -50,6 +50,78 @@ tags = {
 
 **Why manual?** Terraform needs its backend to exist before it can manage anything.
 
+## Backend Configuration Template
+
+**File:** `terraform/environments/{env}/backend.tf`
+
+```hcl
+terraform {
+  required_version = ">= 1.5.0"
+
+  # See DEVELOPMENT_REFERENCE.md for provider versions
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
+  }
+
+  # S3 backend (bucket/table created manually)
+  backend "s3" {
+    bucket         = "enterprise-agentic-ai-tfstate-{initials}"
+    key            = "{env}/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "enterprise-agentic-ai-tflock"
+    encrypt        = true
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Project     = "enterprise-agentic-ai"
+      Environment = "{env}"
+      ManagedBy   = "terraform"
+    }
+  }
+}
+```
+
+**Key points:**
+- Backend block is INSIDE the terraform block
+- Provider versions reference DEVELOPMENT_REFERENCE.md
+- Default tags ensure all resources are tagged consistently
+
+## Verification Commands
+
+**Before committing Terraform changes:**
+```bash
+cd terraform/environments/dev
+
+# Format check (CI will fail if not formatted)
+terraform fmt -check -recursive
+
+# Initialize (downloads providers, configures backend)
+terraform init
+
+# Validate syntax and configuration
+terraform validate
+
+# Preview changes (always review before apply)
+terraform plan
+```
+
+**Fix formatting issues:**
+```bash
+terraform fmt -recursive
+```
+
 ## Cost Safety Checklist
 
 **Before `terraform apply`:**

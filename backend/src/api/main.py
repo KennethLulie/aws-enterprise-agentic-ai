@@ -3,17 +3,23 @@ FastAPI application factory and configuration.
 
 This module creates and configures the FastAPI application instance for the
 backend API. It sets up middleware, error handling, and routes following
-best practices for Phase 0 (local development).
+best practices for Phase 1a (AWS deployment).
 
 The application uses the modern lifespan context manager pattern (recommended
 in FastAPI 0.109+) instead of deprecated on_event decorators for startup/shutdown.
 
-Features (Phase 0):
-    - CORS middleware for frontend communication (localhost:3000)
+Features:
+    - CORS middleware with configurable origins (ALLOWED_ORIGINS env var)
+    - Cookie-based authentication with credentials support
     - Basic error handling with user-friendly messages
     - Health check endpoint (/health)
-    - Configuration validation on startup
+    - Configuration validation on startup (including AWS Secrets Manager)
     - Structured for future route additions
+
+CORS Configuration:
+    Origins are configured via ALLOWED_ORIGINS environment variable:
+    - Local: http://localhost:3000 (default)
+    - Production: https://xxxxx.cloudfront.net (set via App Runner env)
 
 Usage:
     # Run directly with uvicorn
@@ -28,24 +34,25 @@ Usage:
 
 from __future__ import annotations
 
-import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
+import structlog
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.api import __api_version__, __version__
+from src.api.middleware.logging import configure_logging
 from src.api.routes import auth_router, chat_router, health_router
 from src.config import Settings, get_settings, validate_config
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-# Configure module logger
-logger = logging.getLogger(__name__)
+# Module logger - configured after configure_logging() is called
+logger = structlog.get_logger(__name__)
 
 
 # =============================================================================
@@ -93,37 +100,45 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         ValueError: If configuration validation fails.
     """
     # === Startup ===
-    logger.info("Starting application...")
+    # Configure logging FIRST before any log statements
+    settings = get_settings()
+    configure_logging(
+        environment=settings.environment,
+        log_level=settings.log_level,
+    )
+
+    logger.info("application_starting")
 
     try:
         # Validate configuration on startup
         validation_result = validate_config()
-        settings = get_settings()
 
         logger.info(
-            f"Configuration validated. Environment: {settings.environment}, "
-            f"Debug: {settings.debug}"
+            "configuration_validated",
+            environment=settings.environment,
+            debug=settings.debug,
         )
 
         # Log any configuration warnings
         for warning in validation_result.get("warnings", []):
-            logger.warning(f"Config warning: {warning}")
+            logger.warning("config_warning", message=warning)
 
         logger.info(
-            f"Application started successfully. "
-            f"Version: {__version__}, API Version: {__api_version__}"
+            "application_started",
+            version=__version__,
+            api_version=__api_version__,
         )
 
     except ValueError as e:
-        logger.error(f"Configuration validation failed: {e}")
+        logger.error("configuration_validation_failed", error=str(e))
         raise
 
     yield  # Application runs here
 
     # === Shutdown ===
-    logger.info("Shutting down application...")
+    logger.info("application_shutting_down")
     # Add cleanup logic here when needed (e.g., close DB connections)
-    logger.info("Application shutdown complete.")
+    logger.info("application_shutdown_complete")
 
 
 # =============================================================================
@@ -193,25 +208,32 @@ def _configure_cors(app: FastAPI, settings: Settings) -> None:
     """
     Configure CORS middleware for cross-origin requests.
 
-    Allows the frontend (localhost:3000 in development) to communicate with
-    the backend API. In production, the allowed origins will include the
-    CloudFront distribution URL.
+    Allows the frontend to communicate with the backend API:
+    - Local development: http://localhost:3000, http://127.0.0.1:3000
+    - Production: CloudFront distribution URL (https://xxxxx.cloudfront.net)
+
+    Origins are configured via ALLOWED_ORIGINS environment variable (comma-separated)
+    or the cors_origins setting. Defaults support local development out of the box.
 
     Args:
         app: The FastAPI application instance.
         settings: Application settings containing CORS configuration.
+
+    Note:
+        allow_credentials=True is required for cookie-based authentication.
+        This means allow_origins cannot be ["*"] - specific origins must be listed.
     """
     cors_origins = settings.get_cors_origins_list()
 
-    logger.info(f"Configuring CORS for origins: {cors_origins}")
+    logger.info("cors_configured", origins=cors_origins)
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["*"],
-        expose_headers=["X-Request-ID"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "Cookie"],
+        expose_headers=["Content-Type"],
     )
 
 
@@ -237,8 +259,10 @@ def _register_error_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         """Handle HTTP exceptions with consistent response format."""
         logger.warning(
-            f"HTTP exception: {exc.status_code} - {exc.detail}",
-            extra={"path": str(request.url.path)},
+            "http_exception",
+            status_code=exc.status_code,
+            detail=exc.detail,
+            path=str(request.url.path),
         )
         return JSONResponse(
             status_code=exc.status_code,
@@ -253,8 +277,9 @@ def _register_error_handlers(app: FastAPI) -> None:
     async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
         """Handle validation errors with user-friendly messages."""
         logger.warning(
-            f"Validation error: {exc}",
-            extra={"path": str(request.url.path)},
+            "validation_error",
+            error=str(exc),
+            path=str(request.url.path),
         )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -279,8 +304,9 @@ def _register_error_handlers(app: FastAPI) -> None:
 
         # Log full exception details
         logger.exception(
-            f"Unhandled exception: {type(exc).__name__}",
-            extra={"path": str(request.url.path)},
+            "unhandled_exception",
+            exception_type=type(exc).__name__,
+            path=str(request.url.path),
         )
 
         # Return user-friendly message (hide details in production)

@@ -1,0 +1,7 @@
+# No required variables - using locals in main.tf
+#
+# This file serves as a template for terraform.tfvars
+# Copy to terraform.tfvars if you need to override any values
+#
+# Example:
+# environment = "staging"

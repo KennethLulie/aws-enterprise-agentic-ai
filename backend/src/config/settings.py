@@ -13,6 +13,15 @@ Auto-detection logic determines the environment based on:
 1. Explicit ENVIRONMENT variable (preferred)
 2. AWS metadata availability (for EC2/ECS/App Runner)
 
+AWS Secrets Manager Integration (Phase 1a+):
+When ENVIRONMENT=aws, secrets are loaded from AWS Secrets Manager:
+- enterprise-agentic-ai/demo-password (key: "password")
+- enterprise-agentic-ai/auth-token-secret (key: "secret")
+- enterprise-agentic-ai/tavily-api-key (key: "api_key")
+- enterprise-agentic-ai/fmp-api-key (key: "api_key")
+
+Secrets are cached in memory to avoid repeated API calls.
+
 Usage:
     from src.config.settings import Settings, get_settings, validate_config
 
@@ -29,6 +38,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from functools import lru_cache
@@ -44,6 +54,115 @@ from pydantic import (
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# AWS Secrets Manager Integration
+# =============================================================================
+
+# Module-level cache for secrets (loaded once at startup)
+_secrets_cache: dict[str, str] = {}
+_secrets_loaded: bool = False
+
+
+def _get_boto3_client() -> Any:
+    """
+    Get a boto3 Secrets Manager client.
+
+    Returns:
+        Any: boto3 SecretsManager client instance. Type is Any to avoid
+            requiring boto3 type stubs at import time.
+
+    Raises:
+        ImportError: If boto3 is not available.
+    """
+    import boto3  # type: ignore[import-untyped]
+
+    region = os.environ.get("AWS_REGION", "us-east-1")
+    return boto3.client("secretsmanager", region_name=region)
+
+
+def _load_secret_from_aws(secret_name: str, key: str) -> str | None:
+    """
+    Load a secret value from AWS Secrets Manager.
+
+    Args:
+        secret_name: The full name of the secret in Secrets Manager.
+        key: The key within the secret's JSON structure.
+
+    Returns:
+        The secret value, or None if not found.
+    """
+    try:
+        client = _get_boto3_client()
+        response = client.get_secret_value(SecretId=secret_name)
+        secret_data = json.loads(response["SecretString"])
+        return secret_data.get(key)
+    except Exception as e:
+        logger.warning(f"Failed to load secret '{secret_name}': {e}")
+        return None
+
+
+def load_secrets_from_aws() -> dict[str, str]:
+    """
+    Load all application secrets from AWS Secrets Manager.
+
+    Secrets are cached in the module-level _secrets_cache dict.
+    This function should be called once at application startup when
+    ENVIRONMENT=aws.
+
+    Returns:
+        Dict mapping setting names to their secret values.
+    """
+    global _secrets_cache, _secrets_loaded
+
+    if _secrets_loaded:
+        return _secrets_cache
+
+    # Secret mappings: setting_name -> (secret_name, key)
+    secret_mappings = {
+        "demo_password": ("enterprise-agentic-ai/demo-password", "password"),
+        "auth_token_secret": ("enterprise-agentic-ai/auth-token-secret", "secret"),
+        "tavily_api_key": ("enterprise-agentic-ai/tavily-api-key", "api_key"),
+        "fmp_api_key": ("enterprise-agentic-ai/fmp-api-key", "api_key"),
+    }
+
+    for setting_name, (secret_name, key) in secret_mappings.items():
+        try:
+            value = _load_secret_from_aws(secret_name, key)
+            if value:
+                _secrets_cache[setting_name] = value
+                logger.debug(f"Loaded secret: {setting_name}")
+            else:
+                logger.warning(
+                    f"Secret '{secret_name}' returned empty value for key '{key}'"
+                )
+        except Exception as e:
+            logger.warning(f"Could not load secret '{secret_name}': {e}")
+
+    _secrets_loaded = True
+    logger.info(f"Loaded {len(_secrets_cache)} secrets from AWS Secrets Manager")
+    return _secrets_cache
+
+
+def get_cached_secret(setting_name: str) -> str | None:
+    """
+    Get a cached secret value by setting name.
+
+    Args:
+        setting_name: The setting name (e.g., 'demo_password').
+
+    Returns:
+        The cached secret value, or None if not cached.
+    """
+    return _secrets_cache.get(setting_name)
+
+
+def clear_secrets_cache() -> None:
+    """Clear the secrets cache. Useful for testing."""
+    global _secrets_cache, _secrets_loaded
+    _secrets_cache = {}
+    _secrets_loaded = False
 
 
 class Settings(BaseSettings):
@@ -265,6 +384,59 @@ class Settings(BaseSettings):
         description="Cookie name for storing the session token.",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def load_aws_secrets(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Load secrets from AWS Secrets Manager when ENVIRONMENT=aws.
+
+        This validator runs before field validation to inject secrets into
+        the settings data. It checks for ENVIRONMENT=aws and loads secrets
+        from AWS Secrets Manager, then merges them with environment variables.
+
+        Priority (highest to lowest):
+        1. Explicit environment variables
+        2. AWS Secrets Manager values
+        3. Default values
+
+        Args:
+            data: The raw settings data from environment variables.
+
+        Returns:
+            Updated data dict with secrets injected.
+        """
+        # Check environment - support both dict and env var
+        env_from_data = data.get("environment")
+        env_from_os = os.environ.get("ENVIRONMENT", "local")
+        environment = str(env_from_data) if env_from_data else env_from_os
+
+        # Set environment-aware log_level default if not explicitly set
+        # Default: DEBUG for local, INFO for aws
+        if "log_level" not in data and not os.environ.get("LOG_LEVEL"):
+            data["log_level"] = "DEBUG" if environment.lower() == "local" else "INFO"
+
+        if environment.lower() == "aws":
+            logger.info(
+                "AWS environment detected, loading secrets from Secrets Manager..."
+            )
+            try:
+                secrets = load_secrets_from_aws()
+
+                # Inject secrets only if not already set (env vars take precedence)
+                for setting_name, secret_value in secrets.items():
+                    # Check if setting is already set in data or env
+                    env_key = setting_name.upper()
+                    if setting_name not in data and not os.environ.get(env_key):
+                        data[setting_name] = secret_value
+                        logger.debug(f"Injected secret for: {setting_name}")
+
+            except Exception as e:
+                logger.error(f"Failed to load secrets from AWS Secrets Manager: {e}")
+                # Continue with defaults/env vars - allows graceful degradation
+                # The validate_auth_secrets validator will catch missing critical secrets
+
+        return data
+
     @model_validator(mode="after")
     def populate_database_url(self) -> "Settings":
         """
@@ -301,6 +473,7 @@ class Settings(BaseSettings):
     cors_origins: str = Field(
         default="http://localhost:3000,http://127.0.0.1:3000",
         description="Comma-separated list of allowed CORS origins.",
+        validation_alias="ALLOWED_ORIGINS",
     )
 
     # =========================================================================
@@ -318,7 +491,10 @@ class Settings(BaseSettings):
     # =========================================================================
     log_level: str = Field(
         default="INFO",
-        description="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL.",
+        description=(
+            "Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL. "
+            "Defaults to DEBUG for local, INFO for aws if not explicitly set."
+        ),
     )
 
     # =========================================================================
@@ -388,6 +564,8 @@ class Settings(BaseSettings):
         env_prefix="",
         # Enable environment variable nesting with double underscore
         env_nested_delimiter="__",
+        # Populate by name for aliases to work properly
+        populate_by_name=True,
     )
 
     # =========================================================================
@@ -499,10 +677,20 @@ class Settings(BaseSettings):
         Get CORS origins as a list.
 
         Parses the comma-separated cors_origins string into a list.
+        Also accessible via ALLOWED_ORIGINS environment variable.
         """
         return [
             origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
         ]
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        """
+        Alias for get_cors_origins_list().
+
+        Provides a property-based access pattern for CORS origins.
+        """
+        return self.get_cors_origins_list()
 
     def is_local(self) -> bool:
         """Check if running in local development environment."""
@@ -622,37 +810,41 @@ def validate_config() -> dict[str, Any]:
         errors.append(f"Failed to load settings: {e}")
         raise ValueError(f"Configuration validation failed: {errors}") from e
 
+    # Placeholder values that indicate unconfigured secrets
+    placeholders = {"change-me", "change-this-password", "change-this-secret"}
+    demo_password_value = settings.demo_password.get_secret_value()
+    auth_secret_value = settings.auth_token_secret.get_secret_value()
+
     # Check for production-critical settings
     if settings.is_aws():
-        # In AWS, certain settings must be configured
-        if settings.demo_password.get_secret_value() == "change-this-password":
+        # In AWS, placeholder secrets are errors
+        if demo_password_value in placeholders:
             errors.append(
                 "DEMO_PASSWORD must be changed from default in production. "
                 "Store it in AWS Secrets Manager."
             )
-        if settings.auth_token_secret.get_secret_value() == "change-this-secret":
+        if auth_secret_value in placeholders:
             errors.append(
                 "AUTH_TOKEN_SECRET must be set in production. "
                 "Store it in AWS Secrets Manager."
             )
-    else:
-        # In local dev, warn if auth secret is default
-        if settings.auth_token_secret.get_secret_value() == "change-this-secret":
-            warnings.append(
-                "AUTH_TOKEN_SECRET is using the default value. "
-                "Set a unique secret in local .env to match production behavior."
-            )
-
+        # AWS-specific warnings
         if settings.vector_store_type == "chroma":
             warnings.append(
                 "Using ChromaDB in AWS environment. "
                 "Consider using Pinecone for production."
             )
-
         if settings.debug:
             warnings.append(
                 "DEBUG mode is enabled in AWS environment. "
                 "Consider setting DEBUG=false for production."
+            )
+    else:
+        # In local dev, warn if auth secrets use placeholders
+        if auth_secret_value in placeholders:
+            warnings.append(
+                "AUTH_TOKEN_SECRET is using the default value. "
+                "Set a unique secret in local .env to match production behavior."
             )
 
     # Check API keys for functionality warnings
@@ -716,4 +908,7 @@ __all__ = [
     "validate_config",
     "get_environment",
     "detect_environment",
+    "load_secrets_from_aws",
+    "get_cached_secret",
+    "clear_secrets_cache",
 ]
