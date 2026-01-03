@@ -145,8 +145,17 @@ async def _mock_stream_response(conversation_id: str, user_message: str) -> None
 
 
 def _should_use_real_agent(settings: Settings) -> bool:
-    """Use real LangGraph only when AWS credentials are configured."""
+    """Use real LangGraph only when AWS credentials are configured.
 
+    Returns True when:
+    1. Running in AWS environment (credentials come from IAM role), OR
+    2. Explicit AWS credentials are set (for local development)
+    """
+    # In AWS environment, IAM role provides credentials via instance metadata
+    if settings.is_aws():
+        return True
+
+    # For local development, require explicit credentials
     return bool(settings.aws_access_key_id and settings.aws_secret_access_key)
 
 

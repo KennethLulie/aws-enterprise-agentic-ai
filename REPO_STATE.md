@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-02 (Phase 1a: AWS Secrets Manager, CORS, CloudWatch logging)
+**Last Updated:** 2026-01-02 (Phase 1a: COMPLETED - AWS deployment live and tested)
 
 ---
 
@@ -57,7 +57,7 @@
 | backend/src/api/middleware/logging.py | CloudWatch-compatible structlog configuration |
 | backend/src/api/routes/__init__.py | API routes package |
 | backend/src/api/routes/auth.py | Demo password login route |
-| backend/src/api/routes/chat.py | Chat API endpoints with streaming |
+| backend/src/api/routes/chat.py | Chat API endpoints with streaming (fixed IAM role detection) |
 | backend/src/api/routes/health.py | Health check endpoint |
 | backend/src/api/routes/v1/__init__.py | Versioned API routes (Phase 1b+) |
 | backend/src/agent/__init__.py | Agent package marker |
@@ -93,7 +93,7 @@
 | frontend/eslint.config.mjs | ESLint configuration |
 | frontend/postcss.config.mjs | PostCSS configuration |
 | frontend/src/app/layout.tsx | Root layout |
-| frontend/src/app/page.tsx | Chat page with streaming |
+| frontend/src/app/page.tsx | Chat page with streaming (fixed TypeScript types) |
 | frontend/src/app/login/page.tsx | Login page |
 | frontend/src/app/globals.css | Global styles and Tailwind imports |
 | frontend/src/components/ui/button.tsx | shadcn/ui Button component |
@@ -101,7 +101,7 @@
 | frontend/src/components/ui/dialog.tsx | shadcn/ui Dialog component |
 | frontend/src/components/ui/input.tsx | shadcn/ui Input component |
 | frontend/src/components/ui/sonner.tsx | shadcn/ui Sonner toast component |
-| frontend/src/lib/api.ts | API client with SSE support |
+| frontend/src/lib/api.ts | API client with SSE support (fixed TypeScript type validation) |
 | frontend/src/lib/utils.ts | Utility functions (cn for classnames) |
 
 ### Documentation Directory

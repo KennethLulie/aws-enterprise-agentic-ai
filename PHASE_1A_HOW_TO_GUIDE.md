@@ -1,5 +1,14 @@
 # Phase 1a: Minimal MVP - AWS Cloud Deployment - Complete How-To Guide
 
+> ✅ **PHASE 1a COMPLETED** - Successfully deployed and tested on January 2, 2026
+>
+> | Component | URL |
+> |-----------|-----|
+> | **Frontend (CloudFront)** | `https://d2bhnqevtvjc7f.cloudfront.net` |
+> | **Backend (App Runner)** | `https://yhvmf3inyx.us-east-1.awsapprunner.com` |
+>
+> The system is live with streaming chat, Bedrock integration, and password protection working correctly.
+
 **Purpose:** This guide provides step-by-step instructions for deploying the Phase 0 local development environment to AWS, creating a publicly accessible demo with password protection.
 
 **Estimated Time:** 8-16 hours depending on AWS/Terraform experience
@@ -1983,10 +1992,6 @@ cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
 # Preview what will be created
 terraform plan
 
-# Apply App Runner and any remaining resources
-terraform apply
-```
-
 **⚠️ Review the plan carefully before typing `yes`:**
 **Again sanity check plan with LLM in addition to manual check**
 | Check | Expected | If Wrong |
@@ -1994,6 +1999,11 @@ terraform apply
 | Resources to add | 4-8 (App Runner service, IAM roles) | Too many = investigate |
 | Resources to change | 0-2 (minor updates OK) | Many changes = review carefully |
 | Resources to destroy | 0 | STOP if destroying resources |
+
+
+# Apply App Runner and any remaining resources
+terraform apply
+```
 
 **Expected new resources:**
 - `aws_apprunner_service` (1)
@@ -2033,6 +2043,8 @@ curl ${APP_RUNNER_URL}/health
 
 ### 9.4 Check App Runner Logs
 
+**note no logs have actually been generated yet**
+
 **Navigate in AWS Console:**
 1. AWS Console → **App Runner**
 2. Click on your service name
@@ -2055,7 +2067,7 @@ cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
 # Count all resources
 terraform state list | wc -l
 # Expected: 20-26 resources
-
+# was actually 38
 # List all resources for review
 terraform state list
 ```
@@ -2167,6 +2179,7 @@ cd ~/Projects/aws-enterprise-agentic-ai/frontend
 aws s3 sync out/ s3://${S3_BUCKET}/ --delete
 
 # Verify files uploaded
+#errno 32 expected behavior
 aws s3 ls s3://${S3_BUCKET}/ --recursive | head -20
 ```
 
@@ -2700,6 +2713,9 @@ Note these values for future reference:
 |------|---------|
 | `backend/src/config/settings.py` | AWS Secrets Manager integration, ALLOWED_ORIGINS |
 | `backend/src/api/main.py` | CORS configuration for CloudFront |
+| `backend/src/api/routes/chat.py` | Fixed `_should_use_real_agent()` to recognize IAM role credentials |
+| `frontend/src/app/page.tsx` | Fixed TypeScript type errors for `conversationId` and `handleSseError` |
+| `frontend/src/lib/api.ts` | Fixed TypeScript type error in `getSession` response validation |
 | `.gitignore` | Terraform patterns (*.tfstate, .terraform/, etc.) |
 
 ### Files NOT Created (Exist from Phase 0)
@@ -2760,12 +2776,27 @@ Phase 1a establishes AWS cloud deployment with:
 - Manual but repeatable deployment process
 - Cold start handled with loading indicator
 
+**Bug Fix Applied During Deployment:**
+
+During initial deployment testing, the backend was returning mock responses instead of calling Bedrock. The issue was in `backend/src/api/routes/chat.py` - the `_should_use_real_agent()` function only checked for explicit `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables, but in AWS App Runner with IAM roles, credentials come from the instance metadata service, not environment variables.
+
+**Fix:** Updated the function to also return `True` when `ENVIRONMENT=aws`, trusting the IAM role to provide credentials:
+
+```python
+def _should_use_real_agent(settings: Settings) -> bool:
+    # In AWS environment, IAM role provides credentials via instance metadata
+    if settings.is_aws():
+        return True
+    # For local development, require explicit credentials
+    return bool(settings.aws_access_key_id and settings.aws_secret_access_key)
+```
+
 **Next Phase (1b):** Add production hardening:
 - Persistent database (Aurora Serverless v2)
 - Automated CI/CD (GitHub Actions)
 - Enhanced security (rate limiting)
 - Improved observability
 
-**Estimated Time for Phase 1a:** 8-16 hours (completed)
+**Estimated Time for Phase 1a:** 8-16 hours (completed January 2, 2026)
 
-**Success Criteria:** User can access site via CloudFront URL, login with password, and have a streaming chat conversation with the AI agent.
+**Success Criteria:** ✅ User can access site via CloudFront URL, login with password, and have a streaming chat conversation with the AI agent.

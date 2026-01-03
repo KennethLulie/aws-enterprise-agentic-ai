@@ -156,7 +156,7 @@ export default function ChatPage() {
   const handleChatEvent = useCallback(
     (event: ChatEvent) => {
       if (event.conversationId) {
-        setConversationId((current) => current ?? event.conversationId);
+        setConversationId((current) => current ?? event.conversationId ?? null);
       }
 
       switch (event.type) {
@@ -203,7 +203,7 @@ export default function ChatPage() {
   );
 
   const handleSseError = useCallback(
-    (event: Event) => {
+    (errorMessage: string) => {
       // If the stream just completed normally, this is an expected closure - don't show error
       if (streamCompletedRef.current) {
         console.debug("SSE connection closed after stream completion (normal)");
@@ -211,10 +211,10 @@ export default function ChatPage() {
         return;
       }
 
-      console.warn("SSE connection error", event);
+      console.warn("SSE connection error:", errorMessage);
       eventSourceRef.current?.close();
       setIsLoading(false);
-      toast.error("Connection lost. Attempting to reconnect...");
+      toast.error(errorMessage);
       setReconnectAttempt((attempt) => attempt + 1);
     },
     []

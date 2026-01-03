@@ -69,9 +69,22 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 ## 📋 Project Status
 
-**Current Phase:** Phase 1a (AWS Cloud Deployment)
+**Current Phase:** Phase 1a ✅ Complete (AWS Cloud Deployment)
 
-Phase 0 (completed) established a fully working local development environment with:
+> 🚀 **Live Demo:** [https://d2bhnqevtvjc7f.cloudfront.net](https://d2bhnqevtvjc7f.cloudfront.net)
+> 
+> Backend API: `https://yhvmf3inyx.us-east-1.awsapprunner.com`
+
+**Phase 1a (completed January 2, 2026)** deployed the system to AWS:
+- ✅ App Runner backend with LangGraph agent and Bedrock (Nova Pro)
+- ✅ CloudFront + S3 static frontend hosting
+- ✅ Secrets Manager for secure credential storage
+- ✅ Real-time streaming chat with Server-Sent Events
+- ✅ Password-protected demo access
+- ✅ Infrastructure as Code with Terraform
+- ✅ Cost-optimized (~$10-25/month when active)
+
+**Phase 0 (completed)** established a fully working local development environment with:
 - LangGraph agent with Bedrock (Nova Pro) and streaming responses
 - Tavily search running in mock mode by default; live path enabled only when `TAVILY_API_KEY` is set
 - Financial Modeling Prep (FMP) market data tool running in mock mode by default; live path enabled when `FMP_API_KEY` is set
@@ -84,7 +97,7 @@ Phase 0 (completed) established a fully working local development environment wi
 docker-compose build backend && docker-compose up -d backend
 ```
 
-**Next Phase (1a):** Cloud Deployment - When Phase 0 is complete, Phase 1a deploys the working system to AWS using Terraform (App Runner backend + CloudFront frontend). This provides a publicly accessible demo while maintaining local development for rapid iteration.
+**Next Phase (1b):** Production Hardening - Add persistent database (Aurora Serverless v2), automated CI/CD with GitHub Actions, enhanced security (rate limiting), and improved observability.
 
 ## 📚 Documentation
 
