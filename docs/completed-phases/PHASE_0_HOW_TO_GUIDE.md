@@ -423,7 +423,7 @@ mkdir -p scripts
 mkdir -p docs
 mkdir -p lambda/document-ingestion
 mkdir -p .github/workflows
-mkdir -p terraform/{environments/{dev,prod},modules/{networking,app-runner,aurora,s3-cloudfront,lambda,observability}}
+mkdir -p terraform/{environments/{dev,prod},modules/{networking,app-runner,s3-cloudfront,lambda,observability}}
 ```
 
 **Note:** The `frontend/src/app/` directory is for Next.js App Router pages only. Component directories go under `frontend/src/components/`.
@@ -2190,7 +2190,7 @@ Enable real LangGraph agent flow with real external API tools (Tavily web search
 - **Incremental Testing:** Test each tool one-by-one to isolate issues
 - **Gradual Enablement:** `/api/chat` streams **mock** responses by default; it automatically switches to real LangGraph + Bedrock when AWS credentials are set (so you can verify the UI first, then turn on the real pipeline).
 
-**Note:** SQL and RAG tools remain stubbed in Phase 0. They require database/vector store setup that would duplicate effort needed in later phases. Real SQL (Aurora) and RAG (Pinecone) are enabled in Phase 2.
+**Note:** SQL and RAG tools remain stubbed in Phase 0. They require database/vector store setup that would duplicate effort needed in later phases. Real SQL (Neon PostgreSQL) and RAG (Pinecone) are enabled in Phase 2.
 
 ### Step-by-Step Implementation
 
@@ -2783,7 +2783,7 @@ docker-compose logs backend --tail=20 | grep -i reload
 - Market data tool: Real FMP API (when key set) or mock fallback
 - SQL tool: Stub returning mock data (real in Phase 2)
 - RAG tool: Stub returning mock data (real in Phase 2)
-- **Changes in Phase 2:** Implement real SQL (Aurora) and RAG (Pinecone) integrations
+- **Changes in Phase 2:** Implement real SQL (Neon PostgreSQL) and RAG (Pinecone) integrations
 
 **frontend/src/app/page.tsx:**
 - Chat interface

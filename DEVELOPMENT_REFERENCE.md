@@ -183,7 +183,7 @@ Configure Cursor/VS Code to use `.venv/bin/python` as the Python interpreter. Th
 2. **Tools** (Phase 0 implementation)
    - `search.py` - Real Tavily API (with mock fallback when API key not set)
    - `market_data.py` - Real FMP API (with mock fallback when API key not set)
-   - `sql.py` - Stub returning mock data (real Aurora in Phase 2)
+   - `sql.py` - Stub returning mock data (real Neon PostgreSQL in Phase 2)
    - `rag.py` - Stub returning mock data (real Pinecone in Phase 2)
 
 #### Step 5: Frontend Foundation
@@ -306,7 +306,7 @@ Deployed chatbot accessible via password-protected website with streaming respon
 - **CloudWatch Logs:** Application logging
 
 #### Backend Changes
-- **Checkpointing:** MemorySaver (no Aurora yet)
+- **Checkpointing:** MemorySaver (no database yet)
 - **Logging:** Basic Python logging → CloudWatch Logs
 - **API Endpoint:** `/api/chat` (no versioning yet)
 - **Health Check:** `/health` (simple, no dependency checks)
@@ -437,15 +437,12 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 ### Technology Specifications
 
 #### Infrastructure Additions
-- **Aurora Serverless v2:**
-  - Engine: PostgreSQL 15
-  - Min capacity: 0.5 ACU
-  - Max capacity: 2 ACU
-  - Publicly accessible: true
-  - In public subnets (from Phase 1a)
-- **App Runner VPC Connector:**
-  - Connects to public subnets
-  - Security group allows App Runner → Aurora
+- **Neon PostgreSQL (External Service):**
+  - Free tier (0.5GB storage, 190 compute hours/month)
+  - PostgreSQL 16
+  - Connection via public internet (SSL encrypted)
+  - No VPC connector needed
+  - DATABASE_URL stored in AWS Secrets Manager
 - **Lambda (Warmup):**
   - Runtime: Python 3.11
   - Schedule: Every 5 minutes (EventBridge)
@@ -468,17 +465,16 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 
 ### Implementation Order
 
-#### Step 1: Aurora Infrastructure
-1. **Aurora Module** (`terraform/modules/aurora/`)
-   - Aurora Serverless v2 cluster
-   - Database instance
-   - Security groups
-   - Subnet group (public subnets)
+#### Step 1: Neon Database Setup
+1. **Neon Account & Project:**
+   - Create free tier account at neon.tech
+   - Create project in us-east-1 (AWS)
+   - Copy connection string from dashboard
 
-2. **VPC Connector** (`terraform/modules/app-runner/vpc-connector.tf`)
-   - App Runner VPC connector
-   - Security group for connector
-   - Update App Runner to use connector
+2. **AWS Secrets Manager:**
+   - Create `enterprise-agentic-ai/database-url` secret
+   - Store Neon connection string
+   - Update App Runner to read DATABASE_URL secret
 
 #### Step 2: Database Setup
 1. **Alembic Setup** (`backend/alembic/`)
@@ -514,7 +510,7 @@ Add production-grade features: persistent state, CI/CD, observability, security 
    - Update frontend API calls
 
 2. **Enhanced Health Check** (`backend/src/api/routes/health.py`)
-   - Check Aurora connection
+   - Check Neon database connection
    - Check Bedrock access
    - Return dependency status
 
@@ -575,8 +571,8 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 - [ ] Automated deployment pipeline
 - [ ] Enhanced monitoring and logging
 - [ ] Production-ready security
-- [ ] Aurora database provisioned
-- [ ] VPC connector configured
+- [ ] Neon database connected
+- [ ] DATABASE_URL secret configured
 - [ ] Warmup Lambda running
 - [ ] GitHub Actions workflows working
 
@@ -605,7 +601,7 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **Logging:** Structured logging of queries and results
 
 #### Tool 2b: SQL Query
-- **Database:** Aurora Serverless v2 (from Phase 1b)
+- **Database:** Neon PostgreSQL (from Phase 1b)
 - **ORM:** SQLAlchemy
 - **Connection Pooling:** Built-in (5 connections, max overflow 10)
 - **Security:** Parameterized queries, table whitelisting
@@ -1290,6 +1286,7 @@ botocore~=1.35.0
 sqlalchemy~=2.0.35
 alembic~=1.13.0
 psycopg2-binary~=2.9.9
+langgraph-checkpoint-postgres~=2.0.0
 
 # Vector Store
 pinecone-client~=5.0.0
@@ -1582,7 +1579,7 @@ def test_agent_with_tool():
 
 ### Infrastructure
 - [ ] App Runner scales to 0
-- [ ] Aurora scales to 0.5 ACU minimum
+- [ ] Neon free tier usage verified
 - [ ] DynamoDB on-demand pricing
 - [ ] S3 Intelligent-Tiering
 - [ ] No RDS Proxy (use SQLAlchemy pooling)

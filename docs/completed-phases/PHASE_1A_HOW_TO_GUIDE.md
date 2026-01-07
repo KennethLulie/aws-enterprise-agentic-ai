@@ -2653,7 +2653,7 @@ git push origin v0.2.0-phase1a
 ### Prepare for Phase 1b
 
 Phase 1b adds:
-- Aurora Serverless v2 database
+- Neon PostgreSQL database (external, free tier)
 - PostgresSaver for persistent checkpointing
 - GitHub Actions CI/CD
 - Rate limiting
@@ -2792,7 +2792,7 @@ def _should_use_real_agent(settings: Settings) -> bool:
 ```
 
 **Next Phase (1b):** Add production hardening:
-- Persistent database (Aurora Serverless v2)
+- Persistent database (Neon PostgreSQL, free tier)
 - Automated CI/CD (GitHub Actions)
 - Enhanced security (rate limiting)
 - Improved observability

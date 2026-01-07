@@ -97,13 +97,13 @@ This system goes beyond a simple demo by implementing production-ready features:
 docker-compose build backend && docker-compose up -d backend
 ```
 
-**Next Phase (1b):** Production Hardening - Add persistent database (Aurora Serverless v2), automated CI/CD with GitHub Actions, enhanced security (rate limiting), and improved observability.
+**Next Phase (1b):** Production Hardening - Add persistent database (Neon PostgreSQL, free tier), automated CI/CD with GitHub Actions, enhanced security (rate limiting), and improved observability.
 
 ## 📚 Documentation
 
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
 - **[DEVELOPMENT_REFERENCE.md](./DEVELOPMENT_REFERENCE.md)** - Detailed implementation reference for each phase
-- **[PHASE_1A_HOW_TO_GUIDE.md](./PHASE_1A_HOW_TO_GUIDE.md)** - Step-by-step guide for Phase 1a (current) implementation
+- **[PHASE_1B_HOW_TO_GUIDE.md](./PHASE_1B_HOW_TO_GUIDE.md)** - Step-by-step guide for Phase 1b (current) implementation
 - **[docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md)** - Completed Phase 0 guide (archived)
 - **[docs/SECURITY.md](./docs/SECURITY.md)** - Security and secrets management guide
 
@@ -135,7 +135,7 @@ Planned end-state graph (per `PROJECT_PLAN.md`, implemented in `backend/src/agen
               ▼        ▼         ▼
    ┌────────────┐  ┌──────────┐  ┌────────────────┐
    │ SQL Tool   │  │ Respond  │  │ Error Recovery │
-   │ (Aurora)   │  │ (LLM out)│  │ (fallback/stop)│
+   │  (Neon)    │  │ (LLM out)│  │ (fallback/stop)│
    ├────────────┤  └────┬─────┘  └────────┬───────┘
    │ RAG Tool   │       │                 │
    │ (Pinecone) │       │                 │
@@ -219,7 +219,7 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │    │
 │  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Market    │ │    │
 │  │  │   Search   │  │   Query    │  │  Retrieval │  │   Data     │ │    │
-│  │  │            │  │  (Aurora)  │  │ (Pinecone) │  │   (MCP)    │ │    │
+│  │  │            │  │  (Neon)    │  │ (Pinecone) │  │   (MCP)    │ │    │
 │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -227,7 +227,7 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
           ┌─────────────────────────┼─────────────────────────┐
           ▼                         ▼                         ▼
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│ Aurora Serverless│    │     Pinecone     │    │   S3 Document    │
+│ Neon PostgreSQL  │    │     Pinecone     │    │   S3 Document    │
 │   v2 PostgreSQL  │    │    Serverless    │    │     Bucket       │
 │   (SQL Data)     │    │  (Vector Store)  │    │  (File Upload)   │
 └──────────────────┘    └──────────────────┘    └──────────────────┘
@@ -264,9 +264,9 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
 2. **Runtime Layer**: 
    - **Frontend**: Static Next.js export hosted on S3/CloudFront with password protection
    - **Backend**: AWS App Runner hosts the LangGraph agent orchestrator with Bedrock Nova LLM, input/output verification, inference caching, and Arize Phoenix tracing
-   - **Tools**: Four integrated tools (Tavily web search, Aurora SQL queries, Pinecone RAG retrieval, Market Data API) that the agent can intelligently select and use
+   - **Tools**: Four integrated tools (Tavily web search, Neon SQL queries, Pinecone RAG retrieval, Market Data API) that the agent can intelligently select and use
 
-3. **Data Layer**: Aurora PostgreSQL for structured data, Pinecone Serverless for vector storage, S3 for document storage with Lambda-triggered auto-ingestion
+3. **Data Layer**: Neon PostgreSQL for structured data, Pinecone Serverless for vector storage, S3 for document storage with Lambda-triggered auto-ingestion
 
 4. **Evaluation & Monitoring**: RAGAS evaluates RAG quality via scheduled Lambda and GitHub Actions, sending metrics to Arize Phoenix and CloudWatch for observability and regression detection
 
@@ -305,8 +305,8 @@ docker compose up
 
 - **Phase 0:** Local development environment (real Tavily search, FMP market data; SQL/RAG stubbed)
 - **Phase 1a:** Minimal MVP - AWS Cloud Deployment (App Runner + CloudFront)
-- **Phase 1b:** Production hardening (persistent state, Aurora DB, CI/CD)
-- **Phase 2:** Core agent tools (real SQL with Aurora, real RAG with Pinecone)
+- **Phase 1b:** Production hardening (persistent state, Neon PostgreSQL, CI/CD)
+- **Phase 2:** Core agent tools (real SQL with Neon, real RAG with Pinecone)
 - **Phase 3+:** Advanced features (verification, caching, observability, evaluation)
 
 See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for complete details.
@@ -406,7 +406,7 @@ GitHub Actions automates the entire development lifecycle:
 - **LLM:** AWS Bedrock (Amazon Nova Pro/Lite) - Latest AWS models with cost-effective pay-per-token pricing, excellent AWS integration, and fallback to Claude 3.5 Sonnet for reliability
 - **Agent Framework:** LangGraph - Industry-standard orchestration framework with native streaming, checkpointing for state persistence, and excellent tool integration
 - **Vector Store:** Pinecone Serverless - Fully managed vector database with native hybrid search, free tier (100K vectors), and superior performance vs. pgvector
-- **SQL Database:** Aurora Serverless v2 PostgreSQL - Enterprise-grade database with auto-scaling (0.5 ACU minimum), connection pooling, and cost-optimized for demo workloads
+- **SQL Database:** Neon PostgreSQL - Serverless PostgreSQL with free tier (0.5GB storage), fully managed, connection pooling, and cost-free for demo workloads
 
 ### Infrastructure & DevOps
 - **Compute:** AWS App Runner - Serverless container platform that scales to zero, no timeout limits, simple deployment
@@ -422,7 +422,7 @@ GitHub Actions automates the entire development lifecycle:
 ## 🏛️ Architecture Decisions
 
 ### Serverless-First Approach
-**Decision**: Use serverless and managed services wherever possible (App Runner, Aurora Serverless, Lambda, DynamoDB)
+**Decision**: Use serverless and managed services wherever possible (App Runner, Neon PostgreSQL, Lambda, DynamoDB)
 
 **Rationale**: 
 - **Cost Optimization**: Pay only for what you use, scales to zero when idle
@@ -507,7 +507,7 @@ This architecture demonstrates capabilities essential for enterprise AI deployme
 - **Production-Ready Error Handling**: Circuit breakers, retry logic, graceful degradation
 - **Health Checks**: Dependency validation and warmup endpoints
 - **Monitoring & Alerts**: CloudWatch alarms for errors, latency, and cost thresholds
-- **State Persistence**: Conversation state persists across restarts via Aurora
+- **State Persistence**: Conversation state persists across restarts via Neon PostgreSQL
 
 ### Security
 - **Input Validation**: Pydantic validators prevent malicious inputs

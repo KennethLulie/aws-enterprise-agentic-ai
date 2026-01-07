@@ -7,7 +7,7 @@ variables from .env files and environment variables.
 
 The configuration supports two environments:
 - local: Development environment using local services (Docker Compose)
-- aws: Production environment using AWS services (Secrets Manager, Aurora, etc.)
+- aws: Production environment using AWS services (Secrets Manager, Neon PostgreSQL, etc.)
 
 Auto-detection logic determines the environment based on:
 1. Explicit ENVIRONMENT variable (preferred)
@@ -267,7 +267,7 @@ class Settings(BaseSettings):
         default=None,
         description=(
             "PostgreSQL connection string. Uses Docker Compose postgres "
-            "service locally. Aurora Serverless v2 endpoint in production. "
+            "service locally. Neon PostgreSQL endpoint in production. "
             "If not provided, a URL is constructed from the postgres_* fields."
         ),
     )

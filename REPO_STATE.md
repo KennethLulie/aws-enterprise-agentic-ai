@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-02 (Phase 1a: COMPLETED - AWS deployment live and tested)
+**Last Updated:** 2026-01-06 (Phase 1b: Guide created, ready for implementation)
 
 ---
 
@@ -15,6 +15,7 @@
 | PROJECT_PLAN.md | Complete project plan with all phases |
 | DEVELOPMENT_REFERENCE.md | Phase-specific implementation details |
 | PHASE_1A_HOW_TO_GUIDE.md | Step-by-step Phase 1a guide (AWS deployment) |
+| PHASE_1B_HOW_TO_GUIDE.md | Step-by-step Phase 1b guide (Production hardening) |
 | REPO_STATE.md | This file - tracks repository state |
 
 ### Project Root - Configuration
@@ -39,6 +40,7 @@
 | .cursor/rules/backend.mdc | Python development rules (globs: backend/**) |
 | .cursor/rules/docs.mdc | Documentation rules (globs: docs/**, *.md) |
 | .cursor/rules/frontend.mdc | TypeScript/React rules (globs: frontend/**) |
+| .cursor/rules/howtoguide.mdc | How-to guide generation patterns, structure, prompts (globs: *HOW_TO_GUIDE*.md) |
 | .cursor/rules/infrastructure.mdc | Terraform and AWS infrastructure patterns (globs: terraform/**) |
 
 ### Backend Directory
@@ -111,6 +113,7 @@
 | docs/SECURITY.md | Security and secrets management guide |
 | docs/integration-test-checklist.md | Phase 0 end-to-end test checklist |
 | docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md | Completed Phase 0 guide (archived) |
+| docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md | Completed Phase 1a guide (archived) |
 
 ### Scripts Directory
 | File | Purpose |
@@ -148,18 +151,24 @@
 
 ## Planned Files (Do Not Exist Yet)
 
-### Phase 1a - Infrastructure & Deployment
-| File | Purpose |
-|------|---------|
-| backend/Dockerfile | Production Docker image (multi-stage build) |
-
 ### Phase 1b - Production Hardening
 | File | Purpose |
 |------|---------|
 | .github/workflows/ci.yml | CI pipeline (lint, test, validate) |
 | .github/workflows/deploy.yml | CD pipeline (build, deploy, test) |
-| terraform/modules/aurora/main.tf | Aurora Serverless v2 database |
-| lambda/warm_app_runner/handler.py | App Runner warmup Lambda function |
+| Note: Using Neon PostgreSQL (external) - no Aurora module needed |
+| terraform/modules/lambda/main.tf | Warmup Lambda function and EventBridge |
+| terraform/modules/lambda/variables.tf | Lambda module input variables |
+| terraform/modules/lambda/outputs.tf | Lambda function ARN |
+| lambda/warm_app_runner/handler.py | App Runner warmup Lambda handler |
+| backend/src/db/__init__.py | Database package exports |
+| backend/src/db/session.py | SQLAlchemy session management with connection pooling |
+| backend/alembic.ini | Alembic configuration |
+| backend/alembic/env.py | Alembic migration environment |
+| backend/alembic/versions/001_initial_checkpoint_tables.py | LangGraph checkpoint tables migration |
+| backend/src/api/middleware/rate_limit.py | slowapi rate limiting (10 req/min) |
+| backend/src/api/routes/v1/chat.py | Versioned chat endpoints (/api/v1/chat) |
+| backend/src/api/routes/warmup.py | Warmup endpoint (/health/warmup) |
 
 ### Phase 2+ - Advanced Features
 | File | Purpose |
@@ -174,23 +183,6 @@
 | backend/src/utils/reranker.py | Cross-encoder reranking (Phase 2 RAG) |
 | lambda/document-ingestion/handler.py | S3-triggered document processing |
 | terraform/modules/lambda/main.tf | Lambda infrastructure |
-
-**Scripts (Section 8):**
-| File | Target Section | Purpose |
-|------|---------------|---------|
-
-### Phase 1a - To Be Created
-| File | Purpose |
-|------|---------|
-| backend/Dockerfile | Production Docker image (multi-stage build) |
-
-### Phase 1b - To Be Created
-| File | Purpose |
-|------|---------|
-| .github/workflows/ci.yml | CI pipeline |
-| .github/workflows/deploy.yml | CD pipeline |
-| terraform/modules/aurora/main.tf | Aurora database |
-| lambda/warm_app_runner/handler.py | Warmup Lambda |
 
 ### Phase 2+ - To Be Created
 

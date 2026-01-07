@@ -36,15 +36,15 @@ Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestratio
 |-------|----------|---------------|-----|-------|
 | 0 | None | MemorySaver | `/api/chat` | Mock (Search/Market real if keys) |
 | 1a | None | MemorySaver | `/api/chat` | Mock (Search/Market real if keys) |
-| 1b+ | Aurora | PostgresSaver | `/api/v1/` | Real |
-| 4+ | Aurora | PostgresSaver | `/api/v1/` | Real + Cached |
+| 1b+ | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Real |
+| 4+ | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Real + Cached |
 
 ## Technology Stack
 
 **Backend:** Python 3.11+, FastAPI, LangGraph, LangChain-AWS, Bedrock
 **Frontend:** Next.js 16 (App Router), React 19, TypeScript, shadcn/ui, Tailwind 4
 **Infrastructure:** Terraform, Docker Compose, GitHub Actions
-**AWS:** App Runner, Aurora Serverless v2, S3, CloudFront, Secrets Manager
+**AWS:** App Runner, S3, CloudFront, Secrets Manager (+ Neon PostgreSQL external)
 
 → See DEVELOPMENT_REFERENCE.md for exact versions
 

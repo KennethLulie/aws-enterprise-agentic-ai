@@ -61,7 +61,7 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐ │    │
 │  │  │   Tavily   │  │    SQL     │  │    RAG     │  │  Market    │ │    │
 │  │  │   Search   │  │   Query    │  │  Retrieval │  │   Data     │ │    │
-│  │  │            │  │  (Aurora)  │  │ (Pinecone) │  │   (MCP)    │ │    │
+│  │  │            │  │  (Neon)    │  │ (Pinecone) │  │   (MCP)    │ │    │
 │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘ │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -69,8 +69,8 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
           ┌─────────────────────────┼─────────────────────────┐
           ▼                         ▼                         ▼
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│ Aurora Serverless│    │     Pinecone     │    │   S3 Document    │
-│   v2 PostgreSQL  │    │    Serverless    │    │     Bucket       │
+│ Neon PostgreSQL  │    │     Pinecone     │    │   S3 Document    │
+│  (Free Tier)     │    │    Serverless    │    │     Bucket       │
 │   (SQL Data)     │    │  (Vector Store)  │    │  (File Upload)   │
 └──────────────────┘    └──────────────────┘    └──────────────────┘
                                                          │
@@ -109,7 +109,7 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
 | **LLM (Verification)** | AWS Bedrock - Amazon Nova Lite | Smaller model, cheaper | Sufficient for guardrails |
 | **Agent Framework** | LangGraph | Open source | Industry standard, excellent streaming |
 | **Vector Store** | Pinecone Serverless | Free tier (100K vectors) | Fully managed, better than pgvector |
-| **SQL Database** | Aurora Serverless v2 PostgreSQL | Scales to 0.5 ACU minimum | Enterprise-grade, cost-optimized |
+| **SQL Database** | Neon PostgreSQL (external) | Free tier (0.5GB storage) | PostgreSQL-compatible, cost-free |
 | **Compute** | AWS App Runner | Scales to 0, pay-per-use | No timeout limits, simple deployment |
 | **Frontend Hosting** | CloudFront + S3 | Minimal cost for static | Next.js Static Export → S3 (no server needed) |
 | **Inference Cache** | DynamoDB | Pay-per-request, free tier | No minimum cost |
@@ -266,7 +266,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 **Tool Status in Phase 0:**
 - Search: Real Tavily API (with mock fallback)
 - Market Data: Real FMP API (with mock fallback)
-- SQL: Stub (mock data) - real Aurora in Phase 2
+- SQL: Stub (mock data) - real Neon PostgreSQL in Phase 2
 - RAG: Stub (mock data) - real Pinecone in Phase 2
 
 **Hot Reload Configuration:**
@@ -278,7 +278,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 **Local Service Substitutes (All in Docker Compose):**
 | AWS Service | Local Dev | Container |
 |-------------|-----------|-----------|
-| Aurora PostgreSQL | N/A in Phase 0 (SQL tool stub) | N/A |
+| Neon PostgreSQL | N/A in Phase 0 (SQL tool stub) | N/A |
 | Pinecone | N/A in Phase 0 (RAG tool stub) | N/A |
 | S3 file upload | Local `./uploads` folder | Volume mount |
 | DynamoDB cache | In-memory dict or SQLite | Python in-memory |
@@ -297,7 +297,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 - Working LangGraph agent with streaming responses
 - **LangGraph checkpointing:**
   - **Development:** MemorySaver (no DB dependency, faster)
-  - **Production:** PostgresSaver with Aurora (state persistence)
+  - **Production:** PostgresSaver with Neon PostgreSQL (state persistence)
   - Connection pooling via SQLAlchemy (no RDS Proxy needed for demo)
 - **Error recovery nodes** for graceful failure handling
 - **Built-in tool calling** via LangGraph tool binding (with Bedrock compatibility check)
@@ -337,7 +337,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 2. **Service Quotas (verify defaults are sufficient):**
    - App Runner services: 10 (default, sufficient)
-   - Aurora DB clusters: 40 (default, sufficient)
+   - Note: Neon is external, no AWS DB cluster quotas needed
    - ECR repositories: 10,000 (default, sufficient)
 
 3. **IAM Permissions (for deployment):**
@@ -432,7 +432,7 @@ docker-compose up
 - Simple password protection (shared password via Secrets Manager)
 - App Runner backend with basic LangGraph agent
 - **LangGraph checkpointing:**
-  - **MemorySaver only** (no Aurora yet - simplifies deployment)
+  - **MemorySaver only** (no database yet - simplifies deployment)
   - Conversation state stored in memory (lost on restart, acceptable for MVP)
   - Upgrade to PostgresSaver in Phase 1b
 - **LangGraph native streaming** with proper event handling
@@ -449,7 +449,7 @@ docker-compose up
 - **Health check endpoint** (`/health`) - simple version (no dependency checks yet)
 - **Input validation** with Pydantic models (basic)
 - **No API versioning yet** (use `/api/chat` - add versioning in Phase 1b)
-- **No database migrations** (no Aurora yet)
+- **No database migrations** (no database yet)
 
 **Infrastructure (Terraform) - Minimal:**
 - **Networking:** VPC with two public subnets
@@ -459,7 +459,7 @@ docker-compose up
 - Secrets Manager for password
 - ECR repository
 - CloudWatch Logs
-- **No Aurora yet** (saves cost, simplifies deployment)
+- **No database yet** (saves cost, simplifies deployment)
 
 **Deliverables:**
 - Working chat interface at CloudFront URL
@@ -481,16 +481,17 @@ docker-compose up
 **Goal:** Add production-grade features: persistent state, CI/CD, observability, security hardening
 
 **Features (Add to Phase 1a):**
-- **PostgresSaver checkpointing** with Aurora Serverless v2:
-  - Provision Aurora in public subnets (same VPC as Phase 1a)
-  - Add App Runner VPC connector for secure Aurora access
+- **PostgresSaver checkpointing** with Neon PostgreSQL (external service):
+  - Create Neon account and project (free tier)
+  - Store connection string in AWS Secrets Manager
+  - No VPC connector needed (external service over internet)
   - Migrate from MemorySaver to PostgresSaver
   - Connection pooling via SQLAlchemy
 - **Database migrations:** Alembic for schema versioning
 - **GitHub Actions CI/CD:** Automated build, test, deploy
 - **Structured logging:** structlog with JSON output
 - **Comprehensive error handling:** Graceful degradation, retry logic
-- **Health check endpoint:** Enhanced with dependency checks (Aurora, Bedrock)
+- **Health check endpoint:** Enhanced with dependency checks (Neon database, Bedrock)
 - **Warmup endpoint:** `/health/warmup` - triggers service initialization
 - **Warmup Lambda:** CloudWatch Events → Lambda health check every 5 min
 - **Rate limiting:** slowapi middleware (10 req/min per IP)
@@ -498,10 +499,9 @@ docker-compose up
 - **User-friendly error messages:** Map technical errors to friendly messages
 
 **Infrastructure Additions:**
-- Aurora Serverless v2 cluster (0.5 ACU minimum)
-- App Runner VPC connector (for Aurora access)
+- Neon PostgreSQL project (external, free tier)
+- DATABASE_URL in AWS Secrets Manager
 - Lambda function for warmup (EventBridge schedule)
-- Enhanced security groups (Aurora ingress from connector only)
 
 **Deliverables:**
 - Conversation state persists across restarts
@@ -518,9 +518,9 @@ docker-compose up
 **Infrastructure (Terraform):**
 - **Networking (Public-Only Demo Topology):**
   - Provision a VPC with **two public subnets** (no private subnets, NAT Gateway, or VPC endpoints).
-  - Aurora Serverless v2, ECS/Fargate (later phases), and EFS mount targets all live in these public subnets but are locked down via security groups.
-  - App Runner connects through a **VPC Connector** that targets the same public subnets. This avoids VPC endpoint costs while still giving App Runner a private path to Aurora, DynamoDB, etc.
-  - Aurora must be created with `publicly_accessible = true`; restrict inbound traffic to the security group that App Runner’s VPC connector ENIs use (no 0.0.0.0/0).
+  - ECS/Fargate (later phases), and EFS mount targets will live in these public subnets but are locked down via security groups.
+  - Note: Phase 1b uses Neon PostgreSQL (external service), so no VPC connector needed for database access.
+  - App Runner VPC Connector is optional for Phase 1b but will be needed for Phase 3 (Phoenix self-hosted) and future AWS services.
   - Document the upgrade path: add private subnets + VPC endpoints later for production hardening.
 - App Runner service with auto-scaling:
   - **Minimum instances: 0** (scales to zero when idle, saves cost)
@@ -558,7 +558,7 @@ docker-compose up
 - HTTPS only (CloudFront)
 - Password stored in Secrets Manager (encrypted)
 - IAM roles with minimal permissions
-- Aurora security group only allows ingress from App Runner VPC connector ENIs
+- Neon uses SSL-encrypted connections over public internet (no VPC needed)
 - ECS/EFS (Phase 5) security groups scoped to VPC connector CIDR blocks
 - **Rate limiting** (slowapi middleware, 10 req/min per IP)
 - **SQL injection prevention** (parameterized queries, table whitelisting)
@@ -674,10 +674,10 @@ If something isn't working, follow this systematic debugging process:
 **Common Issues (Phase 1b - Production Hardening)**
 | Symptom | Root Cause | Fix |
 |---------|------------|-----|
-| App Runner cannot reach Aurora (`could not connect to server`) | Aurora SG not allowing App Runner VPC connector ENIs | Add inbound rule: source = connector security group; ensure Aurora `publicly_accessible=true` |
+| App Runner cannot reach Neon (`could not connect to server`) | DATABASE_URL incorrect or missing | Verify DATABASE_URL secret in Secrets Manager, check Neon dashboard for correct connection string |
 | Warmup Lambda fails with 401 | Missing password header | Pass `Authorization: Bearer <password>` or store password in Secrets Manager and inject into Lambda env vars |
 | Terraform apply fails on App Runner VPC connector | Subnets not tagged or already in use | Ensure two public subnets exist and pass IDs to connector module |
-| Alembic migration fails | Database connection string incorrect | Verify `DATABASE_URL` in App Runner environment variables matches Aurora endpoint |
+| Alembic migration fails | Database connection string incorrect | Verify `DATABASE_URL` in App Runner environment variables matches Neon endpoint |
 | GitHub Actions deploy fails | Missing secrets or IAM permissions | Verify all secrets are set and IAM user has required permissions |
 
 ---
@@ -698,7 +698,7 @@ If something isn't working, follow this systematic debugging process:
 - **Structured logging** of search queries and results
 
 **2b. SQL Query Tool**
-- **Uses existing Aurora** from Phase 1b (no new provisioning needed)
+- **Uses existing Neon PostgreSQL** from Phase 1b (no new provisioning needed)
 - **Connection Pooling:** SQLAlchemy built-in (skip RDS Proxy for demo cost savings)
 - Sample database with financial demo data (transactions, accounts, customers, portfolios)
 - Natural language to SQL via LLM
@@ -784,7 +784,7 @@ If something isn't working, follow this systematic debugging process:
 - **No infrastructure required:** Uses existing App Runner backend, no new AWS services
 
 **Infrastructure Additions:**
-- **Note:** Uses existing Aurora Serverless v2 from Phase 1b (no new provisioning needed)
+- **Note:** Uses existing Neon PostgreSQL from Phase 1b (no new provisioning needed)
 - **Connection Pooling Strategy (Cost-Conscious):**
   - **Skip RDS Proxy** ($15-20/month) - too expensive for demo
   - Use SQLAlchemy connection pooling instead (free, built-in)
@@ -798,7 +798,7 @@ If something isn't working, follow this systematic debugging process:
 - Additional IAM policies for tool access
 - **Knowledge Graph Infrastructure (2025 Addition):**
   - Primary: Neo4j AuraDB Free tier (200K nodes, 400K relationships, $0/month)
-  - Fallback: PostgreSQL with recursive CTEs (uses existing Aurora)
+  - Fallback: PostgreSQL with recursive CTEs (uses existing Neon PostgreSQL)
   - Neo4j in Docker for local development
   - spaCy for NLP-based entity extraction (no LLM cost)
 
@@ -1137,10 +1137,7 @@ aws-enterprise-agentic-ai/
 │   │   │   ├── main.tf
 │   │   │   ├── service.tf
 │   │   │   └── outputs.tf
-│   │   ├── aurora/
-│   │   │   ├── main.tf
-│   │   │   ├── database.tf
-│   │   │   └── outputs.tf
+│   │   # Note: No aurora/ module - using Neon PostgreSQL (external)
 │   │   ├── s3-cloudfront/
 │   │   │   ├── main.tf
 │   │   │   ├── s3.tf
@@ -1172,7 +1169,7 @@ aws-enterprise-agentic-ai/
 │   │   │   └── tools/
 │   │   │       ├── __init__.py
 │   │   │       ├── search.py     # Tavily search (with fallback, circuit breaker)
-│   │   │       ├── sql.py        # Aurora query (SQL injection prevention)
+│   │   │       ├── sql.py        # Neon query (SQL injection prevention)
 │   │   │       ├── rag.py        # Pinecone retrieval (query expansion, RRF, compression)
 │   │   │       └── market_data.py # Market data (FMP via MCP, circuit breaker)
 │   │   ├── cache/
@@ -1327,7 +1324,7 @@ aws-enterprise-agentic-ai/
 | Service | Base Cost | Variable Cost | Notes |
 |---------|-----------|---------------|-------|
 | App Runner | $5-15 | $0 | Scales to zero when idle (cold start 10-30s) |
-| Aurora Serverless v2 | $10-20 | $0 | 0.5 ACU minimum, scales up on demand |
+| Neon PostgreSQL | $0 | $0 | Free tier (0.5GB, 190 compute hours) |
 | Bedrock Nova | $0 | $2-10 | Pay-per-token, varies by usage |
 | Pinecone | $0 | $0 | Free tier (100K vectors) |
 | S3 + CloudFront | $0 | $1-2 | First 1GB free, then $0.023/GB storage + $0.085/GB transfer |
@@ -1353,7 +1350,7 @@ aws-enterprise-agentic-ai/
   - ❌ RDS Proxy ($15-20/month) → Use SQLAlchemy connection pooling (free)
   - ❌ VPC Endpoints ($7-10 each) → Use public subnets (free, less secure but fine for demo)
   - ❌ NAT Gateway ($32/month) → Not needed with public subnets
-- Aurora scales to 0.5 ACU minimum (not zero, but minimal)
+- Neon free tier provides 0.5GB storage and 190 compute hours/month
 - App Runner scales to zero when idle
 - DynamoDB on-demand pricing with TTL (no minimum, automatic cleanup)
 - **S3 Intelligent-Tiering** for document storage (saves ~40% on storage)
@@ -1684,7 +1681,7 @@ Deployed to AWS with:
 **Ready to Begin Phase 1b: Production Hardening**
 
 Phase 1b adds:
-- Persistent database (Aurora Serverless v2)
+- Persistent database (Neon PostgreSQL)
 - Automated CI/CD (GitHub Actions)
 - Enhanced security (rate limiting)
 - Improved observability
@@ -1894,28 +1891,23 @@ terraform destroy  # Destroys all resources
 
 **Phase 1b Deployment Order (Production Hardening):**
 
-1. **Deploy Aurora:**
-   ```bash
-   terraform apply -target=module.aurora
-   ```
+1. **Set up Neon database:**
+   - Create Neon account at neon.tech (free tier)
+   - Create project in us-east-1 region
+   - Store connection string in AWS Secrets Manager
    ✅ **Verify:**
-   - Aurora cluster status = "available"
-   - Test connection: `psql -h <endpoint> -U demo -d demo`
+   - Neon project created
+   - Test connection: `psql <neon_connection_string>`
+
+2. **Update Terraform for DATABASE_URL:**
+   ```bash
+   terraform apply
+   ```
+   ✅ **Verify:** App Runner has DATABASE_URL environment variable
    - Run migrations: `alembic upgrade head`
+   - App Runner can reach Neon (check logs)
 
-2. **Deploy VPC Connector:**
-   ```bash
-   terraform apply -target=module.app_runner_vpc_connector
-   ```
-   ✅ **Verify:** Connector status = "active"
-
-3. **Update App Runner** to use VPC connector:
-   ```bash
-   terraform apply -target=module.app_runner
-   ```
-   ✅ **Verify:** App Runner can reach Aurora (check logs)
-
-4. **Deploy Warmup Lambda:**
+3. **Deploy Warmup Lambda:**
    ```bash
    terraform apply -target=module.warmup_lambda
    ```
@@ -2061,7 +2053,7 @@ The architecture is designed to be:
 
 **4. Architecture Overview (1 minute):**
 - Show architecture diagram
-- Highlight: LangGraph, Bedrock, Pinecone, Aurora, App Runner
+- Highlight: LangGraph, Bedrock, Pinecone, Neon, App Runner
 - Mention: Cost optimization, security, observability
 
 **5. Q&A Preparation:**

@@ -150,7 +150,7 @@ terraform apply -target=module.app_runner
 | Resource | Why It's Bad | Monthly Cost |
 |----------|--------------|--------------|
 | `aws_nat_gateway` | Not needed Phase 1a | ~$32 + data |
-| `aws_db_instance` | Use Aurora Serverless | ~$15-50 |
+| `aws_db_instance` | Use Neon (external) or Aurora Serverless | ~$0-50 |
 | `aws_eip` (unattached) | Orphaned resource | $3.60 |
 | Multiple `aws_apprunner_service` | Should only be 1 | ~$25 each |
 

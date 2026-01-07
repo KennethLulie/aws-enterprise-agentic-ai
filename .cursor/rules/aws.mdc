@@ -65,7 +65,7 @@ def get_secret(secret_name: str, key: str) -> str:
 | S3 | 1a+ | Frontend hosting, Terraform state |
 | CloudFront | 1a+ | CDN for frontend |
 | DynamoDB | 0+ (state), 7+ (cache) | TF lock, inference cache |
-| Aurora Serverless v2 | 1b+ | PostgreSQL database |
+| Neon PostgreSQL | 1b+ | PostgreSQL database (external, free tier) |
 | Pinecone | 2+ | Vector store (external service) |
 
 ## Bedrock Model Configuration
@@ -85,7 +85,7 @@ BEDROCK_FALLBACK_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 | Strategy | Implementation |
 |----------|----------------|
-| Scale to zero | App Runner auto-scaling, Aurora min 0.5 ACU |
+| Scale to zero | App Runner auto-scaling, Neon free tier |
 | Use cheaper models | Nova Lite for verification |
 | Cache aggressively | DynamoDB for inference cache (Phase 4+) |
 | Monitor usage | CloudWatch dashboards, billing alerts |

@@ -94,7 +94,7 @@ async def search_tool(query: str) -> str:
 |------|--------|-------|
 | Search | Tavily API | 0+ (real if key set) |
 | Market Data | FMP API | 0+ (real if key set) |
-| SQL Query | Aurora | 2+ |
+| SQL Query | Neon PostgreSQL | 2+ |
 | RAG Retrieval | Pinecone | 2+ |
 
 **Example Flow:** User asks about market + internal data
@@ -151,7 +151,7 @@ async for chunk in agent.astream(state):
 | Phase | Checkpointer | Notes |
 |-------|--------------|-------|
 | 0-1a | MemorySaver | In-memory, no DB needed |
-| 1b+ | PostgresSaver | Persistent, requires Aurora |
+| 1b+ | PostgresSaver | Persistent, requires Neon PostgreSQL |
 
 ```python
 from langgraph.checkpoint.memory import MemorySaver

@@ -94,7 +94,8 @@ resource "aws_route_table_association" "public_b" {
 
 #------------------------------------------------------------------------------
 # Security Group for VPC Connector (egress-only)
-# Used by App Runner to access VPC resources in Phase 1b+
+# Used by App Runner to access VPC resources in Phase 3+ (Phoenix, EFS)
+# Note: Phase 1b uses Neon PostgreSQL (external) - no VPC connector needed for database
 #------------------------------------------------------------------------------
 
 resource "aws_security_group" "vpc_connector" {
@@ -111,8 +112,8 @@ resource "aws_security_group" "vpc_connector" {
     description = "Allow all outbound traffic"
   }
 
-  # No ingress rules - egress only for Phase 1a
-  # Ingress rules will be added in Phase 1b+ for Aurora access
+  # No ingress rules - egress only
+  # Ingress rules will be added in Phase 3+ for Phoenix/EFS access
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-vpc-connector-sg"

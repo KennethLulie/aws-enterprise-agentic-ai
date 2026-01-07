@@ -1,0 +1,1106 @@
+---
+description: Rules for generating phase how-to guides - structure, agent prompts, verification, quality standards
+globs:
+  - "*HOW_TO_GUIDE*.md"
+  - "docs/**/*HOW_TO_GUIDE*.md"
+  - "docs/completed-phases/*HOW_TO_GUIDE*.md"
+alwaysApply: false
+---
+
+# How-To Guide Generation Rules
+
+## Purpose
+
+This rule defines the structure, patterns, and quality standards for generating phase how-to guides. All PHASE_*_HOW_TO_GUIDE.md files must follow these patterns to ensure consistency and completeness.
+
+## Before Generating a Guide
+
+**Required Context - Read These First:**
+
+| Document | What to Extract |
+|----------|-----------------|
+| PROJECT_PLAN.md | Phase goals, features, infrastructure, success criteria |
+| DEVELOPMENT_REFERENCE.md | Technology specs, implementation order, version numbers |
+| Previous phase guide | Continuity, prerequisites, deployment URLs |
+| REPO_STATE.md | Current file inventory, planned files |
+
+## Document Structure Template
+
+Every how-to guide must follow this structure in order:
+
+```markdown
+# Phase [X]: [Phase Name] - Complete How-To Guide
+
+> [Status block - completed or in-progress indicator]
+> | Component | URL |
+> |-----------|-----|
+> | **Frontend** | `https://...` |
+> | **Backend** | `https://...` |
+
+**Purpose:** [One-sentence description of what this phase accomplishes]
+
+**Estimated Time:** [X-Y hours] depending on [relevant experience factors]
+
+**Prerequisites:** [Previous phase] must be complete and verified before starting.
+
+**⚠️ Important:** [Key warning or critical information for this phase]
+
+**🖥️ Development Environment:** [Environment notes - WSL, Docker, etc.]
+
+---
+
+## Table of Contents
+
+- [Quick Start Workflow Summary](#quick-start-workflow-summary)
+- [Section 1](#1-section-name)
+- [Section 2](#2-section-name)
+- ... [12+ sections typical]
+- [Phase Completion Checklist](#phase-x-completion-checklist)
+- [Common Issues and Solutions](#common-issues-and-solutions)
+- [Files Created/Modified](#files-createdmodified-in-phase-x)
+- [Branch Management and Next Steps](#branch-management-and-next-steps)
+
+---
+
+## Quick Start Workflow Summary
+
+**📋 This guide is designed to be followed linearly.**
+
+**Overall Phase [X] Workflow:**
+1. **[Section Name]** (Section 1): [Brief description]
+2. **[Section Name]** (Section 2): [Brief description]
+... [continue for all sections]
+
+**Key Principle:** [Core principle for this phase]
+
+**Architecture Overview:**
+[ASCII art diagram showing phase-specific components]
+
+**Estimated Time:** [X-Y hours]
+
+---
+
+## 1. [Section Name]
+
+### What We're Doing
+[Clear explanation of what this section accomplishes]
+
+### Why This Matters
+- **[Reason 1]:** [Explanation]
+- **[Reason 2]:** [Explanation]
+- **[Reason 3]:** [Explanation]
+
+### [Common Issues - optional]
+| Symptom | Root Cause | Fix |
+|---------|------------|-----|
+| [Issue] | [Cause] | [Solution] |
+
+### 1.1 [Subsection Name]
+
+**Command (run in WSL terminal):**
+```bash
+[command]
+```
+
+**Expected Output:**
+```
+[expected output]
+```
+
+**If [condition]:**
+```bash
+[alternative command or fix]
+```
+
+### 1.2 [Next Subsection]
+
+**Agent Prompt:**
+```
+Create `path/to/file.ext`
+
+Requirements:
+1. [Specific requirement]
+2. [Specific requirement]
+3. [Specific requirement]
+
+Configuration:
+- [Setting or constant]
+- [Integration point]
+
+Reference:
+- [cursor-rule.mdc] for patterns
+- [external-docs-url] for API reference
+
+Verify: [command or check to validate]
+
+Post-creation:
+- Update REPO_STATE.md with new file
+```
+
+**Manual Validation Command:**
+```bash
+[validation command]
+```
+
+### 1.X [Section Name] Checklist
+
+- [ ] [Checkpoint item 1]
+- [ ] [Checkpoint item 2]
+- [ ] [Checkpoint item 3]
+
+---
+
+[Continue for all sections...]
+
+---
+
+## Phase [X] Completion Checklist
+
+### [Category 1]
+- [ ] [Item 1]
+- [ ] [Item 2]
+
+### [Category 2]
+- [ ] [Item 1]
+- [ ] [Item 2]
+
+---
+
+## Common Issues and Solutions
+
+### Issue: [Problem Description]
+
+**Symptoms:**
+- [Symptom 1]
+- [Symptom 2]
+
+**Solution:**
+```bash
+[fix command]
+```
+
+---
+
+## Files Created/Modified in Phase [X]
+
+### New Files Created
+
+| File | Purpose |
+|------|---------|
+| `path/to/file` | [Description] |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `path/to/file` | [What changed] |
+
+---
+
+## Branch Management and Next Steps
+
+### Save Phase [X] Work
+
+**Commands:**
+```bash
+git add .
+git commit -m "Complete Phase [X]: [description]"
+git tag -a v[version]-phase[x] -m "Phase [X] complete - [summary]"
+git push origin main
+git push origin v[version]-phase[x]
+```
+
+### Prepare for Phase [X+1]
+
+Phase [X+1] adds:
+- [Feature 1]
+- [Feature 2]
+- [Feature 3]
+
+**Create Phase [X+1] branch:**
+```bash
+git checkout -b phase-[x+1]-[branch-name]
+```
+
+---
+
+## Summary
+
+Phase [X] establishes:
+- ✅ [Achievement 1]
+- ✅ [Achievement 2]
+- ✅ [Achievement 3]
+
+**Key Achievements:**
+- [Bullet point summary]
+
+**Next Phase ([X+1]):** [Preview of next phase]
+
+**Estimated Time for Phase [X]:** [Actual time if completed]
+
+**Success Criteria:** ✅ [How to verify phase is complete]
+```
+
+## Agent Prompt Format
+
+All agent prompts in how-to guides MUST follow these formats based on file type. The goal is maximum specificity - the AI should be able to generate the exact code needed without guessing.
+
+---
+
+### Format 1: Python Backend Files
+
+Use for: FastAPI routes, config, agent nodes, tools, utilities
+
+```
+Create `backend/src/[path]/[file].py`
+
+Requirements:
+1. [Specific class/function to create with exact name]
+2. [Technical specification with types and signatures]
+3. [Integration point with exact module path, e.g., "from src.config.settings import Settings"]
+4. [Error handling requirement with specific exception types]
+5. [HTTP status codes if API endpoint]
+6. [Pydantic model names to use/create]
+
+Structure:
+- [Class name] inheriting from [BaseClass]
+- [Method 1] that does [specific action]
+- [Method 2] that returns [specific type]
+
+Key Features:
+- [Feature 1 with implementation detail]
+- [Feature 2 with specific library/function to use]
+- [Integration with existing component by exact function name]
+
+Reference:
+- [backend.mdc] for Python code patterns
+- [agent.mdc] for LangGraph patterns (if agent-related)
+- [existing-file.py] for similar implementation
+- [External URL] for library documentation
+
+Verify: Check for linter errors and type safety.
+```
+
+**Example - Python Route:**
+```
+Create `backend/src/api/routes/chat.py`
+
+Requirements:
+1. POST /api/chat endpoint with Server-Sent Events streaming
+2. GET /api/chat endpoint for SSE connection establishment
+3. Integrate LangGraph astream() for real-time streaming
+4. Parse Nova Pro thinking content (<thinking>...</thinking>)
+5. Handle tool call events separately from messages
+6. Implement conversation queue management with asyncio.Queue
+7. Support authentication via session validation
+8. Handle reconnection and error scenarios gracefully
+
+Key Features:
+- Async processing with LangGraph.astream() integration
+- Thinking content extraction and separate event streaming
+- Tool execution event handling (tool_call, tool_used, tool_result)
+- Conversation persistence across reconnections
+- Keepalive mechanism for SSE connections
+- Proper error handling with user-friendly messages
+
+LangChain Integration:
+- Use graph.astream() with stream_mode="values"
+- Extract messages, errors, and metadata from each state update
+- Handle AIMessage with tool_calls for tool execution
+- Support conversation_id for multi-turn conversations
+
+Reference:
+- FastAPI streaming responses docs
+- LangGraph astream() documentation
+- Server-Sent Events spec
+- [backend.mdc] for Python patterns
+
+Verify: Test streaming conversation flow with thinking display and tool calls.
+```
+
+---
+
+### Format 2: Terraform Modules
+
+Use for: All infrastructure in terraform/modules/
+
+```
+Create Terraform [module-name] module at `terraform/modules/[module-name]/`
+
+Files to create: main.tf, variables.tf, outputs.tf
+
+Resources in main.tf:
+1. [aws_resource_type] "[name]"
+   - [attribute] = [exact value or var.variable_name]
+   - [attribute] = [exact value]
+   - [nested block with specific settings]
+2. [aws_resource_type] "[name]"
+   - [detailed configuration]
+
+Variables in variables.tf (follow pattern in infrastructure.mdc):
+- [var_name] ([type], required/default "[value]", description)
+- [var_name] ([type], required/default "[value]", description)
+
+Outputs in outputs.tf:
+- [output_name] = [resource.attribute or expression]
+- [output_name] = [resource.attribute or expression]
+
+Configuration:
+- [Naming convention to follow with example]
+- [Tags pattern: Merge var.tags into all resource tags]
+- [CRITICAL: Any format-specific requirements, e.g., "ARN format: ARN:jsonKey::"]
+- [Cost warning if applicable, e.g., "NO NAT Gateway - ~$32/month"]
+
+Verification:
+- terraform fmt -check (formatting)
+- terraform validate (syntax) - note if deferred to later step
+
+Post-creation:
+- Update REPO_STATE.md to add module files
+
+Reference:
+- [infrastructure.mdc] for module patterns and cost safety
+- [Terraform registry URL for main resource]
+- Cost: [estimated cost if significant]
+```
+
+**Example - Terraform Module:**
+```
+Create Terraform App Runner module at `terraform/modules/app-runner/`
+
+Files to create: main.tf, variables.tf, outputs.tf
+
+Resources in main.tf:
+1. aws_iam_role for ECR access:
+   - Trust: build.apprunner.amazonaws.com
+   - Attach: AmazonEC2ContainerRegistryReadOnly (managed policy)
+
+2. aws_iam_role for instance:
+   - Trust: tasks.apprunner.amazonaws.com
+   - Attach: var.secrets_policy_arn (passed from secrets module)
+   - Inline policy for Bedrock: bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream on resource "*"
+
+3. aws_apprunner_service:
+   - source_configuration.image_repository.image_identifier = "${var.ecr_repository_url}:${var.image_tag}"
+   - instance_configuration: cpu = var.cpu, memory = var.memory
+   - health_check_configuration: protocol = "HTTP", path = "/health"
+
+Environment variables (in image_configuration):
+- runtime_environment_variables:
+  - ENVIRONMENT = "aws"
+  - AWS_REGION = "us-east-1"
+
+- runtime_environment_secrets (CRITICAL FORMAT - ARN:jsonKey::):
+  - DEMO_PASSWORD = "${var.secret_arns["demo_password"]}:password::"
+
+Variables in variables.tf:
+- service_name (string, required, description)
+- ecr_repository_url (string, required, description)
+- image_tag (string, default "latest")
+- cpu (string, default "1024")
+- memory (string, default "2048")
+
+Outputs in outputs.tf:
+- service_url (the https://... URL)
+- service_arn
+
+Configuration:
+- Secret format is ARN:jsonKey:: (the trailing colons are required)
+- CPU 1024 = 1 vCPU, memory 2048 = 2 GB
+
+Reference:
+- [infrastructure.mdc] for module patterns
+- https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/apprunner_service
+- Cost: ~$0.007/vCPU-hour when running
+```
+
+---
+
+### Format 3: Configuration Files
+
+Use for: requirements.txt, package.json, docker-compose.yml, .env files
+
+```
+Create `[path/to/config-file]`
+
+Contents:
+1. [Section or category with specific items]
+   - [item]: [exact version or value]
+   - [item]: [exact version or value]
+2. [Section or category]
+   - [items with exact values]
+
+Constraints:
+- [Version pinning strategy, e.g., "Use ~= for compatible release"]
+- [Ordering or grouping requirement]
+- [Cross-reference: "Versions must match DEVELOPMENT_REFERENCE.md"]
+
+Reference:
+- DEVELOPMENT_REFERENCE.md "Technology Version Reference" section
+- [External format documentation if needed]
+
+Verify: [Validation command, e.g., "pip check" or "npm ls"]
+```
+
+---
+
+### Format 4: Frontend TypeScript/React Files
+
+Use for: Next.js pages, React components, lib utilities
+
+```
+Create `frontend/src/[path]/[file].tsx`
+
+Requirements:
+1. [Component/function name with props interface]
+2. [State management approach]
+3. [Event handlers with specific behavior]
+4. [API integration with exact endpoint]
+5. [Error handling and loading states]
+
+Component Structure:
+- Props interface: [PropName] with fields [field: type]
+- State: [useState hooks with types]
+- Effects: [useEffect dependencies and behavior]
+- Return: [JSX structure description]
+
+Key Features:
+- [UI behavior with shadcn/ui component names]
+- [Streaming/SSE handling if applicable]
+- [Form validation approach]
+
+Styling:
+- [Tailwind classes pattern to follow]
+- [Dark/light mode considerations]
+
+Reference:
+- [frontend.mdc] for TypeScript/React patterns
+- [shadcn/ui documentation for components used]
+- [Existing similar component] for patterns
+
+Verify: npm run lint && npm run type-check
+```
+
+---
+
+### Format 5: User-Input Required Prompts
+
+When a prompt needs user-specific values (like bucket names, URLs, passwords):
+
+```
+**Before running:** Replace `[PLACEHOLDER]` with your actual value from [where to get it]
+
+Create `[file path]`
+
+My [value type]: [PLACEHOLDER]
+
+Contents/Requirements:
+1. [Requirement using the placeholder]
+2. [Other requirements]
+
+[Rest of prompt...]
+```
+
+**Example:**
+```
+**Before running:** Replace `[YOUR_BUCKET_NAME_HERE]` with your actual bucket name from Section 3 (e.g., `enterprise-agentic-ai-tfstate-jd`)
+
+Create `terraform/environments/dev/backend.tf`
+
+My S3 bucket name: [YOUR_BUCKET_NAME_HERE]
+
+Contents:
+1. Terraform block with required_version >= 1.5.0
+2. S3 backend configuration:
+   - bucket = "[use my bucket name above]"
+   - key = "dev/terraform.tfstate"
+...
+```
+
+---
+
+### Format 6: Updating Existing Files
+
+```
+Update `exact/path/to/file.ext`
+
+Changes:
+1. [Specific change: "Add X to Y function"]
+2. [Specific change: "Replace X with Y"]
+3. [Specific change: "Remove X from Z class"]
+
+Context:
+- [Why this change is needed]
+- [What existing code to modify - function/class name]
+
+Reference:
+- [Pattern to follow from cursor rule or existing code]
+
+Verify: [Command to validate the change works]
+```
+
+---
+
+### Agent Prompt Quality Checklist
+
+**Structure:**
+- [ ] Uses the correct format for file type (Python/Terraform/Config/Frontend)
+- [ ] File path uses backticks and exact path from workspace root
+- [ ] Requirements are numbered, specific, and actionable
+- [ ] Includes exact class/function/variable names, not generic descriptions
+
+**Technical Specificity:**
+- [ ] Types and signatures specified for Python (not just "add a function")
+- [ ] Exact resource configurations for Terraform (not just "create a VPC")
+- [ ] Version numbers reference DEVELOPMENT_REFERENCE.md
+- [ ] Integration points specify exact module paths (`from src.config import Settings`)
+
+**References:**
+- [ ] References relevant cursor rules by name (backend.mdc, agent.mdc, infrastructure.mdc)
+- [ ] Links to external documentation (Terraform registry, FastAPI docs, etc.)
+- [ ] Points to existing similar files for patterns
+
+**Safety:**
+- [ ] Cost warnings for expensive resources (NAT Gateway, RDS Proxy, etc.)
+- [ ] CRITICAL FORMAT notes for tricky syntax (like ARN:jsonKey::)
+- [ ] Security considerations noted where applicable
+
+**Verification:**
+- [ ] Includes specific verification command
+- [ ] Notes expected output or success criteria
+- [ ] Post-creation tasks include REPO_STATE.md update
+
+**User Input:**
+- [ ] Placeholders clearly marked with [BRACKETS]
+- [ ] "Before running" note explains where to get the value
+- [ ] Example values provided where helpful
+
+## Verification Command Requirements
+
+Every section must include verification commands that:
+
+1. **Are executable** - Can be copy-pasted and run
+2. **Show expected output** - User knows what success looks like
+3. **Include error handling** - "If you see X, do Y"
+4. **Reference Docker** - Most commands run in containers
+
+### Verification Command Template
+
+```bash
+# Command description
+[command]
+```
+
+**Expected Output:**
+```
+[exact expected output or pattern]
+```
+
+**If [error condition]:**
+```bash
+[recovery command]
+```
+
+## Cross-Reference Requirements
+
+How-to guides MUST include these cross-references:
+
+| Reference | When to Use |
+|-----------|-------------|
+| DEVELOPMENT_REFERENCE.md | All version numbers, package versions, API specs |
+| REPO_STATE.md | Before referencing any file, verify it exists |
+| PROJECT_PLAN.md | Phase goals, architecture decisions, success criteria |
+| Previous phase guide | Prerequisites, deployment URLs, continuity |
+| Cursor rules (.mdc) | Implementation patterns in agent prompts |
+| .env.example | Environment variable names and descriptions |
+
+## Quality Standards
+
+### Must Include
+
+- [ ] **Estimated time** for phase completion
+- [ ] **Prerequisites** clearly stated
+- [ ] **WSL/Docker notes** for Windows developers
+- [ ] **ASCII architecture diagram** for the phase
+- [ ] **Section checklists** after each major section
+- [ ] **Comprehensive completion checklist** at end
+- [ ] **Troubleshooting tables** with Symptom | Cause | Fix format
+- [ ] **File inventory tables** (created/modified)
+- [ ] **Git workflow** for saving and branching
+- [ ] **Next phase preview** with feature list
+
+### Formatting Standards
+
+- Use `⚠️ Important:` for critical warnings
+- Use `**Note:**` for helpful tips
+- Use tables for organized data (not bullet lists)
+- Use checkboxes `- [ ]` for all trackable items
+- Use code blocks with language hints (```bash, ```python, etc.)
+- Use horizontal rules `---` between major sections
+- Use anchor links in Table of Contents
+
+### Section Naming Pattern
+
+Sections should be numbered and follow this pattern:
+- `## 1. Prerequisites Verification`
+- `## 2. [Phase-specific Setup]`
+- `## 3. [First Major Feature]`
+- ... continue with logical grouping
+- `## [N-3]. End-to-End Verification`
+- `## [N-2]. Common Issues and Solutions`
+- `## [N-1]. Phase Completion Checklist`
+- `## [N]. Branch Management and Next Steps`
+
+## Optimal Prompt for Generating a New Guide
+
+When you need to generate a new phase guide, use this exact prompt format. This template ensures the generated guide contains high-quality, specific agent prompts that can be executed directly.
+
+### The Master Prompt Template
+
+```
+Generate `PHASE_[X]_HOW_TO_GUIDE.md`
+
+Phase: [X] - [Phase Name]
+Goal: [Copy exact goal from PROJECT_PLAN.md Phase [X] section]
+
+## Context to Review First
+
+1. PROJECT_PLAN.md - Phase [X] section for:
+   - Goals and success criteria
+   - Features to implement
+   - Infrastructure requirements
+   - Common issues and debugging
+
+2. DEVELOPMENT_REFERENCE.md - Phase [X] section for:
+   - Technology specifications
+   - Implementation order
+   - Package versions
+   - Coding patterns
+
+3. Previous phase guide ([docs/completed-phases/PHASE_[X-1]_HOW_TO_GUIDE.md]) for:
+   - Deployed URLs to reference
+   - Prerequisites that are now complete
+   - Continuity of instructions
+
+4. REPO_STATE.md for:
+   - Current file inventory
+   - Planned files for this phase
+
+## Prerequisites from Prior Phase
+
+- Phase [X-1] must be complete with [specific verification]
+- Deployed URLs:
+  - CloudFront: https://[domain].cloudfront.net
+  - App Runner: https://[id].us-east-1.awsapprunner.com
+- [Any specific state that must exist]
+
+## What This Phase Creates
+
+### New Infrastructure (Terraform)
+- [AWS service 1 with specific module name]
+- [AWS service 2 with specific module name]
+- [Resource with cost estimate if significant]
+
+### New Backend Features (Python)
+- [Feature 1 with file path: backend/src/...]
+- [Feature 2 with file path: backend/src/...]
+- [Feature 3 with integration point]
+
+### New Frontend Features (if any)
+- [Feature 1 with file path: frontend/src/...]
+
+### New Configuration
+- [New environment variables]
+- [New settings]
+
+## Agent Prompt Quality Requirements
+
+CRITICAL: Every agent prompt in this guide must follow howtoguide.mdc format:
+
+1. **Python files:** Use Format 1 with Requirements, Structure, Key Features, Reference
+2. **Terraform modules:** Use Format 2 with Resources in main.tf, Variables, Outputs, Configuration
+3. **Config files:** Use Format 3 with Contents, Constraints, Reference
+4. **Frontend files:** Use Format 4 with Requirements, Component Structure, Styling
+
+Each prompt must include:
+- Exact file path with backticks
+- Numbered, specific requirements (not vague descriptions)
+- Exact class/function/resource names to create
+- Integration points with module paths
+- Reference to relevant cursor rule (.mdc file)
+- Verification command
+- Post-creation task (update REPO_STATE.md)
+- Cost warnings for expensive resources
+- CRITICAL FORMAT notes for tricky syntax
+
+## Verification Approach
+
+Every section must end with:
+- Executable verification command
+- Expected output or success criteria
+- Troubleshooting for common failures
+
+## Structure Requirements
+
+Follow howtoguide.mdc template exactly:
+- Header with status, purpose, time, prerequisites
+- Table of Contents with anchor links
+- Quick Start Workflow Summary with ASCII diagram
+- Numbered sections with "What We're Doing" and "Why This Matters"
+- Section checklists after each major section
+- Phase Completion Checklist
+- Common Issues and Solutions (table format)
+- Files Created/Modified inventory
+- Branch Management and Next Steps
+
+Estimated time: [X-Y hours]
+```
+
+### Example: Complete Prompt for Phase 1b
+
+```
+Generate `PHASE_1B_HOW_TO_GUIDE.md`
+
+Phase: 1b - Production Hardening
+Goal: Add production-grade features: persistent state, CI/CD, observability, security hardening
+
+## Context to Review First
+
+1. PROJECT_PLAN.md - Phase 1b section for:
+   - Goals: Production-ready deployment with persistence
+   - Features: PostgresSaver, CI/CD, observability, security
+   - Infrastructure: Neon PostgreSQL (external), Lambda warmup
+   - Common issues: VPC connectivity, cold starts
+
+2. DEVELOPMENT_REFERENCE.md - Phase 1b section for:
+   - Neon PostgreSQL: Free tier (0.5GB), external service
+   - Lambda: Python 3.11, EventBridge schedule
+   - GitHub Actions workflow patterns
+   - slowapi rate limiting configuration
+
+3. Previous phase guide (docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md) for:
+   - Deployed App Runner URL
+   - CloudFront distribution URL
+   - Secrets Manager secrets already created
+   - ECR repository URL
+
+4. REPO_STATE.md for:
+   - Current backend structure
+   - Planned files: .github/workflows/, terraform/modules/lambda/
+
+## Prerequisites from Prior Phase
+
+- Phase 1a must be complete:
+  - App Runner deployed at https://yhvmf3inyx.us-east-1.awsapprunner.com
+  - CloudFront at https://d2bhnqevtvjc7f.cloudfront.net
+  - Secrets Manager configured with 4 secrets
+  - ECR repository with backend image
+- Verify: curl https://yhvmf3inyx.us-east-1.awsapprunner.com/health returns 200
+
+## What This Phase Creates
+
+### New Infrastructure (Terraform)
+- Note: Uses Neon PostgreSQL (external service, free tier) - no Aurora module needed
+- lambda/warm_app_runner/ - Warmup Lambda (EventBridge every 5 min)
+- Cost: Neon free tier ($0), Lambda ~$0
+
+### New Backend Features (Python)
+- backend/src/db/ - Database package with SQLAlchemy session management
+- backend/src/agent/checkpointing.py - PostgresSaver replacing MemorySaver
+- backend/alembic/ - Database migrations
+- backend/src/api/middleware/rate_limit.py - slowapi rate limiting (10 req/min)
+- backend/src/api/routes/v1/ - Versioned API routes
+
+### New Configuration
+- DATABASE_URL environment variable
+- Rate limiting settings in settings.py
+- Alembic configuration
+
+### CI/CD
+- .github/workflows/ci.yml - Lint, test, type-check on PR
+- .github/workflows/deploy.yml - Build, push, deploy on main merge
+
+## Agent Prompt Quality Requirements
+
+CRITICAL: Every agent prompt must be directly executable.
+
+For Neon: Include connection string format, Secrets Manager configuration, App Runner environment setup
+For PostgresSaver: Include exact LangGraph checkpoint table schema
+For CI/CD: Include exact workflow triggers, job dependencies, secrets needed
+For rate limiting: Include exact decorator usage and configuration
+
+Each prompt needs:
+- Exact resource configurations (not "create a database")
+- Security group rules with port numbers
+- IAM policy documents with exact actions
+- Environment variable names matching .env.example
+- Cost estimates for new resources
+
+## Verification Approach
+
+- Database: psql connection test, table creation verification
+- CI/CD: Manual workflow dispatch test
+- Rate limiting: curl test hitting limit
+- Database: App Runner logs showing Neon connection success
+
+Estimated time: 8-12 hours
+```
+
+## Phase-Specific Additions
+
+### For Infrastructure Phases (1a, 1b)
+
+Include:
+- Terraform staged apply sections
+- Plan review guidance ("Review with LLM for sanity check")
+- Cost estimates and red flags table
+- Emergency rollback procedures
+- AWS Console navigation steps (with screenshots or step lists)
+
+### For Feature Phases (2+)
+
+Include:
+- Integration with existing components
+- Testing sections (unit, integration)
+- Performance considerations
+- Cost implications per feature
+
+### For Production Phases (1b, later)
+
+Include:
+- CI/CD workflow setup
+- Monitoring and alerting configuration
+- Security hardening checklist
+- Backup and recovery procedures
+
+## Example Sections from Existing Guides
+
+### Good Architecture Diagram Example (Phase 1a)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Internet                                 │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+        ┌───────────────────┴───────────────────┐
+        │                                       │
+        ▼                                       ▼
+┌───────────────────┐                 ┌───────────────────┐
+│    CloudFront     │                 │    App Runner     │
+│  (Static Frontend)│                 │  (FastAPI Backend)│
+│                   │      CORS       │                   │
+│  S3 Bucket ───────┼────────────────▶│  - LangGraph      │
+│  - HTML/JS/CSS    │                 │  - Bedrock        │
+│                   │                 │  - Tools          │
+└───────────────────┘                 └─────────┬─────────┘
+                                                │
+                                                ▼
+                                      ┌───────────────────┐
+                                      │ Secrets Manager   │
+                                      │ - DEMO_PASSWORD   │
+                                      │ - API Keys        │
+                                      └───────────────────┘
+```
+
+### Good Troubleshooting Table Example
+
+| Symptom | Root Cause | Fix |
+|---------|------------|-----|
+| `AccessDeniedException` from Bedrock | Model access not approved | Request access in AWS Console → Bedrock → Model access |
+| CORS error in browser console | CloudFront origin not whitelisted | Update FastAPI CORS middleware `allow_origins` |
+| Docker image push fails | ECR login expired | Re-run `aws ecr get-login-password` |
+
+### Good Agent Prompt Examples
+
+**Example 1: Python Backend (Settings Configuration)**
+```
+Create `backend/src/config/settings.py`
+
+Requirements:
+1. Use Pydantic Settings (BaseSettings from pydantic_settings)
+2. Load from .env file using SettingsConfigDict
+3. Auto-detect environment (local vs aws) based on ENVIRONMENT variable
+   - Important: Use `ENVIRONMENT` variable name, not `ENV`
+4. Include all environment variables from .env.example with proper types
+5. Add validation for required variables with clear error messages
+6. Provide sensible defaults where possible
+7. Use type hints throughout
+8. Add docstrings explaining each setting
+
+Structure:
+- Settings class inheriting from BaseSettings
+- SettingsConfigDict with env_file=".env"
+- Fields for: AWS, Bedrock models, External APIs, Database, Application
+- validate_config() function that checks all required settings
+- get_settings() cached singleton function
+- detect_environment() function for local vs AWS detection
+
+Reference:
+- [backend.mdc] for Python patterns
+- .env.example for all required variables
+
+Verify: Check for linter errors and type safety.
+```
+
+**Example 2: Terraform Module (App Runner)**
+```
+Create Terraform App Runner module at `terraform/modules/app-runner/`
+
+Files to create: main.tf, variables.tf, outputs.tf
+
+Resources in main.tf:
+1. aws_iam_role for ECR access:
+   - Trust: build.apprunner.amazonaws.com
+   - Attach: AmazonEC2ContainerRegistryReadOnly (managed policy)
+
+2. aws_iam_role for instance:
+   - Trust: tasks.apprunner.amazonaws.com
+   - Attach: var.secrets_policy_arn (passed from secrets module)
+   - Inline policy for Bedrock: bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream on resource "*"
+   - Inline policy for CloudWatch Logs: logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents
+
+3. aws_apprunner_service:
+   - source_configuration.image_repository.image_identifier = "${var.ecr_repository_url}:${var.image_tag}"
+   - instance_configuration: cpu = var.cpu, memory = var.memory, instance_role_arn = instance role
+   - health_check_configuration: protocol = "HTTP", path = "/health", interval = 10
+
+Environment variables (in image_configuration):
+- runtime_environment_variables:
+  - ENVIRONMENT = "aws"
+  - AWS_REGION = "us-east-1"
+  - ALLOWED_ORIGINS = var.allowed_origins
+
+- runtime_environment_secrets (CRITICAL FORMAT - ARN:jsonKey::):
+  - DEMO_PASSWORD = "${var.secret_arns["demo_password"]}:password::"
+  - AUTH_TOKEN_SECRET = "${var.secret_arns["auth_token_secret"]}:secret::"
+
+Variables in variables.tf:
+- service_name (string, required, description)
+- ecr_repository_url (string, required, description)
+- image_tag (string, default "latest")
+- secrets_policy_arn (string, required, description)
+- secret_arns (map(string), required, description)
+- allowed_origins (string, required, description)
+- cpu (string, default "1024")
+- memory (string, default "2048")
+
+Outputs in outputs.tf:
+- service_url (the https://... URL)
+- service_arn
+- service_id
+
+Configuration:
+- Secret format is ARN:jsonKey:: (the trailing colons are required)
+- CPU 1024 = 1 vCPU, memory 2048 = 2 GB
+- Health check on /health endpoint
+
+Reference:
+- [infrastructure.mdc] for module patterns
+- https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/apprunner_service
+- Cost: ~$0.007/vCPU-hour when running
+
+Post-creation:
+- Update REPO_STATE.md to add App Runner module files
+```
+
+**Example 3: User-Input Required (Terraform Backend)**
+```
+**Before running:** Replace `[YOUR_BUCKET_NAME_HERE]` with your actual bucket name from Section 3 (e.g., `enterprise-agentic-ai-tfstate-jd`)
+
+Create `terraform/environments/dev/backend.tf`
+
+My S3 bucket name: [YOUR_BUCKET_NAME_HERE]
+
+Contents:
+1. Terraform block with required_version >= 1.5.0
+2. Required providers (see DEVELOPMENT_REFERENCE.md for versions):
+   - hashicorp/aws ~> 5.0
+   - hashicorp/random ~> 3.0
+3. S3 backend configuration (inside terraform block):
+   - bucket = "[use my bucket name above]"
+   - key = "dev/terraform.tfstate"
+   - region = "us-east-1"
+   - dynamodb_table = "enterprise-agentic-ai-tflock"
+   - encrypt = true
+4. AWS provider with region us-east-1 and default_tags:
+   - Project = "enterprise-agentic-ai"
+   - Environment = "dev"
+   - ManagedBy = "terraform"
+
+Configuration:
+- Backend block goes INSIDE the terraform block (not separate)
+- Use Terraform HCL syntax, not JSON
+- Include comments explaining each section
+
+Verification (run in order):
+1. terraform fmt -check (formatting)
+2. terraform init -backend=false (install providers without backend)
+3. terraform validate (syntax check)
+
+Post-creation:
+- Commit the generated .terraform.lock.hcl file (provider version lock)
+- Update REPO_STATE.md to move backend.tf from planned to existing files
+
+Reference:
+- Terraform S3 backend docs: https://developer.hashicorp.com/terraform/language/settings/backends/s3
+- [infrastructure.mdc] for backend template
+```
+
+**Example 4: Streaming Chat Route (Complex Integration)**
+```
+Create `backend/src/api/routes/chat.py`
+
+Requirements:
+1. POST /api/chat endpoint with Server-Sent Events streaming
+2. GET /api/chat endpoint for SSE connection establishment
+3. Integrate LangGraph astream() for real-time streaming
+4. Parse Nova Pro thinking content (<thinking>...</thinking>)
+5. Handle tool call events separately from messages
+6. Implement conversation queue management with asyncio.Queue
+7. Support authentication via session validation
+8. Handle reconnection and error scenarios gracefully
+
+Key Features:
+- Async processing with LangGraph.astream() integration
+- Thinking content extraction and separate event streaming
+- Tool execution event handling (tool_call, tool_used, tool_result)
+- Conversation persistence across reconnections
+- Keepalive mechanism for SSE connections
+- Proper error handling with user-friendly messages
+
+LangChain Integration:
+- Use graph.astream() with stream_mode="values"
+- Extract messages, errors, and metadata from each state update
+- Handle AIMessage with tool_calls for tool execution
+- Support conversation_id for multi-turn conversations
+
+Reference:
+- FastAPI streaming responses
+- LangGraph astream() documentation
+- [backend.mdc] for Python patterns
+- [agent.mdc] for LangGraph patterns
+
+Verify: Test streaming conversation flow with thinking display and tool calls.
+```
+
+## After Guide Creation
+
+1. **Validate Structure:**
+   - [ ] All sections from template present
+   - [ ] Table of Contents links work
+   - [ ] Checkboxes in all checklists
+   - [ ] Architecture diagram included
+
+2. **Validate Content:**
+   - [ ] Version numbers match DEVELOPMENT_REFERENCE.md
+   - [ ] File references exist in REPO_STATE.md
+   - [ ] Agent prompts follow exact format
+   - [ ] Verification commands are runnable
+
+3. **Update REPO_STATE.md:**
+   - Add new guide to "Currently Existing Files" under Documentation
+   - Format: `| docs/[path]/PHASE_X_HOW_TO_GUIDE.md | Phase X step-by-step guide |`
+
+→ See [_project.mdc] for sources of truth
+→ See [docs.mdc] for documentation standards
+→ See [_workflow.mdc] for development process
