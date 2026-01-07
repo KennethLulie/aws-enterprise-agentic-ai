@@ -15,7 +15,8 @@ repos:
           (?x)^(
             \.env\.example|
             .*\.lock|
-            package-lock\.json
+            package-lock\.json|
+            .*HOW_TO_GUIDE.*\.md
           )$
 
   # =============================================================================

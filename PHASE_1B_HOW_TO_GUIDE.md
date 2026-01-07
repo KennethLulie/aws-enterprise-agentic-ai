@@ -270,13 +270,11 @@ After signing up, you'll be prompted to create a project:
    - Or click **"Connection Details"** in the left sidebar
 2. You'll see a connection string that looks like:
    ```
-# pragma: allowlist secret
    postgresql://neondb_owner:YOUR_NEON_PASSWORD_HERE@ep-cool-darkness-123456.us-east-1.aws.neon.tech/neondb?sslmode=require
    ```
 
 **Understanding the Connection String Parts:**
 ```
-# pragma: allowlist secret
 postgresql://USERNAME:PASSWORD@ENDPOINT/DATABASE?sslmode=require
              └──────┘ └───────┘ └──────┘ └──────┘
                 │         │         │        │
@@ -703,7 +701,6 @@ Update `backend/alembic.ini` for project configuration
 Changes:
 1. Update sqlalchemy.url line:
    - Comment out the default:
-   # pragma: allowlist secret
    # sqlalchemy.url = driver://user:pass@localhost/dbname
    - Add comment: # URL is set programmatically in env.py from settings
 
@@ -819,7 +816,6 @@ You can run Alembic migrations directly against your Neon database from local:
 ```bash
 cd ~/Projects/aws-enterprise-agentic-ai
 
-# pragma: allowlist secret
 # Set DATABASE_URL for Neon
 export DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@ep-YOUR-ENDPOINT.us-east-1.aws.neon.tech/neondb?sslmode=require"
 
@@ -1060,7 +1056,6 @@ Verify: docker-compose exec backend python -c "from src.agent import get_agent; 
 If you have a local PostgreSQL for testing:
 
 ```bash
-# pragma: allowlist secret
 # Set DATABASE_URL for local testing
 export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/test"
 
@@ -2001,7 +1996,6 @@ Testing all Phase 1b features together to ensure the production hardening is com
 
 1. **Start a conversation:**
 ```bash
-# pragma: allowlist secret
 # Login and get session
 curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/login \
   -H "Content-Type: application/json" \
