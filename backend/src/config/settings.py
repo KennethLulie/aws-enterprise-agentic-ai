@@ -185,7 +185,7 @@ class Settings(BaseSettings):
     - Rate Limiting Configuration
     - Logging Configuration
     - Cache Configuration
-    - Knowledge Graph Configuration
+    - Knowledge Graph Configuration (Neo4j only)
     """
 
     # =========================================================================
@@ -539,14 +539,6 @@ class Settings(BaseSettings):
         description="Neo4j password.",
     )
 
-    kg_store_type: str = Field(
-        default="neo4j",
-        description=(
-            "Knowledge graph store type: 'neo4j' or 'postgresql'. "
-            "PostgreSQL uses recursive CTEs as fallback."
-        ),
-    )
-
     # =========================================================================
     # Pydantic Settings Configuration
     # =========================================================================
@@ -598,17 +590,6 @@ class Settings(BaseSettings):
         if lower_v not in {"pinecone", "chroma"}:
             raise ValueError(
                 f"Invalid vector_store_type '{v}'. Must be 'pinecone' or 'chroma'."
-            )
-        return lower_v
-
-    @field_validator("kg_store_type")
-    @classmethod
-    def validate_kg_store_type(cls, v: str) -> str:
-        """Validate knowledge graph store type is supported."""
-        lower_v = v.lower()
-        if lower_v not in {"neo4j", "postgresql"}:
-            raise ValueError(
-                f"Invalid kg_store_type '{v}'. Must be 'neo4j' or 'postgresql'."
             )
         return lower_v
 
@@ -882,7 +863,6 @@ def validate_config() -> dict[str, Any]:
             "debug": settings.debug,
             "aws_region": settings.aws_region,
             "vector_store_type": settings.vector_store_type,
-            "kg_store_type": settings.kg_store_type,
             "log_level": settings.log_level,
         },
     }

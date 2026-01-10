@@ -597,8 +597,7 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **Compression:** LLMChainExtractor for contextual compression
 
 #### Tool 2c-KG: Knowledge Graph Integration
-- **Primary Store:** Neo4j AuraDB Free (200K nodes, $0/month)
-- **Fallback:** PostgreSQL with recursive CTEs
+- **Store:** Neo4j AuraDB Free (200K nodes, $0/month)
 - **Entity Extraction:** spaCy NER + dependency parsing (no LLM needed)
 - **Ontology:** Financial domain (Policy, Customer, Account, Regulation, Concept, Person)
 - **Traversal:** 1-2 hop relationship queries
@@ -694,8 +693,7 @@ Agent can search the web, query SQL databases, and retrieve from documents.
    - Cost: ~$0.001/doc (vs $0.02-0.05 with LLM)
 
 6. **Knowledge Graph Store** (`backend/src/knowledge_graph/store.py`)
-   - Neo4j adapter for production
-   - PostgreSQL fallback with recursive CTEs
+   - Neo4j adapter (AuraDB Free in production, Docker locally)
    - Connection pooling
    - Entity/relationship CRUD
 
@@ -1390,7 +1388,6 @@ terraform {
 - **Region:** us-east-1 (if available) or closest
 - **Connection:** Bolt protocol (neo4j+s://)
 - **Local Dev:** Docker image `neo4j:5-community`
-- **Fallback:** PostgreSQL with recursive CTEs
 
 ### spaCy (NLP Entity Extraction)
 - **Model:** en_core_web_sm (small English model)

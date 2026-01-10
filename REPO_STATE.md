@@ -170,9 +170,9 @@
 |------|---------|
 | backend/src/ingestion/semantic_chunking.py | Grammar-aware text chunking (spaCy) |
 | backend/src/ingestion/contextual_chunking.py | Context-preserving chunking |
-| backend/src/knowledge_graph/__init__.py | Knowledge graph package |
+| backend/src/knowledge_graph/__init__.py | Knowledge graph package (Neo4j) |
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
-| backend/src/knowledge_graph/store.py | Neo4j/PostgreSQL graph store |
+| backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
 | backend/src/knowledge_graph/queries.py | Graph traversal queries |
 | backend/src/knowledge_graph/ontology.py | Financial domain ontology |
 | backend/src/utils/reranker.py | Cross-encoder reranking (Phase 2 RAG) |
@@ -186,9 +186,9 @@
 |------|---------|
 | backend/src/ingestion/semantic_chunking.py | Grammar-aware chunking (spaCy) |
 | backend/src/ingestion/contextual_chunking.py | Context prepending for chunks |
-| backend/src/knowledge_graph/__init__.py | KG package |
+| backend/src/knowledge_graph/__init__.py | KG package (Neo4j) |
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
-| backend/src/knowledge_graph/store.py | Neo4j/PostgreSQL adapter |
+| backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
 | backend/src/knowledge_graph/queries.py | Graph traversal queries |
 | backend/src/knowledge_graph/ontology.py | Financial domain ontology |
 | backend/src/utils/reranker.py | Cross-encoder reranking |

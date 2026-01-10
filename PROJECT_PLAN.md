@@ -688,9 +688,9 @@ If something isn't working, follow this systematic debugging process:
 - **Error handling:** Graceful failures with helpful error messages
 - **Circuit breaker:** Prevent repeated failures from overwhelming database
 
-**2c. RAG Document Tool (2025 SOTA Hybrid Search + Knowledge Graph)**
+**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)**
 
-**December 2025 State-of-the-Art Techniques:**
+**January 2026 State-of-the-Art Techniques:**
 
 - **Semantic Chunking (replaces fixed-size splitting):**
   - Split at sentence/paragraph boundaries using spaCy
@@ -708,6 +708,7 @@ If something isn't working, follow this systematic debugging process:
   - Use spaCy NER + dependency parsing instead of LLM calls
   - Custom patterns for financial domain entities
   - Extract entities and relationships at 20-50x lower cost
+  - Storage: Neo4j AuraDB Free tier (200K nodes, $0/month)
   - Impact: Same coverage as LLM, ~$0.001/doc vs $0.02-0.05/doc
 
 - **Cross-Encoder Reranking:**
@@ -717,7 +718,7 @@ If something isn't working, follow this systematic debugging process:
   - Cost: ~$0.01-0.015/query
 
 - **Knowledge Graph Integration:**
-  - Infrastructure: Neo4j AuraDB Free (200K nodes, $0/month) or PostgreSQL fallback
+  - Infrastructure: Neo4j AuraDB Free (200K nodes, $0/month)
   - 1-2 hop entity relationship traversal
   - Base ontology for financial domain (Policy, Customer, Account, Regulation, Concept)
   - Enhances retrieval with entity relationships
@@ -773,8 +774,7 @@ If something isn't working, follow this systematic debugging process:
 - Lambda function for document processing
 - Additional IAM policies for tool access
 - **Knowledge Graph Infrastructure (2025 Addition):**
-  - Primary: Neo4j AuraDB Free tier (200K nodes, 400K relationships, $0/month)
-  - Fallback: PostgreSQL with recursive CTEs (uses existing Neon PostgreSQL)
+  - Neo4j AuraDB Free tier (200K nodes, 400K relationships, $0/month)
   - Neo4j in Docker for local development
   - spaCy for NLP-based entity extraction (no LLM cost)
 
