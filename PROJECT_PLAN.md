@@ -405,7 +405,7 @@ docker-compose up
 - **Fallback tests:** Verify Claude fallback works if Nova unavailable
 - Manual testing for UI/UX
 - E2E tests added in later phases
-- **Cold start testing:** Verify warmup endpoint works
+- **Cold start testing:** Verify health endpoint works during cold start
 
 **Common Issues (Phase 0)**
 | Symptom | Root Cause | Fix |
@@ -440,7 +440,7 @@ docker-compose up
   - Primary: `amazon.nova-pro-v1:0` (verify availability in us-east-1 - N. Virginia)
   - Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0` (Bedrock on-demand supported)
 - Server-Sent Events (SSE) streaming from FastAPI to frontend
-- **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate). Accept ~30s cold start to minimize cost; keep-alive warming can stay off for the demo.
+- **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate). Accept ~30s cold start to minimize cost.
 - **Conversation persistence:** conversation_id in localStorage (state in MemorySaver)
 - **Basic Terraform infrastructure** (networking, App Runner, S3, CloudFront, Secrets Manager, ECR)
 - **Manual deployment** (no CI/CD yet - deploy via `terraform apply` and manual S3 upload)
@@ -492,8 +492,6 @@ docker-compose up
 - **Structured logging:** structlog with JSON output
 - **Comprehensive error handling:** Graceful degradation, retry logic
 - **Health check endpoint:** Enhanced with dependency checks (Neon database, Bedrock)
-- **Warmup endpoint:** `/health/warmup` - triggers service initialization
-- **Warmup Lambda:** CloudWatch Events → Lambda health check every 5 min
 - **Rate limiting:** slowapi middleware (10 req/min per IP)
 - **API versioning:** `/api/v1/chat` (allows future `/api/v2/chat`)
 - **User-friendly error messages:** Map technical errors to friendly messages
@@ -501,7 +499,6 @@ docker-compose up
 **Infrastructure Additions:**
 - Neon PostgreSQL project (external, free tier)
 - DATABASE_URL in AWS Secrets Manager
-- Lambda function for warmup (EventBridge schedule)
 
 **Deliverables:**
 - Conversation state persists across restarts
@@ -526,9 +523,6 @@ docker-compose up
   - **Minimum instances: 0** (scales to zero when idle, saves cost)
   - Maximum instances: 10 (auto-scales on demand)
   - **Cold start: 10-30 seconds** (acceptable for portfolio demo)
-  - **Keep-alive Lambda (details below):** CloudWatch Events → Lambda health check every 5 min
-    - Cost: ~$0.50/month (free tier covers it)
-    - Reduces cold starts by warming instance periodically
   - **Request timeout:** Set `instance_configuration.connection_drain_timeout` to 900 seconds so SSE streams are not dropped during long toolchains.
 - S3 bucket for frontend static files (us-east-1)
 - CloudFront distribution with HTTPS
@@ -536,23 +530,6 @@ docker-compose up
 - IAM roles and policies (least privilege)
 - ECR repository for container images (us-east-1)
 - CloudWatch Logs for monitoring (us-east-1)
-
-**Keep-alive Lambda Details (optional; default disabled to save cost):**
-- Purpose: hit the `/health/warmup` endpoint every 5 minutes to keep App Runner container warm. Disable if a ~30s cold start is acceptable for the demo.
-- Implementation:
-  ```python
-  # lambda/warm_app_runner/handler.py
-  import os, urllib.request
-
-  APP_RUNNER_URL = os.environ["APP_RUNNER_URL"]
-
-  def handler(event, context):
-      req = urllib.request.Request(f"{APP_RUNNER_URL}/health/warmup", method="GET")
-      req.add_header("Authorization", f"Bearer {os.environ['DEMO_PASSWORD']}")
-      urllib.request.urlopen(req, timeout=10)
-      return {"status": "ok"}
-  ```
-- Terraform: create a Lambda with the above handler, schedule it via EventBridge rule (`rate(5 minutes)`), and inject `APP_RUNNER_URL` + `DEMO_PASSWORD` as env vars (retrieved from Secrets Manager).
 
 **Security (Public-Subnet Demo Mode):**
 - HTTPS only (CloudFront)
@@ -675,7 +652,6 @@ If something isn't working, follow this systematic debugging process:
 | Symptom | Root Cause | Fix |
 |---------|------------|-----|
 | App Runner cannot reach Neon (`could not connect to server`) | DATABASE_URL incorrect or missing | Verify DATABASE_URL secret in Secrets Manager, check Neon dashboard for correct connection string |
-| Warmup Lambda fails with 401 | Missing password header | Pass `Authorization: Bearer <password>` or store password in Secrets Manager and inject into Lambda env vars |
 | Terraform apply fails on App Runner VPC connector | Subnets not tagged or already in use | Ensure two public subnets exist and pass IDs to connector module |
 | Alembic migration fails | Database connection string incorrect | Verify `DATABASE_URL` in App Runner environment variables matches Neon endpoint |
 | GitHub Actions deploy fails | Missing secrets or IAM permissions | Verify all secrets are set and IAM user has required permissions |
@@ -1196,8 +1172,7 @@ aws-enterprise-agentic-ai/
 │   │   │   │   ├── v1/           # API versioning
 │   │   │   │   │   ├── __init__.py
 │   │   │   │   │   └── chat.py   # /api/v1/chat endpoint
-│   │   │   │   ├── health.py     # Health check (with dependency checks)
-│   │   │   │   └── warmup.py     # Warmup endpoint (reduces cold start)
+│   │   │   │   └── health.py     # Health check (with dependency checks)
 │   │   │   └── middleware/
 │   │   │       ├── __init__.py
 │   │   │       ├── auth.py       # Password auth (abstracted for future Cognito migration)
@@ -1329,7 +1304,6 @@ aws-enterprise-agentic-ai/
 | Pinecone | $0 | $0 | Free tier (100K vectors) |
 | S3 + CloudFront | $0 | $1-2 | First 1GB free, then $0.023/GB storage + $0.085/GB transfer |
 | Secrets Manager | $0.40 | $0 | 1 secret |
-| Lambda (keep-alive) | $0 | $0 | Free tier (1M requests/month) |
 | DynamoDB | $0 | $0-2 | Free tier + minimal usage, TTL for auto-cleanup |
 | ECS Fargate (Phoenix) | $0 | $3-8 | Minimal instance, scales down when idle |
 | EFS (Phoenix storage) | $0 | $0.30 | Minimal storage (~1GB) |
@@ -1359,7 +1333,6 @@ aws-enterprise-agentic-ai/
 - Inference cache reduces Bedrock API calls by 30-40%
 - **Bedrock on-demand** (not provisioned throughput) for cost flexibility
 - **Cost tracking:** Monitor and alert on cost thresholds ($50/month alarm)
-- **Keep-alive Lambda:** Free tier covers periodic health checks
 
 **Cost Savings for Demo:**
 - Public subnets instead of VPC endpoints: **Save $20-30/month**
@@ -1641,11 +1614,6 @@ Fully working local development environment with:
 
 ### ✅ Phase 1a: AWS Cloud Deployment - COMPLETED (January 2, 2026)
 
-| Component | URL |
-|-----------|-----|
-| **Frontend (CloudFront)** | `https://d2bhnqevtvjc7f.cloudfront.net` |
-| **Backend (App Runner)** | `https://yhvmf3inyx.us-east-1.awsapprunner.com` |
-
 Deployed to AWS with:
 - App Runner backend with LangGraph agent and Bedrock integration
 - CloudFront + S3 static frontend hosting
@@ -1674,7 +1642,7 @@ Deployed to AWS with:
 - ✅ **Cost Optimization:** Public subnets (skip VPC endpoints), SQLAlchemy pooling (skip RDS Proxy)
 - ✅ **Frontend:** Next.js static export (no server), native SSE client
 - ✅ **Model Fallback:** Nova Pro → Claude 3.5 Sonnet
-- ✅ **Cold Start UX:** Loading indicator with warmup endpoint
+- ✅ **Cold Start UX:** Loading indicator for 10-30s cold starts
 - ✅ **API Versioning:** /api/v1/ for future compatibility
 - ✅ **Database Migrations:** Alembic for schema management
 
@@ -1907,13 +1875,7 @@ terraform destroy  # Destroys all resources
    - Run migrations: `alembic upgrade head`
    - App Runner can reach Neon (check logs)
 
-3. **Deploy Warmup Lambda:**
-   ```bash
-   terraform apply -target=module.warmup_lambda
-   ```
-   ✅ **Verify:** Lambda executes successfully (check CloudWatch Logs)
-
-5. **Set up GitHub Actions CI/CD:**
+3. **Set up GitHub Actions CI/CD:**
    - Add secrets to GitHub repository
    - Push code to trigger workflow
    - Verify deployment succeeds
@@ -2018,7 +1980,7 @@ The architecture is designed to be:
 
 1. ✅ **Frontend Architecture:** Clarified - Next.js static export → S3, API calls App Runner
 2. ✅ **Docker Prerequisites:** Fixed - Docker Desktop required for all services
-3. ✅ **Cold Start UX:** Added loading indicator + warmup endpoint
+3. ✅ **Cold Start UX:** Added loading indicator for 10-30s cold starts
 4. ✅ **Bedrock Nova:** Added fallback to Claude 3.5 Sonnet
 5. ✅ **Database Migrations:** Added Alembic for schema management
 6. ✅ **LangGraph Checkpointing:** MemorySaver for dev, PostgresSaver for prod

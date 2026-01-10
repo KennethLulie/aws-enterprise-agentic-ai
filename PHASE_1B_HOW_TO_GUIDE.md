@@ -32,9 +32,8 @@
 - [6. Rate Limiting](#6-rate-limiting)
 - [7. API Versioning](#7-api-versioning)
 - [8. Enhanced Health Checks](#8-enhanced-health-checks)
-- [9. Warmup Lambda](#9-warmup-lambda)
-- [10. GitHub Actions CI/CD](#10-github-actions-cicd)
-- [11. End-to-End Verification](#11-end-to-end-verification)
+- [9. GitHub Actions CI/CD](#9-github-actions-cicd)
+- [10. End-to-End Verification](#10-end-to-end-verification)
 - [Phase 1b Completion Checklist](#phase-1b-completion-checklist)
 - [Common Issues and Solutions](#common-issues-and-solutions)
 - [Files Created/Modified in Phase 1b](#files-createdmodified-in-phase-1b)
@@ -44,7 +43,7 @@
 
 ## Quick Start Workflow Summary
 
-**📋 This guide is designed to be followed linearly.** Complete each section in order (1→2→3→...→12). There is no jumping back and forth.
+**📋 This guide is designed to be followed linearly.** Complete each section in order (1→2→3→...→10). There is no jumping back and forth.
 
 **Overall Phase 1b Workflow:**
 1. **Prerequisites** (Section 1): Verify Phase 1a complete, App Runner healthy
@@ -55,9 +54,8 @@
 6. **Rate Limiting** (Section 6): slowapi middleware (10 req/min)
 7. **API Versioning** (Section 7): Move to /api/v1/chat
 8. **Enhanced Health** (Section 8): Dependency checks (Neon, Bedrock)
-9. **Warmup Lambda** (Section 9): Keep App Runner warm (optional)
-10. **CI/CD** (Section 10): GitHub Actions workflows
-11. **Verification** (Section 11): End-to-end testing
+9. **CI/CD** (Section 9): GitHub Actions workflows
+10. **Verification** (Section 10): End-to-end testing
 
 **Key Principle:** Production hardening with persistent state. Conversation history survives App Runner restarts.
 
@@ -79,15 +77,13 @@
 │                     │ │  - PostgresSaver    │ │  - 0.5GB Storage    │
 └─────────────────────┘ └──────────┬──────────┘ └─────────────────────┘
                                    │
-                    ┌──────────────┴──────────────┐
-                    │                             │
-                    ▼                             ▼
-         ┌─────────────────────┐      ┌─────────────────────┐
-         │  Secrets Manager    │      │   Lambda Warmup     │
-         │  - DEMO_PASSWORD    │      │  (EventBridge 5min) │
-         │  - DATABASE_URL     │      │  - /health/warmup   │
-         │  - API Keys         │      │                     │
-         └─────────────────────┘      └─────────────────────┘
+                                   ▼
+                        ┌─────────────────────┐
+                        │  Secrets Manager    │
+                        │  - DEMO_PASSWORD    │
+                        │  - DATABASE_URL     │
+                        │  - API Keys         │
+                        └─────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         GitHub Actions CI/CD                             │
@@ -100,7 +96,7 @@
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Estimated Time:** 8-12 hours
+**Estimated Time:** 6-10 hours
 
 ---
 
@@ -1355,7 +1351,7 @@ Verify:
 ## 8. Enhanced Health Checks
 
 ### What We're Doing
-Upgrading the health endpoint to check dependencies (Neon database, Bedrock) and adding a warmup endpoint for Lambda to keep the service warm.
+Upgrading the health endpoint to check dependencies (Neon database, Bedrock) for better monitoring and debugging.
 
 ### Why This Matters
 - **Reliability:** Know when dependencies are down
@@ -1411,355 +1407,15 @@ Reference:
 Verify: curl http://localhost:8000/health
 ```
 
-### 8.2 Create Warmup Endpoint
-
-**Agent Prompt:**
-```
-Create `backend/src/api/routes/warmup.py`
-
-Requirements:
-1. Create router with prefix="/health"
-2. GET /warmup endpoint (NO authentication required - called by Lambda):
-   - Initialize database connection pool (if DATABASE_URL set)
-   - Initialize Bedrock client connection
-   - Load any cached configurations
-   - Measure total duration
-   - Return {"status": "warmed", "duration_ms": X, "services": [...]}
-
-Structure:
-import time
-import structlog
-from fastapi import APIRouter
-
-logger = structlog.get_logger(__name__)
-router = APIRouter(prefix="/health", tags=["Health"])
-
-@router.get("/warmup")
-async def warmup():
-    """Warmup endpoint for Lambda keep-alive.
-    
-    No authentication required - endpoint only initializes services,
-    doesn't expose sensitive data.
-    """
-    start = time.perf_counter()
-    services_warmed = []
-    
-    # Warm database connection pool
-    try:
-        from src.db.session import get_engine
-        engine = get_engine()
-        if engine:
-            services_warmed.append("database")
-    except Exception as e:
-        logger.warning("Database warmup skipped", error=str(e))
-    
-    # Warm Bedrock client (optional - just imports)
-    try:
-        from src.config.settings import get_settings
-        settings = get_settings()
-        if settings.is_aws():
-            services_warmed.append("bedrock")
-    except Exception as e:
-        logger.warning("Bedrock warmup skipped", error=str(e))
-    
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.info("Warmup completed", duration_ms=duration_ms, services=services_warmed)
-    
-    return {
-        "status": "warmed",
-        "duration_ms": round(duration_ms, 2),
-        "services": services_warmed
-    }
-
-Key Features:
-- NO authentication (simplifies Lambda, endpoint is safe)
-- Called by Lambda every 5 minutes
-- Keeps App Runner instance warm
-- Pre-warms connections
-
-Reference:
-- [backend.mdc] for route patterns
-- App Runner cold start optimization
-
-Verify: curl http://localhost:8000/health/warmup
-```
-
-### 8.3 Include Warmup Router
-
-**Agent Prompt:**
-```
-Update `backend/src/api/main.py` to include warmup router
-
-Changes:
-1. Import warmup router:
-   from src.api.routes.warmup import router as warmup_router
-
-2. Include router:
-   app.include_router(warmup_router)
-
-Reference:
-- Existing main.py patterns
-
-Verify: docker-compose exec backend python -c "from src.api.main import app; print([r.path for r in app.routes if 'warmup' in r.path])"
-```
-
-### 8.4 Enhanced Health Checklist
+### 8.2 Enhanced Health Checklist
 
 - [ ] Health endpoint checks Neon database connection
 - [ ] Health endpoint checks Bedrock access
 - [ ] Health returns status: ok/degraded/error
-- [ ] Warmup endpoint created at /health/warmup
-- [ ] Warmup router included in main app
-- [ ] Warmup initializes connections
 
 ---
 
-## 9. Warmup Lambda
-
-### What We're Doing
-Creating a Lambda function triggered by EventBridge every 5 minutes to keep the App Runner service warm and reduce cold start latency.
-
-### Why This Matters
-- **User Experience:** Faster first response (no cold start)
-- **Reliability:** Service always ready
-- **Cost:** Lambda is nearly free (~$0/month in free tier)
-
-### 9.1 Create Lambda Function Directory
-
-**Command:**
-```bash
-cd ~/Projects/aws-enterprise-agentic-ai
-mkdir -p lambda/warm_app_runner
-```
-
-### 9.2 Create Lambda Handler
-
-**Agent Prompt:**
-```
-Create `lambda/warm_app_runner/handler.py`
-
-Requirements:
-1. Import: os, json, urllib.request, logging
-2. Configure logging for CloudWatch
-
-3. Get configuration from environment:
-   - APP_RUNNER_URL: The App Runner service URL
-
-4. handler(event, context) function:
-   - Get App Runner URL from environment
-   - Make HTTP GET request to {APP_RUNNER_URL}/health/warmup
-   - NO authentication needed (warmup endpoint is public)
-   - Timeout: 30 seconds
-   - Log success/failure
-   - Return {"statusCode": 200, "body": "Warmup successful"}
-
-Structure:
-import os
-import json
-import urllib.request
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-def handler(event, context):
-    """Keep App Runner warm by calling the warmup endpoint."""
-    app_runner_url = os.environ.get("APP_RUNNER_URL")
-    if not app_runner_url:
-        logger.error("APP_RUNNER_URL not set")
-        return {"statusCode": 500, "body": "Configuration error"}
-    
-    warmup_url = f"{app_runner_url}/health/warmup"
-    
-    try:
-        req = urllib.request.Request(warmup_url, method="GET")
-        with urllib.request.urlopen(req, timeout=30) as response:
-            body = response.read().decode("utf-8")
-            logger.info(f"Warmup successful: {body}")
-            return {"statusCode": 200, "body": "Warmup successful"}
-    except Exception as e:
-        logger.error(f"Warmup failed: {e}")
-        # Return success anyway - Lambda executed, just warmup failed
-        return {"statusCode": 200, "body": f"Warmup attempted: {e}"}
-
-Error Handling:
-- Log errors with context
-- Return 200 even on failure (Lambda executed, App Runner may be restarting)
-- Handle network timeouts gracefully
-
-Key Features:
-- Uses urllib.request (no external dependencies)
-- NO secrets needed (warmup endpoint is unauthenticated)
-- Logs to CloudWatch
-- Fault tolerant
-
-Reference:
-- Lambda Python runtime
-- Keep-alive Lambda pattern from PROJECT_PLAN.md
-
-Verify: python -c "import handler; print('OK')" (in lambda directory)
-```
-
-### 9.3 Create Lambda Terraform Module
-
-**Agent Prompt:**
-```
-Create Terraform Lambda module at `terraform/modules/lambda/`
-
-Files to create: main.tf, variables.tf, outputs.tf
-
-Resources in main.tf:
-1. data "archive_file" for Lambda code:
-   - type = "zip"
-   - source_dir = "${path.module}/../../../lambda/warm_app_runner"
-   - output_path = "${path.module}/warm_app_runner.zip"
-
-2. aws_iam_role for Lambda:
-   - Trust policy for lambda.amazonaws.com
-   - Name: "${var.project_name}-${var.environment}-warmup-lambda-role"
-
-3. aws_iam_role_policy_attachment:
-   - Attach AWSLambdaBasicExecutionRole (managed policy for CloudWatch Logs)
-
-4. aws_lambda_function:
-   - function_name = "${var.project_name}-${var.environment}-warmup"
-   - runtime = "python3.11"
-   - handler = "handler.handler"
-   - filename = data.archive_file.lambda_code.output_path
-   - source_code_hash = data.archive_file.lambda_code.output_base64sha256
-   - role = aws_iam_role.lambda.arn
-   - timeout = 60
-   - memory_size = 128
-   - environment variables:
-     - APP_RUNNER_URL = var.app_runner_url
-
-5. aws_cloudwatch_event_rule:
-   - name = "${var.project_name}-${var.environment}-warmup-schedule"
-   - schedule_expression = "rate(5 minutes)"
-
-6. aws_cloudwatch_event_target:
-   - rule = aws_cloudwatch_event_rule.warmup.name
-   - target_id = "warmup-lambda"
-   - arn = aws_lambda_function.warmup.arn
-
-7. aws_lambda_permission:
-   - statement_id = "AllowEventBridge"
-   - action = "lambda:InvokeFunction"
-   - function_name = aws_lambda_function.warmup.function_name
-   - principal = "events.amazonaws.com"
-   - source_arn = aws_cloudwatch_event_rule.warmup.arn
-
-Note: NO Secrets Manager access needed (warmup endpoint is unauthenticated)
-
-Variables in variables.tf:
-- project_name (string, required)
-- environment (string, default "dev")
-- app_runner_url (string, required, "App Runner service URL")
-- tags (map(string), default {})
-
-Outputs in outputs.tf:
-- function_name = aws_lambda_function.warmup.function_name
-- function_arn = aws_lambda_function.warmup.arn
-- event_rule_arn = aws_cloudwatch_event_rule.warmup.arn
-
-Configuration:
-- Lambda runs every 5 minutes
-- Timeout 60 seconds (enough for cold App Runner)
-- Memory 128 MB (minimum, sufficient for HTTP request)
-- No VPC access needed (calls public App Runner URL)
-
-Cost:
-- Free tier: 1M requests/month
-- 5-min interval = ~8,640 requests/month = $0
-
-Reference:
-- AWS Lambda Terraform: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function
-- EventBridge schedule: https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-schedule.html
-- [infrastructure.mdc] for module patterns
-
-Post-creation:
-- Update REPO_STATE.md to add Lambda module files
-
-Verify: terraform fmt -check
-```
-
-### 9.4 Update Dev Environment for Lambda
-
-**Agent Prompt:**
-```
-Update `terraform/environments/dev/main.tf` to add Lambda module
-
-Changes:
-1. Add module "warmup_lambda":
-   source = "../../modules/lambda"
-   project_name = local.project_name
-   environment = local.environment
-   app_runner_url = module.app_runner.service_url
-   tags = local.common_tags
-   depends_on = [module.app_runner]
-
-2. Add to outputs.tf:
-   output "warmup_lambda_arn" {
-     value = module.warmup_lambda.function_arn
-   }
-
-Reference:
-- Existing main.tf patterns
-- Lambda module outputs
-
-Verify: terraform validate
-```
-
-### 9.5 Deploy Lambda
-
-**Commands:**
-```bash
-cd ~/Projects/aws-enterprise-agentic-ai/terraform/environments/dev
-
-# Plan Lambda deployment
-terraform plan -target=module.warmup_lambda
-
-# Apply Lambda
-terraform apply -target=module.warmup_lambda
-```
-
-### 9.6 Verify Lambda
-
-**Commands:**
-```bash
-# Check Lambda exists
-aws lambda list-functions \
-  --query 'Functions[?contains(FunctionName, `warmup`)].{Name:FunctionName,Runtime:Runtime}' \
-  --output table
-
-# Check EventBridge rule
-aws events list-rules \
-  --query 'Rules[?contains(Name, `warmup`)].{Name:Name,State:State}' \
-  --output table
-
-# Manually invoke Lambda to test
-aws lambda invoke \
-  --function-name enterprise-agentic-ai-dev-warmup \
-  --payload '{}' \
-  response.json
-
-cat response.json
-```
-
-**Expected Output:** `{"statusCode": 200, "body": "Warmup successful"}`
-
-### 9.7 Warmup Lambda Checklist
-
-- [ ] Lambda handler created at lambda/warm_app_runner/handler.py
-- [ ] Lambda Terraform module created
-- [ ] Dev environment updated to include Lambda module
-- [ ] Lambda deployed and invocable
-- [ ] EventBridge rule created (rate 5 minutes)
-- [ ] Lambda logs show successful warmup
-
----
-
-## 10. GitHub Actions CI/CD
+## 9. GitHub Actions CI/CD
 
 ### What We're Doing
 Creating GitHub Actions workflows for continuous integration (on PRs) and continuous deployment (on merge to main).
@@ -1770,7 +1426,7 @@ Creating GitHub Actions workflows for continuous integration (on PRs) and contin
 - **Speed:** Faster feedback on issues
 - **Reliability:** Consistent deployment process
 
-### 10.1 Create CI Workflow
+### 9.1 Create CI Workflow
 
 **Agent Prompt:**
 ```
@@ -1853,7 +1509,7 @@ Post-creation:
 - Update REPO_STATE.md to add workflow file
 ```
 
-### 10.2 Create CD Workflow
+### 9.2 Create CD Workflow
 
 **Agent Prompt:**
 ```
@@ -1925,7 +1581,7 @@ Post-creation:
 - Update REPO_STATE.md to add workflow file
 ```
 
-### 10.3 Create GitHub Secrets
+### 9.3 Create GitHub Secrets
 
 **Navigate in GitHub:**
 1. Go to your repository on GitHub
@@ -1939,7 +1595,7 @@ Post-creation:
 | AWS_REGION | us-east-1 | Fixed value |
 | AWS_ACCOUNT_ID | Your 12-digit account ID | `aws sts get-caller-identity` |
 
-### 10.4 Create Workflow Directories
+### 9.4 Create Workflow Directories
 
 **Command:**
 ```bash
@@ -1947,7 +1603,7 @@ cd ~/Projects/aws-enterprise-agentic-ai
 mkdir -p .github/workflows
 ```
 
-### 10.5 Test CI Workflow
+### 9.5 Test CI Workflow
 
 **Commands:**
 ```bash
@@ -1968,7 +1624,7 @@ git push origin test-ci
 # Create PR in GitHub UI and observe CI checks
 ```
 
-### 10.6 GitHub Actions Checklist
+### 9.6 GitHub Actions Checklist
 
 - [ ] CI workflow created at .github/workflows/ci.yml
 - [ ] CD workflow created at .github/workflows/deploy.yml
@@ -1979,7 +1635,7 @@ git push origin test-ci
 
 ---
 
-## 11. End-to-End Verification
+## 10. End-to-End Verification
 
 ### What We're Doing
 Testing all Phase 1b features together to ensure the production hardening is complete and working.
@@ -1990,7 +1646,7 @@ Testing all Phase 1b features together to ensure the production hardening is com
 - **Security:** Test rate limiting works
 - **Automation:** Confirm CI/CD pipeline functions
 
-### 11.1 Database Persistence Test
+### 10.1 Database Persistence Test
 
 **Test conversation persistence across restarts:**
 
@@ -2024,7 +1680,7 @@ curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
 
 **Expected:** Agent remembers the name from before restart.
 
-### 11.2 Rate Limiting Test
+### 10.2 Rate Limiting Test
 
 **Test that rate limiting works:**
 
@@ -2043,7 +1699,7 @@ done
 
 **Expected:** First 10 requests return 200, subsequent requests return 429.
 
-### 11.3 Health Check Verification
+### 10.3 Health Check Verification
 
 **Test enhanced health endpoint:**
 
@@ -2065,20 +1721,7 @@ curl https://yhvmf3inyx.us-east-1.awsapprunner.com/health | jq
 }
 ```
 
-### 11.4 Warmup Lambda Verification
-
-**Check Lambda is running:**
-
-```bash
-# View recent Lambda invocations
-aws logs tail /aws/lambda/enterprise-agentic-ai-dev-warmup \
-  --since 1h \
-  --format short
-```
-
-**Expected:** Logs showing successful warmup every 5 minutes.
-
-### 11.5 CI/CD Pipeline Verification
+### 10.4 CI/CD Pipeline Verification
 
 **Test the full pipeline:**
 
@@ -2087,7 +1730,7 @@ aws logs tail /aws/lambda/enterprise-agentic-ai-dev-warmup \
 3. Merge PR → CD should deploy
 4. Verify changes are live
 
-### 11.6 Neon Connection Verification
+### 10.5 Neon Connection Verification
 
 **Step 1: Check Health Endpoint Shows Database Status**
 
@@ -2130,7 +1773,7 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 | `timeout` | Network issue | Verify Neon endpoint is correct region (us-east-1) |
 | No tables | Migrations not run | Run `alembic upgrade head` or restart App Runner to trigger setup() |
 
-### 11.7 Final End-to-End Test
+### 10.6 Final End-to-End Test
 
 **Complete user flow:**
 
@@ -2142,12 +1785,11 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 6. Continue conversation (should remember name)
 7. Send 15 rapid messages (should see rate limit)
 
-### 11.8 End-to-End Checklist
+### 10.7 End-to-End Checklist
 
 - [ ] Conversations persist after App Runner restart
 - [ ] Rate limiting kicks in after 10 requests/minute
 - [ ] Health endpoint shows database and Bedrock status
-- [ ] Warmup Lambda logs show successful invocations
 - [ ] CI runs on PR creation
 - [ ] CD deploys on merge to main
 - [ ] Full user flow works in browser
@@ -2173,14 +1815,6 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 - [ ] Rate limiting middleware added (10 req/min)
 - [ ] API versioned to /api/v1/chat
 - [ ] Enhanced health checks (Neon database, Bedrock)
-- [ ] Warmup endpoint created
-
-### Lambda
-- [ ] Warmup Lambda handler created
-- [ ] Lambda Terraform module created
-- [ ] Lambda deployed and running
-- [ ] EventBridge rule triggers every 5 minutes
-- [ ] Lambda logs show successful warmups
 
 ### CI/CD
 - [ ] CI workflow runs on PRs
@@ -2198,8 +1832,7 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 ### Cost Verification
 - [ ] Neon free tier (~$0/month)
 - [ ] No unexpected resources (NAT Gateway, etc.)
-- [ ] Lambda within free tier
-- [ ] Total Phase 1 cost ~$55-70/month
+- [ ] Total Phase 1 cost ~$5-15/month
 
 ---
 
@@ -2274,35 +1907,6 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 3. **Check exception handler:**
    Verify RateLimitExceeded handler in main.py.
 
-### Issue: Warmup Lambda fails
-
-**Symptoms:**
-- Lambda invocation errors
-- 401 Unauthorized in Lambda logs
-
-**Solutions:**
-1. **Check Lambda environment:**
-   ```bash
-   aws lambda get-function-configuration \
-     --function-name enterprise-agentic-ai-dev-warmup \
-     --query 'Environment.Variables'
-   ```
-
-2. **Check Secrets Manager access:**
-   ```bash
-   aws lambda invoke \
-     --function-name enterprise-agentic-ai-dev-warmup \
-     --log-type Tail \
-     response.json
-   base64 -d <<< $(cat response.json | jq -r '.LogResult')
-   ```
-
-3. **Verify secret exists:**
-   ```bash
-   aws secretsmanager get-secret-value \
-     --secret-id enterprise-agentic-ai/demo-password
-   ```
-
 ### Issue: GitHub Actions deployment fails
 
 **Symptoms:**
@@ -2338,9 +1942,6 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 | `terraform/modules/secrets/main.tf` | Updated with database-url secret reference |
 | `terraform/modules/secrets/outputs.tf` | Updated with database_url in secret_arns |
 | `terraform/modules/app-runner/main.tf` | Updated with DATABASE_URL environment secret |
-| `terraform/modules/lambda/main.tf` | Warmup Lambda function and EventBridge |
-| `terraform/modules/lambda/variables.tf` | Lambda module input variables (app_runner_url, tags) |
-| `terraform/modules/lambda/outputs.tf` | Lambda function ARN |
 | `backend/src/db/__init__.py` | Database package exports |
 | `backend/src/db/session.py` | SQLAlchemy session management |
 | `backend/alembic.ini` | Alembic configuration |
@@ -2349,8 +1950,6 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 | `backend/src/api/middleware/rate_limit.py` | slowapi rate limiting |
 | `backend/src/api/routes/v1/__init__.py` | V1 API router |
 | `backend/src/api/routes/v1/chat.py` | Versioned chat endpoints |
-| `backend/src/api/routes/warmup.py` | Warmup endpoint |
-| `lambda/warm_app_runner/handler.py` | Warmup Lambda handler |
 | `.github/workflows/ci.yml` | CI pipeline (lint, test, validate) |
 | `.github/workflows/deploy.yml` | CD pipeline (build, deploy, test) |
 
@@ -2358,15 +1957,13 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 
 | File | Changes |
 |------|---------|
-| `terraform/environments/dev/main.tf` | Add Lambda module |
-| `terraform/environments/dev/outputs.tf` | Add Lambda outputs |
 | `terraform/modules/app-runner/main.tf` | Add DATABASE_URL environment secret |
 | `terraform/modules/secrets/main.tf` | Add database password secret |
 | `backend/requirements.txt` | Add langgraph-checkpoint-postgres |
 | `backend/src/config/settings.py` | Add database_url, rate limit settings |
 | `backend/src/agent/graph.py` | PostgresSaver integration |
 | `backend/src/agent/__init__.py` | Checkpointer initialization |
-| `backend/src/api/main.py` | Rate limiting, V1 router, warmup router |
+| `backend/src/api/main.py` | Rate limiting, V1 router |
 | `backend/src/api/routes/health.py` | Enhanced dependency checks |
 | `backend/src/api/routes/chat.py` | Rate limit decorator |
 | `frontend/src/lib/api.ts` | Use /api/v1/chat endpoints |
@@ -2377,13 +1974,7 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 | Resource Type | Count | Details |
 |---------------|-------|---------|
 | Neon Database | 1 | External PostgreSQL (free tier) |
-| RDS Cluster Instance | 1 | Serverless instance |
-| DB Subnet Group | 1 | Uses existing public subnets |
 | Secrets Manager Secret | 1 | DATABASE_URL for Neon connection |
-| Secrets Manager Secret | 1 | DATABASE_URL |
-| Lambda Function | 1 | Warmup function |
-| EventBridge Rule | 1 | 5-minute schedule |
-| IAM Role (Lambda) | 1 | Lambda execution role |
 
 ---
 
@@ -2431,7 +2022,6 @@ Update your deployment values:
 | App Runner URL | `https://yhvmf3inyx.us-east-1.awsapprunner.com` |
 | Neon Endpoint | (from Neon dashboard) |
 | Database Name | neondb |
-| Warmup Lambda | enterprise-agentic-ai-dev-warmup |
 
 ---
 
@@ -2444,7 +2034,6 @@ Phase 1b establishes production hardening with:
 - ✅ Rate limiting (10 requests/minute per IP)
 - ✅ API versioning (/api/v1/chat)
 - ✅ Enhanced health checks with dependency validation
-- ✅ Warmup Lambda to reduce cold starts
 - ✅ GitHub Actions CI/CD automation
 
 **Key Achievements:**
@@ -2452,7 +2041,7 @@ Phase 1b establishes production hardening with:
 - Automated deployment pipeline
 - Production-grade security with rate limiting
 - Enhanced observability with dependency health checks
-- Cost-optimized (~$55-70/month total for Phase 1)
+- Cost-optimized (~$5-15/month total for Phase 1)
 
 **Next Phase (2):** Add core agent tools:
 - Real Tavily web search
@@ -2460,6 +2049,6 @@ Phase 1b establishes production hardening with:
 - Real RAG retrieval with Pinecone
 - Real market data from FMP
 
-**Estimated Time for Phase 1b:** 8-12 hours
+**Estimated Time for Phase 1b:** 6-10 hours
 
 **Success Criteria:** ✅ Conversations persist across App Runner restarts, rate limiting prevents abuse, CI/CD automates deployment, and the system is production-ready.

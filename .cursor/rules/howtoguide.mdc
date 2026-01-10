@@ -769,12 +769,11 @@ Goal: Add production-grade features: persistent state, CI/CD, observability, sec
 1. PROJECT_PLAN.md - Phase 1b section for:
    - Goals: Production-ready deployment with persistence
    - Features: PostgresSaver, CI/CD, observability, security
-   - Infrastructure: Neon PostgreSQL (external), Lambda warmup
+   - Infrastructure: Neon PostgreSQL (external)
    - Common issues: VPC connectivity, cold starts
 
 2. DEVELOPMENT_REFERENCE.md - Phase 1b section for:
    - Neon PostgreSQL: Free tier (0.5GB), external service
-   - Lambda: Python 3.11, EventBridge schedule
    - GitHub Actions workflow patterns
    - slowapi rate limiting configuration
 
@@ -786,23 +785,22 @@ Goal: Add production-grade features: persistent state, CI/CD, observability, sec
 
 4. REPO_STATE.md for:
    - Current backend structure
-   - Planned files: .github/workflows/, terraform/modules/lambda/
+   - Planned files: .github/workflows/
 
 ## Prerequisites from Prior Phase
 
 - Phase 1a must be complete:
-  - App Runner deployed at https://yhvmf3inyx.us-east-1.awsapprunner.com
-  - CloudFront at https://d2bhnqevtvjc7f.cloudfront.net
+  - App Runner deployed
+  - CloudFront deployed
   - Secrets Manager configured with 4 secrets
   - ECR repository with backend image
-- Verify: curl https://yhvmf3inyx.us-east-1.awsapprunner.com/health returns 200
+- Verify: curl https://<app-runner-url>/health returns 200
 
 ## What This Phase Creates
 
 ### New Infrastructure (Terraform)
 - Note: Uses Neon PostgreSQL (external service, free tier) - no Aurora module needed
-- lambda/warm_app_runner/ - Warmup Lambda (EventBridge every 5 min)
-- Cost: Neon free tier ($0), Lambda ~$0
+- Cost: Neon free tier ($0)
 
 ### New Backend Features (Python)
 - backend/src/db/ - Database package with SQLAlchemy session management

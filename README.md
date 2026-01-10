@@ -65,15 +65,13 @@ This system goes beyond a simple demo by implementing production-ready features:
 - **Circuit Breakers**: Prevent cascade failures when external services are unavailable
 - **Retry Logic**: Exponential backoff for transient failures
 - **Fallback Mechanisms**: Graceful degradation when tools fail
-- **Health Checks**: Dependency validation and warmup endpoints
+- **Health Checks**: Dependency validation endpoints
 
 ## 📋 Project Status
 
 **Current Phase:** Phase 1a ✅ Complete (AWS Cloud Deployment)
 
-> 🚀 **Live Demo:** [https://d2bhnqevtvjc7f.cloudfront.net](https://d2bhnqevtvjc7f.cloudfront.net)
-> 
-> Backend API: `https://yhvmf3inyx.us-east-1.awsapprunner.com`
+> 🚀 **Demo link and password available on request**
 
 **Phase 1a (completed January 2, 2026)** deployed the system to AWS:
 - ✅ App Runner backend with LangGraph agent and Bedrock (Nova Pro)
@@ -104,7 +102,8 @@ docker-compose build backend && docker-compose up -d backend
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
 - **[DEVELOPMENT_REFERENCE.md](./DEVELOPMENT_REFERENCE.md)** - Detailed implementation reference for each phase
 - **[PHASE_1B_HOW_TO_GUIDE.md](./PHASE_1B_HOW_TO_GUIDE.md)** - Step-by-step guide for Phase 1b (current) implementation
-- **[docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md)** - Completed Phase 0 guide (archived)
+- **[docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md)** - Completed Phase 1a guide (AWS Cloud Deployment - archived)
+- **[docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md)** - Completed Phase 0 guide (Local Development - archived)
 - **[docs/SECURITY.md](./docs/SECURITY.md)** - Security and secrets management guide
 
 ## 🧭 LangGraph Flow (Planned Graph)
@@ -430,7 +429,7 @@ GitHub Actions automates the entire development lifecycle:
 - **Faster Development**: Focus on application logic, not infrastructure management
 
 **Trade-offs**: 
-- Cold starts (10-30s) acceptable for demo, mitigated with warmup Lambda
+- Cold starts (10-30s) acceptable for demo
 - Less control over infrastructure, but sufficient for enterprise needs
 
 ### Multi-Tool Agent Pattern
@@ -505,7 +504,7 @@ This architecture demonstrates capabilities essential for enterprise AI deployme
 
 ### Reliability
 - **Production-Ready Error Handling**: Circuit breakers, retry logic, graceful degradation
-- **Health Checks**: Dependency validation and warmup endpoints
+- **Health Checks**: Dependency validation endpoints
 - **Monitoring & Alerts**: CloudWatch alarms for errors, latency, and cost thresholds
 - **State Persistence**: Conversation state persists across restarts via Neon PostgreSQL
 

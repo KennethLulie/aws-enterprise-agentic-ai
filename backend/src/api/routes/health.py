@@ -13,7 +13,6 @@ Phase 1b+ (Planned):
     - Enhanced health checks with dependency status
     - Database connectivity check
     - External service availability
-    - Warmup endpoint for cold start mitigation
 
 Usage:
     from src.api.routes.health import router as health_router

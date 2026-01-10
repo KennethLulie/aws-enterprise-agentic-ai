@@ -2800,3 +2800,295 @@ def _should_use_real_agent(settings: Settings) -> bool:
 **Estimated Time for Phase 1a:** 8-16 hours (completed January 2, 2026)
 
 **Success Criteria:** ✅ User can access site via CloudFront URL, login with password, and have a streaming chat conversation with the AI agent.
+
+---
+
+## Addendum A: Cold Start "Warming Up" Message (Optional Enhancement)
+
+> ⚠️ **Status:** Implented as add on feature in Phase 1a
+>
+> This addendum documents the planned "Warming up" cold start UX that was specified in PROJECT_PLAN.md but not implemented during the initial Phase 1a deployment. Implement this enhancement when UX polish is a priority.
+
+### What We're Doing
+
+Adding a user-friendly "Warming up..." message when the App Runner backend is cold starting. App Runner can take 10-30 seconds to wake up from zero, and users should see a clear indication that the system is starting rather than broken.
+
+### Why This Matters
+
+- **User Experience:** Users understand the delay is expected, not an error
+- **Professional Polish:** Enterprise demos need clear feedback
+- **Reduced Support Questions:** "Is it broken?" becomes "It's warming up"
+- **PROJECT_PLAN.md Requirement:** Specified as part of Phase 1a cold start UX
+
+### A.1 Implementation Approach
+
+Two complementary strategies:
+
+**Strategy 1: Health Check on Page Load**
+- When chat page loads, call `/health` endpoint
+- If response takes >3 seconds, show "Warming up..." message
+- Once healthy, hide message and enable chat
+
+**Strategy 2: Slow Response Detection**
+- When user sends first message, start a timer
+- If POST to `/api/chat` takes >5 seconds, switch loading message
+- Change from "Generating response..." to "Warming up the server..."
+
+### A.2 Frontend Changes
+
+**Agent Prompt:**
+```
+Update `frontend/src/app/page.tsx` to add cold start detection
+
+Changes:
+1. Add new state variables:
+   - isWarmingUp: boolean (default false)
+   - healthCheckComplete: boolean (default false)
+
+2. Add useEffect for health check on mount (after authentication):
+   - Call getHealth() from api.ts
+   - Use Promise.race with 3-second timeout
+   - If timeout wins, set isWarmingUp = true
+   - When health check succeeds, set isWarmingUp = false, healthCheckComplete = true
+   - If health check fails completely after 30s, show error toast
+
+3. Update loading state display:
+   - When isWarmingUp AND isLoading: show "Warming up the server... This may take up to 30 seconds"
+   - When NOT isWarmingUp AND isLoading: show existing "Generating response..."
+
+4. Add visual indicator for warming up state:
+   - Amber/orange colored banner at top of chat area
+   - Animated spinner with "Warming up..." text
+   - Optional: progress indication or estimated time
+
+5. Disable send button during warmup (optional):
+   - Users can still type but sending waits for warmup
+   - Or allow sending and handle the delay gracefully
+
+Configuration:
+- WARMUP_TIMEOUT_MS = 3000 (3 seconds before showing warming message)
+- MAX_WARMUP_TIME_MS = 60000 (60 seconds before giving up)
+
+Reference:
+- Existing page.tsx structure
+- frontend.mdc for React patterns
+- getHealth() function in api.ts
+
+Verify:
+1. Build succeeds: cd frontend && npm run build
+2. No TypeScript errors: npm run lint
+3. Manual test: Stop backend, load page, verify warming message appears
+```
+
+### A.3 Warming Up UI Component (Optional)
+
+**Agent Prompt:**
+```
+Create optional warming up indicator component at `frontend/src/components/warming-indicator.tsx`
+
+Component: WarmingIndicator
+Props:
+- isVisible: boolean
+- estimatedTime?: number (seconds, default 30)
+
+Features:
+1. Animated gradient background (amber to orange)
+2. Pulsing spinner icon
+3. Text: "Warming up the server..."
+4. Subtext: "This may take up to {estimatedTime} seconds"
+5. Optional: Elapsed time counter
+
+Styling:
+- Use Tailwind classes
+- Match existing shadcn/ui design language
+- Smooth fade in/out transitions
+- Accessible (aria-live for screen readers)
+
+Configuration:
+- Position: Fixed banner at top of chat area OR inline above messages
+- Z-index: Above messages but below modals
+
+Reference:
+- Existing component patterns in frontend/src/components/
+- shadcn/ui styling conventions
+- Tailwind animation classes
+
+Verify: Component renders without errors when imported
+```
+
+### A.4 API Client Enhancement
+
+**Agent Prompt:**
+```
+Update `frontend/src/lib/api.ts` to support health check with timeout
+
+Changes:
+1. Add healthCheckWithTimeout function:
+   - Takes timeout parameter (default 3000ms)
+   - Returns { healthy: boolean, isColdStart: boolean, latencyMs: number }
+   - If latency > timeout, isColdStart = true
+   - Uses AbortController for timeout
+
+2. Export the new function for use in page.tsx
+
+Example implementation:
+```typescript
+export interface HealthCheckResult {
+  healthy: boolean;
+  isColdStart: boolean;
+  latencyMs: number;
+}
+
+export const healthCheckWithTimeout = async (
+  timeoutMs: number = 3000
+): Promise<HealthCheckResult> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs + 30000);
+  const startTime = Date.now();
+  
+  try {
+    const response = await fetch(buildUrl("/health"), {
+      signal: controller.signal,
+    });
+    const latencyMs = Date.now() - startTime;
+    clearTimeout(timeoutId);
+    
+    return {
+      healthy: response.ok,
+      isColdStart: latencyMs > timeoutMs,
+      latencyMs,
+    };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    const latencyMs = Date.now() - startTime;
+    return {
+      healthy: false,
+      isColdStart: true,
+      latencyMs,
+    };
+  }
+};
+```
+
+Reference:
+- Existing api.ts patterns
+- AbortController for fetch timeout
+- frontend.mdc for TypeScript patterns
+
+Verify: npm run lint passes
+```
+
+### A.5 Manual Validation Commands
+
+```bash
+cd ~/Projects/aws-enterprise-agentic-ai
+
+# Build frontend
+cd frontend && npm run build
+
+# Run linting
+npm run lint
+
+# Type check
+npx tsc --noEmit
+```
+
+### A.6 Testing Cold Start Behavior
+
+**Local Testing (Simulated):**
+```bash
+# 1. Stop backend to simulate cold start
+docker-compose stop backend
+
+# 2. Open frontend in browser
+# Should see "Warming up..." message
+
+# 3. Start backend
+docker-compose start backend
+
+# 4. Message should disappear when health check succeeds
+```
+
+**AWS Testing:**
+```bash
+# 1. Wait for App Runner to scale to zero (10-15 minutes of inactivity)
+# 2. Open CloudFront URL
+# 3. Observe warming up message during cold start
+# 4. Message should disappear once backend is ready (10-30 seconds)
+```
+
+### A.7 Cold Start UX Checklist
+
+- [ ] Health check with timeout function added to api.ts
+- [ ] isWarmingUp state added to page.tsx
+- [ ] Health check runs on page load (after auth)
+- [ ] "Warming up..." message displays when health check is slow
+- [ ] Message disappears when backend becomes healthy
+- [ ] Loading indicator changes based on warming state
+- [ ] No TypeScript errors (`npm run lint`)
+- [ ] Build succeeds (`npm run build`)
+- [ ] Manual testing confirms behavior
+
+### A.8 Alternative: Simple Timeout-Based Approach
+
+If the health check approach is too complex, implement a simpler version:
+
+**Agent Prompt:**
+```
+Update `frontend/src/app/page.tsx` with simple timeout-based warming detection
+
+Changes:
+1. In handleSubmit, start a 5-second timer when sending message
+2. If timer fires before any SSE events arrive, show warming message
+3. Cancel timer when first SSE event arrives
+4. Update loading text based on warming state
+
+This is simpler but less proactive - user must send a message to discover cold start.
+
+Example:
+```typescript
+const handleSubmit = async (event: FormEvent) => {
+  // ... existing code ...
+  setIsLoading(true);
+  
+  // Start warming detection timer
+  const warmingTimer = setTimeout(() => {
+    setIsWarmingUp(true);
+  }, 5000);
+  
+  // Clear timer when first event arrives (in handleChatEvent)
+  // clearTimeout(warmingTimer);
+};
+```
+
+Verify: Same as A.5
+```
+
+### A.9 Troubleshooting
+
+**Issue: Warming message never disappears**
+
+**Symptoms:**
+- Health check keeps timing out
+- Message stays visible indefinitely
+
+**Solutions:**
+1. Verify backend is actually running: `curl ${APP_RUNNER_URL}/health`
+2. Check for CORS issues blocking health check
+3. Increase timeout threshold if cold starts are longer than expected
+4. Add maximum retry limit with error fallback
+
+**Issue: Warming message flashes briefly on fast connections**
+
+**Symptoms:**
+- Message appears for <1 second then disappears
+- Looks glitchy
+
+**Solutions:**
+1. Add minimum display time (e.g., 500ms) once shown
+2. Increase timeout threshold from 3s to 5s
+3. Use CSS transition for smooth fade out
+
+---
+
+**Note:** This addendum can be implemented at any time after Phase 1a is complete. It's a UX enhancement that doesn't affect core functionality.

@@ -443,10 +443,6 @@ Add production-grade features: persistent state, CI/CD, observability, security 
   - Connection via public internet (SSL encrypted)
   - No VPC connector needed
   - DATABASE_URL stored in AWS Secrets Manager
-- **Lambda (Warmup):**
-  - Runtime: Python 3.11
-  - Schedule: Every 5 minutes (EventBridge)
-  - Calls `/health/warmup` endpoint
 - **GitHub Actions:**
   - **Phase gating:** Workflows added in Phase 1b (none active in Phase 0).
   - **CI (`pull_request`):** black, ruff, mypy; ESLint/Prettier/tsc; pytest; Docker test builds; Terraform fmt/validate/plan (no apply); security scans (Bandit, Checkov, gitleaks).
@@ -514,34 +510,17 @@ Add production-grade features: persistent state, CI/CD, observability, security 
    - Check Bedrock access
    - Return dependency status
 
-3. **Warmup Endpoint** (`backend/src/api/routes/warmup.py`)
-   - `/health/warmup` endpoint
-   - Initialize services
-   - Return warmup status
-
-4. **Rate Limiting** (`backend/src/api/middleware/rate_limit.py`)
+3. **Rate Limiting** (`backend/src/api/middleware/rate_limit.py`)
    - slowapi middleware
    - 10 requests/minute per IP
    - Configurable limits
 
-5. **Error Handling** (`backend/src/api/middleware/error_handler.py`)
+4. **Error Handling** (`backend/src/api/middleware/error_handler.py`)
    - Global error handler
    - User-friendly messages
    - Error logging
 
-#### Step 5: Lambda Warmup
-1. **Lambda Function** (`lambda/warm_app_runner/handler.py`)
-   - HTTP request to `/health/warmup`
-   - Authorization header
-   - Error handling
-
-2. **Lambda Terraform** (`terraform/modules/lambda/warmup.tf`)
-   - Lambda function
-   - EventBridge schedule
-   - IAM role
-   - Environment variables
-
-#### Step 6: GitHub Actions CI/CD
+#### Step 5: GitHub Actions CI/CD
 1. **CI Pipeline** (`.github/workflows/ci.yml`)
    - Lint (black, ruff)
    - Type check (mypy)
@@ -573,7 +552,6 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 - [ ] Production-ready security
 - [ ] Neon database connected
 - [ ] DATABASE_URL secret configured
-- [ ] Warmup Lambda running
 - [ ] GitHub Actions workflows working
 
 ### Consistency Checks
@@ -1570,7 +1548,6 @@ def test_agent_with_tool():
 ### Infrastructure
 - [ ] Auto-scaling configured
 - [ ] Health checks enabled
-- [ ] Warmup Lambda (Phase 1b+)
 - [ ] CloudFront caching
 
 ---

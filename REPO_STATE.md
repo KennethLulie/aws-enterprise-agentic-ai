@@ -157,10 +157,6 @@
 | .github/workflows/ci.yml | CI pipeline (lint, test, validate) |
 | .github/workflows/deploy.yml | CD pipeline (build, deploy, test) |
 | Note: Using Neon PostgreSQL (external) - no Aurora module needed |
-| terraform/modules/lambda/main.tf | Warmup Lambda function and EventBridge |
-| terraform/modules/lambda/variables.tf | Lambda module input variables |
-| terraform/modules/lambda/outputs.tf | Lambda function ARN |
-| lambda/warm_app_runner/handler.py | App Runner warmup Lambda handler |
 | backend/src/db/__init__.py | Database package exports |
 | backend/src/db/session.py | SQLAlchemy session management with connection pooling |
 | backend/alembic.ini | Alembic configuration |
@@ -168,7 +164,6 @@
 | backend/alembic/versions/001_initial_checkpoint_tables.py | LangGraph checkpoint tables migration |
 | backend/src/api/middleware/rate_limit.py | slowapi rate limiting (10 req/min) |
 | backend/src/api/routes/v1/chat.py | Versioned chat endpoints (/api/v1/chat) |
-| backend/src/api/routes/warmup.py | Warmup endpoint (/health/warmup) |
 
 ### Phase 2+ - Advanced Features
 | File | Purpose |
