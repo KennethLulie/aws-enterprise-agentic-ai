@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/sonner";
-import { connectSSE, getSession, sendMessage, type ChatEvent } from "@/lib/api";
+import { WarmingIndicator } from "@/components/ui/warming-indicator";
+import { connectSSE, getHealth, getSession, sendMessage, type ChatEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type ChatRole = "user" | "assistant";
@@ -51,12 +52,18 @@ export default function ChatPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [reconnectAttempt, setReconnectAttempt] = useState<number>(0);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
+  const [isWarmingUp, setIsWarmingUp] = useState<boolean>(false);
+  const [healthCheckComplete, setHealthCheckComplete] = useState<boolean>(false);
 
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track if the last stream completed normally (to suppress "connection lost" errors)
   const streamCompletedRef = useRef<boolean>(false);
+
+  // Configuration for cold start detection
+  const WARMUP_TIMEOUT_MS = 3000;  // 3 seconds before showing warming message
+  const MAX_WARMUP_TIME_MS = 60000;  // 60 seconds before giving up
 
   useEffect(() => {
     const verifySession = async () => {
@@ -69,6 +76,81 @@ export default function ChatPage() {
     };
     void verifySession();
   }, [router]);
+
+  // Health check with cold start detection
+  useEffect(() => {
+    if (!isAuthenticated || healthCheckComplete) {
+      return;
+    }
+
+    let isCancelled = false;
+    const startTime = Date.now();
+
+    const performHealthCheck = async (): Promise<boolean> => {
+      try {
+        await getHealth();
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const timeoutPromise = (ms: number): Promise<"timeout"> =>
+      new Promise((resolve) => setTimeout(() => resolve("timeout"), ms));
+
+    const checkHealth = async () => {
+      // First, race with a short timeout to detect cold start
+      const initialResult = await Promise.race([
+        performHealthCheck(),
+        timeoutPromise(WARMUP_TIMEOUT_MS),
+      ]);
+
+      if (isCancelled) return;
+
+      if (initialResult === true) {
+        // Health check succeeded quickly - no cold start
+        setHealthCheckComplete(true);
+        setIsWarmingUp(false);
+        return;
+      }
+
+      // Timeout won or health check failed - show warming indicator
+      setIsWarmingUp(true);
+
+      // Keep polling until health check succeeds or max time exceeded
+      const pollInterval = 2000; // Poll every 2 seconds
+      const poll = async () => {
+        if (isCancelled) return;
+
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= MAX_WARMUP_TIME_MS) {
+          setIsWarmingUp(false);
+          toast.error("Server is taking too long to respond. Please refresh the page.");
+          return;
+        }
+
+        const success = await performHealthCheck();
+        if (isCancelled) return;
+
+        if (success) {
+          setHealthCheckComplete(true);
+          setIsWarmingUp(false);
+        } else {
+          // Schedule next poll
+          setTimeout(poll, pollInterval);
+        }
+      };
+
+      // Start polling
+      void poll();
+    };
+
+    void checkHealth();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isAuthenticated, healthCheckComplete]);
 
   const appendAssistantChunk = useCallback((chunk: string) => {
     setMessages((prev) => {
@@ -415,6 +497,13 @@ export default function ChatPage() {
         </CardHeader>
 
         <CardContent className="flex flex-1 flex-col gap-4 overflow-hidden p-0">
+          {/* Cold start warming up banner */}
+          <WarmingIndicator
+            isVisible={isWarmingUp}
+            estimatedTime={30}
+            showElapsed
+          />
+
           <div
             ref={messageListRef}
             className="flex-1 space-y-4 overflow-y-auto px-6 py-6"
@@ -436,9 +525,16 @@ export default function ChatPage() {
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="inline-flex items-center gap-2 rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground shadow-sm">
+                <div className={cn(
+                  "inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm shadow-sm",
+                  isWarmingUp
+                    ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
+                    : "bg-muted text-muted-foreground"
+                )}>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating response...
+                  {isWarmingUp
+                    ? "Warming up the server... This may take up to 30 seconds"
+                    : "Generating response..."}
                 </div>
               </div>
             )}
@@ -460,13 +556,21 @@ export default function ChatPage() {
             />
             <Button
               type="submit"
-              className="gap-2"
+              className={cn(
+                "gap-2",
+                isWarmingUp && !isLoading && "bg-amber-600 hover:bg-amber-700"
+              )}
               disabled={isLoading || !inputValue.trim() || !isAuthenticated}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Sending
+                  {isWarmingUp ? "Warming up..." : "Sending"}
+                </>
+              ) : isWarmingUp ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Send
                 </>
               ) : (
                 <>
