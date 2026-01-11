@@ -154,6 +154,45 @@ terraform apply -target=module.app_runner
 | `aws_eip` (unattached) | Orphaned resource | $3.60 |
 | Multiple `aws_apprunner_service` | Should only be 1 | ~$25 each |
 
+## Avoiding Forced Replacements (CRITICAL)
+
+**When modifying modules for existing infrastructure, ALWAYS check `terraform plan` for:**
+
+| Plan Output | Risk Level | Action |
+|-------------|------------|--------|
+| `~ update in-place` | ✅ Safe | Proceed |
+| `-/+ must be replaced` | 🔴 DANGEROUS | Stop and investigate |
+| `+ will be created` | ⚠️ Review | Verify it's intentional |
+| `- will be destroyed` | 🔴 DANGEROUS | Stop and investigate |
+
+**Common causes of forced replacement:**
+
+| Resource Type | Field That Forces Replacement | Solution |
+|---------------|------------------------------|----------|
+| `aws_iam_policy` | `description` | Match existing description exactly |
+| `aws_iam_policy` | `name` | Match existing name exactly |
+| `aws_iam_role` | `name` | Match existing name exactly |
+| `aws_s3_bucket` | `bucket` | Never change bucket name |
+| `aws_apprunner_service` | `service_name` | Never change service name |
+
+**Before creating/modifying Terraform for deployed resources:**
+
+1. Run `terraform plan` first to see current state
+2. Check deployed resource attributes in AWS Console
+3. Match descriptions, names, and immutable fields exactly
+4. Re-run `terraform plan` to verify only in-place updates
+
+**Example - IAM Policy description mismatch causes replacement:**
+```hcl
+# ❌ WRONG - Different description forces policy recreation
+description = "Allows read access to secrets"  # New wording
+
+# ✅ CORRECT - Match existing description exactly
+description = "Allow access to application secrets in Secrets Manager"
+```
+
+**Why this matters:** Forced replacement of IAM policies/roles can cause brief service outages where applications lose permissions.
+
 ## Module Patterns
 
 **Variables (every module):**

@@ -474,18 +474,18 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 
 #### Step 2: Database Setup
 1. **Alembic Setup** (`backend/alembic/`)
-   - Initialize Alembic
-   - Create initial migration
-   - LangGraph checkpoint tables schema
+   - Initialize Alembic for future app migrations
+   - Configure env.py for dynamic DATABASE_URL
+   - Note: Checkpoint tables handled by PostgresSaver.setup()
 
-2. **Database Connection** (`backend/src/config/database.py`)
+2. **Database Connection** (`backend/src/db/session.py`)
    - SQLAlchemy engine
    - Connection pooling (5 connections, max overflow 10)
    - Session management
 
-3. **PostgresSaver Migration** (`backend/src/agent/graph.py`)
+3. **PostgresSaver Integration** (`backend/src/agent/graph.py`)
    - Replace MemorySaver with PostgresSaver
-   - Use SQLAlchemy connection
+   - PostgresSaver.setup() creates checkpoint tables automatically
    - Test checkpointing
 
 #### Step 3: Structured Logging
@@ -555,7 +555,7 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 - [ ] GitHub Actions workflows working
 
 ### Consistency Checks
-- [ ] PostgresSaver uses same connection pool as SQLAlchemy
+- [ ] PostgresSaver configured with DATABASE_URL (uses psycopg3, separate from SQLAlchemy pool)
 - [ ] All logs use structlog with JSON format
 - [ ] API versioning consistent across all endpoints
 - [ ] Rate limiting applied to all API routes
@@ -617,6 +617,44 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **Neo4j AuraDB Free:** Knowledge graph storage (200K nodes, $0/month)
 - **Neo4j Docker:** Local development graph database
 - **spaCy Model:** en_core_web_sm for NLP entity extraction
+
+#### Security Hardening (Phase 2)
+
+**SQL Tool Security:**
+- Parameterized queries only (SQLAlchemy `text()` with parameters)
+- `ALLOWED_TABLES` whitelist for query validation
+- Read-only database user for SQL tool queries
+- Query timeout: 30 seconds max
+- Result limit: 1000 rows max
+- Never use string formatting for SQL
+
+**Conversation Security (Checkpoint Protection):**
+- UUID format validation for `conversation_id` at API layer
+- Session-to-conversation binding (map conversation_id → user session)
+- Access control: users can only access their own conversations
+- Reject non-UUID conversation_ids to prevent enumeration attacks
+
+**Implementation:**
+```python
+from uuid import UUID
+from pydantic import field_validator
+
+class SendMessageRequest(BaseModel):
+    conversation_id: str | None = None
+
+    @field_validator('conversation_id')
+    @classmethod
+    def validate_uuid(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            UUID(v)
+            return v
+        except ValueError:
+            raise ValueError("conversation_id must be a valid UUID")
+```
+
+**Reference:** See `[_security.mdc]` for complete patterns
 
 ### Implementation Order
 
@@ -1262,6 +1300,7 @@ botocore~=1.35.0
 sqlalchemy~=2.0.35
 alembic~=1.13.0
 psycopg2-binary~=2.9.9
+psycopg[binary]~=3.2.0  # Required by langgraph-checkpoint-postgres
 langgraph-checkpoint-postgres~=2.0.0
 
 # Vector Store

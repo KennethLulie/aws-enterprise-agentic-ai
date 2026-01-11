@@ -486,8 +486,8 @@ docker-compose up
   - Store connection string in AWS Secrets Manager
   - No VPC connector needed (external service over internet)
   - Migrate from MemorySaver to PostgresSaver
-  - Connection pooling via SQLAlchemy
-- **Database migrations:** Alembic for schema versioning
+  - PostgresSaver.setup() creates checkpoint tables automatically
+- **Database migrations:** Alembic for future app schema (SQLAlchemy with connection pooling)
 - **GitHub Actions CI/CD:** Automated build, test, deploy
 - **Structured logging:** structlog with JSON output
 - **Comprehensive error handling:** Graceful degradation, retry logic
@@ -815,6 +815,24 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 - Company policies (financial policies, compliance docs)
 - Financial reports (quarterly reports, market analysis)
 - FAQs (common customer questions, account management)
+
+**Security Hardening (Phase 2):**
+- **SQL Tool Security:**
+  - Parameterized queries only (never string formatting)
+  - ALLOWED_TABLES whitelist for query validation
+  - Read-only database connections for SQL tool
+  - Query timeout limits (30 seconds max)
+  - Result set limits (1000 rows max)
+- **Conversation Security (Checkpoint Protection):**
+  - UUID validation for conversation_id (reject non-UUID formats at API layer)
+  - Session-to-conversation binding (store mapping of conversation_id to user session)
+  - Access control verification (users can only access their own conversations)
+  - Prevent conversation enumeration attacks
+- **Input Validation:**
+  - Pydantic validators on all API inputs
+  - Message length limits (4000 chars)
+  - Conversation ID format validation (UUID only)
+- **Reference:** See `[_security.mdc]` for implementation patterns
 
 **Deliverables:**
 - Agent can search the web and cite sources

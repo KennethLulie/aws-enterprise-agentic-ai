@@ -49,7 +49,7 @@
 1. **Prerequisites** (Section 1): Verify Phase 1a complete, App Runner healthy
 2. **Neon Setup** (Section 2): Create Neon account, database, and connection secret
 3. **Database Package** (Section 3): SQLAlchemy session management
-4. **Alembic Migrations** (Section 4): Schema versioning, checkpoint tables
+4. **Alembic Migrations** (Section 4): Schema versioning setup (checkpoint tables via PostgresSaver)
 5. **PostgresSaver** (Section 5): Replace MemorySaver for persistent state
 6. **Rate Limiting** (Section 6): slowapi middleware (10 req/min)
 7. **API Versioning** (Section 7): Move to /api/v1/chat
@@ -666,7 +666,7 @@ Verify: docker-compose exec backend python -c "from src.config.settings import g
 ## 4. Alembic Migrations
 
 ### What We're Doing
-Setting up Alembic for database schema versioning and creating the initial migration for LangGraph checkpoint tables.
+Setting up Alembic for database schema versioning (checkpoint tables are handled by PostgresSaver.setup()).
 
 ### Why This Matters
 - **Schema Versioning:** Track database changes over time
@@ -752,101 +752,30 @@ Reference:
 Verify: docker-compose exec backend alembic --help
 ```
 
-### 4.4 Create Initial Migration for LangGraph Checkpoints
+### 4.4 ~~Create Initial Migration for LangGraph Checkpoints~~ (REMOVED)
 
-**Agent Prompt:**
-```
-Create `backend/alembic/versions/001_initial_checkpoint_tables.py`
+> **Note:** This section was removed. The `langgraph-checkpoint-postgres` library manages its own schema via `PostgresSaver.setup()`, which:
+> - Creates tables: `checkpoints`, `checkpoint_writes`, `checkpoint_blobs`
+> - Tracks migrations in `checkpoint_migrations` table
+> - Handles schema evolution automatically
+>
+> **Do NOT create Alembic migrations for checkpoint tables.** The library's internal schema may differ from documentation and is subject to change between versions.
 
-Requirements:
-1. Revision ID: Use format "001" with descriptive suffix
-2. Create tables required by langgraph-checkpoint-postgres:
+### 4.5 Verify Alembic Setup
 
-Table: checkpoints
-- thread_id: VARCHAR(255) NOT NULL
-- checkpoint_ns: VARCHAR(255) NOT NULL DEFAULT ''
-- checkpoint_id: VARCHAR(255) NOT NULL
-- parent_checkpoint_id: VARCHAR(255)
-- type: VARCHAR(255)
-- checkpoint: JSONB NOT NULL
-- metadata: JSONB NOT NULL DEFAULT '{}'
-- PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)
-
-Table: checkpoint_writes
-- thread_id: VARCHAR(255) NOT NULL
-- checkpoint_ns: VARCHAR(255) NOT NULL DEFAULT ''
-- checkpoint_id: VARCHAR(255) NOT NULL
-- task_id: VARCHAR(255) NOT NULL
-- idx: INTEGER NOT NULL
-- channel: VARCHAR(255) NOT NULL
-- type: VARCHAR(255)
-- value: BYTEA
-- PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id, task_id, idx)
-
-Table: checkpoint_blobs
-- thread_id: VARCHAR(255) NOT NULL
-- checkpoint_ns: VARCHAR(255) NOT NULL DEFAULT ''
-- channel: VARCHAR(255) NOT NULL
-- version: VARCHAR(255) NOT NULL
-- type: VARCHAR(255) NOT NULL
-- value: BYTEA
-- PRIMARY KEY (thread_id, checkpoint_ns, channel, version)
-
-Downgrade function:
-- Drop all three tables
-
-Reference:
-- langgraph-checkpoint-postgres source code for exact schema
-- Alembic migration patterns
-- PostgreSQL JSONB type for checkpoint data
-
-Verify: docker-compose exec backend alembic history
-```
-
-### 4.5 Test Migration (Local) and Run in AWS
-
-**Option A: Test Locally Against Neon (Recommended)**
-
-You can run Alembic migrations directly against your Neon database from local:
+Alembic is now configured for future application migrations (user tables, etc.). Checkpoint tables are handled by `PostgresSaver.setup()` in Section 5.
 
 ```bash
-cd ~/Projects/aws-enterprise-agentic-ai
-
-# Set DATABASE_URL for Neon
-export DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@ep-YOUR-ENDPOINT.us-east-1.aws.neon.tech/neondb?sslmode=require"
-
-# Run migration
-docker-compose exec -e DATABASE_URL="$DATABASE_URL" backend alembic upgrade head
+# Verify Alembic is configured correctly
+docker-compose exec backend alembic --help
 ```
-
-**Expected Output:**
-```
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
-INFO  [alembic.runtime.migration] Running upgrade  -> 001_initial, Initial checkpoint tables
-```
-
-**Verify Tables Created:**
-```bash
-# Check tables exist in Neon
-psql "$DATABASE_URL" -c "\dt"
-```
-
-**Expected:** Should show `checkpoints`, `checkpoint_writes`, `checkpoint_blobs`, and `alembic_version` tables.
-
-**Option B: Let PostgresSaver Create Tables (Automatic)**
-
-If you skip the migration step, PostgresSaver.setup() will create the tables automatically when the application first starts with DATABASE_URL configured. This is a valid approach for development.
-
-**Note:** In Section 5, PostgresSaver.setup() will also create these tables automatically if they don't exist. The Alembic migration provides explicit schema versioning and control, while setup() serves as a fallback. This belt-and-suspenders approach is recommended for production.
 
 ### 4.6 Alembic Checklist
 
 - [ ] Alembic initialized in backend directory
 - [ ] alembic.ini configured (URL from settings)
 - [ ] env.py updated for dynamic URL loading
-- [ ] Initial migration created for checkpoint tables
-- [ ] `alembic history` shows migration
+- [ ] (Checkpoint tables: handled by PostgresSaver.setup() - see Section 5)
 
 ---
 
@@ -855,63 +784,26 @@ If you skip the migration step, PostgresSaver.setup() will create the tables aut
 ### What We're Doing
 Replacing the in-memory MemorySaver with PostgresSaver for persistent conversation state that survives App Runner restarts.
 
-### Security Requirements - CRITICAL
+### Security Note
 
-**⚠️ CRITICAL SECURITY REQUIREMENT:** Before enabling database access, ensure SQL injection prevention is properly implemented.
+**Good news:** The `langgraph-checkpoint-postgres` package handles all database operations for checkpoint tables internally. You don't write any SQL queries for checkpoint operations - the library manages:
+- Table creation/migration (via its `setup()` method or our Alembic migration)
+- Parameterized queries for all checkpoint operations
+- Proper connection handling
 
-#### Required SQL Safety Measures
+**What this means for Phase 1b:**
+- ✅ No custom SQL code needed for checkpoints
+- ✅ The library handles SQL injection prevention internally
+- ✅ You only need to provide a valid DATABASE_URL
 
-**1. Parameterized Queries ONLY** (from [_security.mdc])
-```python
-# ✅ CORRECT - Always use parameterized queries
-result = session.execute(
-    text("SELECT * FROM users WHERE id = :user_id"),
-    {"user_id": user_id}
-)
+**For Phase 2 (SQL Query Tool):**
+When implementing the SQL query tool that allows natural language database queries, you'll need to implement the full SQL security measures documented in `[_security.mdc]`:
+- Parameterized queries only
+- Table/column whitelisting (ALLOWED_TABLES)
+- Query restrictions and timeouts
+- Input validation with Pydantic
 
-# ❌ WRONG - NEVER use string formatting
-result = session.execute(f"SELECT * FROM users WHERE id = {user_id}")
-```
-
-**2. Table/Column Whitelisting** (from [_security.mdc])
-```python
-# Define allowed tables for LangGraph checkpoints
-ALLOWED_TABLES = {"checkpoints", "checkpoint_writes", "checkpoint_blobs"}
-
-def validate_checkpoint_table(table_name: str) -> bool:
-    if table_name not in ALLOWED_TABLES:
-        raise ValueError(f"Table {table_name} not allowed for checkpoint operations")
-    return True
-```
-
-**3. Query Restrictions** (from [_security.mdc])
-- Only allow SELECT/INSERT/UPDATE/DELETE operations on checkpoint tables
-- Set query timeouts (recommended: 30 seconds max)
-- Limit result set sizes (recommended: max 1000 rows)
-
-**4. Input Validation** (from [_security.mdc])
-```python
-from pydantic import BaseModel, Field, field_validator
-
-class CheckpointOperation(BaseModel):
-    conversation_id: str = Field(..., min_length=1, max_length=100)
-    thread_id: str = Field(..., min_length=1, max_length=255)
-
-    @field_validator('conversation_id', 'thread_id')
-    @classmethod
-    def validate_ids(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("ID cannot be empty")
-        # Additional validation as needed
-        return v.strip()
-```
-
-**Implementation Verification:**
-- [ ] Parameterized queries used throughout database operations
-- [ ] Table whitelisting implemented for checkpoint tables
-- [ ] Query timeouts configured (30s max recommended)
-- [ ] Input validation with Pydantic models
-- [ ] Error messages are user-friendly (no internal details exposed)
+**Reference:** See `[_security.mdc]` for complete SQL security patterns when needed.
 
 ### Why This Matters
 - **Persistence:** Conversations survive restarts
@@ -1074,7 +966,7 @@ print(f'Checkpointer: {type(cp).__name__}')
 - [ ] Fallback to MemorySaver works for local dev
 
 ---
-
+PLACEHOLDER - Resume here
 ## 6. Rate Limiting
 
 ### What We're Doing
@@ -1809,8 +1701,7 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 - [ ] Database package created (src/db/)
 - [ ] SQLAlchemy session management with connection pooling
 - [ ] Alembic initialized and configured
-- [ ] Checkpoint tables migration created
-- [ ] PostgresSaver replaces MemorySaver in AWS
+- [ ] PostgresSaver replaces MemorySaver in AWS (creates checkpoint tables via setup())
 - [ ] SQL injection prevention implemented (parameterized queries, table whitelisting)
 - [ ] Rate limiting middleware added (10 req/min)
 - [ ] API versioned to /api/v1/chat
@@ -1946,7 +1837,6 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
 | `backend/src/db/session.py` | SQLAlchemy session management |
 | `backend/alembic.ini` | Alembic configuration |
 | `backend/alembic/env.py` | Alembic migration environment |
-| `backend/alembic/versions/001_initial_checkpoint_tables.py` | Checkpoint tables migration |
 | `backend/src/api/middleware/rate_limit.py` | slowapi rate limiting |
 | `backend/src/api/routes/v1/__init__.py` | V1 API router |
 | `backend/src/api/routes/v1/chat.py` | Versioned chat endpoints |

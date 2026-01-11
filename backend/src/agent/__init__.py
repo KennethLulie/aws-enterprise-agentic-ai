@@ -18,6 +18,32 @@ Usage:
     from src.agent import validate_agent_config
     validation = validate_agent_config()
 
+    # Get default agent (MemorySaver)
+    from src.agent import get_agent
+    agent = get_agent()
+
+Checkpointing:
+    The agent supports two checkpointing modes:
+
+    1. MemorySaver (default, local development):
+       from src.agent import get_agent
+       agent = get_agent()  # Uses MemorySaver by default
+
+    2. PostgresSaver (production, requires database):
+       from src.agent import get_checkpointer, build_graph
+
+       # Use context manager for proper connection lifecycle
+       with get_checkpointer(database_url) as checkpointer:
+           agent = build_graph(checkpointer)
+           # Use agent within this context...
+
+       # Or in FastAPI lifespan:
+       @asynccontextmanager
+       async def lifespan(app: FastAPI):
+           with get_checkpointer(settings.database_url) as checkpointer:
+               app.state.agent = build_graph(checkpointer)
+               yield
+
 Package Structure:
     - graph.py: LangGraph graph definition and tool registration
     - state.py: Agent state schema (TypedDict)
@@ -38,14 +64,14 @@ Architecture:
                       ↓              ↓
                    LLM Call    External APIs
 
-Phase 0 (Current):
+Phase 0-1a:
     - Tool registration with market_data_tool
     - MemorySaver for in-memory checkpointing
     - Mock data fallback when API keys unavailable
 
-Phase 1b+ (Planned):
+Phase 1b+:
     - Full LangGraph StateGraph with streaming
-    - PostgresSaver for persistent checkpointing
+    - PostgresSaver for persistent checkpointing (Neon PostgreSQL)
     - Multi-tool orchestration and coordination
     - Error recovery with fallback strategies
 
@@ -63,10 +89,17 @@ Example - Tool Registration:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
-from src.agent.graph import get_registered_tools
+import structlog
+
+from src.agent.graph import (
+    POSTGRES_AVAILABLE,
+    build_graph,
+    get_checkpointer,
+    get_registered_tools,
+    graph,
+)
 from src.agent.state import (
     AgentState,
     add_tool_used,
@@ -78,15 +111,90 @@ from src.agent.state import (
 )
 from src.agent.tools import market_data_tool
 
+if TYPE_CHECKING:
+    from langchain_core.tools import BaseTool
+    from langgraph.graph.state import CompiledStateGraph
+
 # Version tracking for the agent package
 __version__ = "0.1.0"
 
-# Configure module logger
-logger = logging.getLogger(__name__)
+# Configure module logger (structlog for Phase 1b+)
+logger = structlog.get_logger(__name__)
 
-# Type exports for IDE support and type checking
-if TYPE_CHECKING:
-    from langchain_core.tools import BaseTool
+
+# =============================================================================
+# Agent Factory
+# =============================================================================
+
+
+def get_agent(database_url: str | None = None) -> "CompiledStateGraph":
+    """
+    Get a configured agent instance.
+
+    This is the recommended entry point for obtaining an agent. For simple use
+    cases and local development, call without arguments to get an agent with
+    MemorySaver (in-memory checkpointing).
+
+    For production use with PostgresSaver, prefer using the context manager
+    pattern directly for proper connection lifecycle management:
+
+        from src.agent import get_checkpointer, build_graph
+
+        with get_checkpointer(database_url) as checkpointer:
+            agent = build_graph(checkpointer)
+            # Use agent within this context
+
+    Args:
+        database_url: Optional PostgreSQL connection string. If provided and
+            langgraph-checkpoint-postgres is installed, attempts to use
+            PostgresSaver. Falls back to MemorySaver on failure.
+
+    Returns:
+        A compiled LangGraph agent ready for invocation.
+
+    Note:
+        When using PostgresSaver, the returned agent is only valid while the
+        database connection is active. For long-running applications (like
+        FastAPI), use the context manager pattern in the application lifespan.
+
+    Example:
+        # Simple usage (MemorySaver)
+        agent = get_agent()
+
+        # With conversation thread
+        config = {"configurable": {"thread_id": "conv-123"}}
+        async for chunk in agent.astream(state, config=config):
+            print(chunk)
+    """
+    if database_url and POSTGRES_AVAILABLE:
+        # For simple scripts, we can create a PostgresSaver directly
+        # Note: For production, prefer the context manager pattern
+        try:
+            from langgraph.checkpoint.postgres import PostgresSaver
+
+            saver = PostgresSaver.from_conn_string(database_url)
+            saver.setup()  # Creates checkpoint tables if they don't exist
+            logger.info(
+                "agent_initialized",
+                checkpointer_type="PostgresSaver",
+                message="Using PostgresSaver for persistent checkpointing",
+            )
+            return build_graph(saver)
+        except Exception as e:
+            logger.warning(
+                "postgres_checkpointer_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                message="Falling back to MemorySaver",
+            )
+
+    logger.info(
+        "agent_initialized",
+        checkpointer_type="MemorySaver",
+        message="Using MemorySaver for in-memory checkpointing",
+    )
+    # Return the pre-built graph with MemorySaver (from graph.py)
+    return graph
 
 
 # =============================================================================
@@ -127,11 +235,19 @@ def validate_agent_config() -> dict[str, Any]:
                 "No tools registered. Agent will operate in chat-only mode."
             )
 
-        logger.info(f"Agent configuration validated. Tools available: {tool_names}")
+        logger.info(
+            "agent_configuration_validated",
+            tools_available=tool_names,
+            tool_count=len(tool_names),
+        )
 
     except Exception as e:
         errors.append(f"Failed to load agent tools: {e}")
-        logger.error(f"Agent configuration error: {e}")
+        logger.error(
+            "agent_configuration_error",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         raise ValueError(f"Agent configuration validation failed: {errors}") from e
 
     return {
@@ -205,6 +321,12 @@ __all__ = [
     "add_tool_used",
     "set_error",
     "clear_error",
+    # Agent factory and graph
+    "get_agent",
+    "build_graph",
+    "get_checkpointer",
+    "graph",
+    "POSTGRES_AVAILABLE",
     # Tool functions
     "get_registered_tools",
     "validate_agent_config",

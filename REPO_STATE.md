@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-06 (Phase 1b: Guide created, ready for implementation)
+**Last Updated:** 2026-01-11 (Phase 1b: Agent __init__.py updated with get_agent(), Alembic initialized)
 
 ---
 
@@ -62,8 +62,8 @@
 | backend/src/api/routes/chat.py | Chat API endpoints with streaming (fixed IAM role detection) |
 | backend/src/api/routes/health.py | Health check endpoint |
 | backend/src/api/routes/v1/__init__.py | Versioned API routes (Phase 1b+) |
-| backend/src/agent/__init__.py | Agent package marker |
-| backend/src/agent/graph.py | LangGraph tool registration |
+| backend/src/agent/__init__.py | Agent package with get_agent(), checkpointer exports, tool utilities |
+| backend/src/agent/graph.py | LangGraph graph definition, build_graph(), get_checkpointer() |
 | backend/src/agent/state.py | Agent state schema (TypedDict) |
 | backend/src/agent/nodes/__init__.py | Agent nodes package |
 | backend/src/agent/nodes/chat.py | Chat node with LLM invocation |
@@ -75,6 +75,8 @@
 | backend/src/agent/tools/search.py | Tavily search tool |
 | backend/src/agent/tools/sql.py | SQL query tool stub |
 | backend/src/cache/__init__.py | Cache package (Phase 4+ placeholders) |
+| backend/src/db/__init__.py | Database package exports (SQLAlchemy session management) |
+| backend/src/db/session.py | SQLAlchemy engine, session, connection pooling |
 | backend/src/ingestion/__init__.py | Data ingestion package (Phase 2+ placeholders) |
 | backend/src/utils/__init__.py | Utility helpers package |
 | backend/tests/__init__.py | Tests package |
@@ -82,6 +84,10 @@
 | backend/tests/test_api.py | API endpoint tests |
 | backend/tests/test_tools.py | Tool tests (mock/live scenarios) |
 | backend/scripts/verify_code_quality.py | Code quality verification report generator |
+| backend/alembic.ini | Alembic migration configuration |
+| backend/alembic/README | Alembic directory readme |
+| backend/alembic/env.py | Alembic migration environment (dynamic DATABASE_URL) |
+| backend/alembic/script.py.mako | Alembic migration script template |
 
 ### Frontend Directory
 | File | Purpose |
@@ -156,14 +162,10 @@
 |------|---------|
 | .github/workflows/ci.yml | CI pipeline (lint, test, validate) |
 | .github/workflows/deploy.yml | CD pipeline (build, deploy, test) |
-| Note: Using Neon PostgreSQL (external) - no Aurora module needed |
-| backend/src/db/__init__.py | Database package exports |
-| backend/src/db/session.py | SQLAlchemy session management with connection pooling |
-| backend/alembic.ini | Alembic configuration |
-| backend/alembic/env.py | Alembic migration environment |
-| backend/alembic/versions/001_initial_checkpoint_tables.py | LangGraph checkpoint tables migration |
 | backend/src/api/middleware/rate_limit.py | slowapi rate limiting (10 req/min) |
 | backend/src/api/routes/v1/chat.py | Versioned chat endpoints (/api/v1/chat) |
+| Note: Using Neon PostgreSQL (external) - no Aurora module needed |
+| Note: LangGraph checkpoint tables are created by PostgresSaver.setup(), not Alembic |
 
 ### Phase 2+ - Advanced Features
 | File | Purpose |

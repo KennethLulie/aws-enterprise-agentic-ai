@@ -25,7 +25,7 @@ variable "secrets_policy_arn" {
 
 variable "secret_arns" {
   type        = map(string)
-  description = "Map of secret names to their ARNs (demo_password, auth_token_secret, tavily_api_key, fmp_api_key)"
+  description = "Map of secret names to their ARNs (demo_password, auth_token_secret, tavily_api_key, fmp_api_key, database_url)"
 }
 
 variable "allowed_origins" {

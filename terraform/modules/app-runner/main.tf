@@ -144,6 +144,7 @@ resource "aws_apprunner_service" "main" {
           AUTH_TOKEN_SECRET = "${var.secret_arns["auth_token_secret"]}:secret::"
           TAVILY_API_KEY    = "${var.secret_arns["tavily_api_key"]}:api_key::"
           FMP_API_KEY       = "${var.secret_arns["fmp_api_key"]}:api_key::"
+          DATABASE_URL      = "${var.secret_arns["database_url"]}:url::"
         }
       }
     }
