@@ -1,0 +1,240 @@
+# =============================================================================
+# CI Pipeline - Continuous Integration
+# =============================================================================
+# Runs on every push to main and on pull requests to main.
+# Validates code quality, runs tests, and checks security.
+#
+# Jobs run in parallel for faster feedback:
+# - lint-backend: Python code quality (black, ruff, mypy)
+# - lint-frontend: TypeScript code quality (eslint, tsc)
+# - test-backend: Python unit tests (pytest)
+# - terraform-validate: Infrastructure validation
+# - build-docker: Docker image build test (no push)
+# - security-scan: Security scanning (bandit, gitleaks)
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Explicitly declare minimal permissions (security best practice)
+permissions:
+  contents: read
+  # security-events needed for gitleaks to report findings
+  security-events: write
+
+jobs:
+  # ===========================================================================
+  # Backend Linting
+  # ===========================================================================
+  lint-backend:
+    name: Lint Backend (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Check formatting with Black
+        run: black --check backend/src/
+
+      - name: Lint with Ruff
+        run: ruff check backend/src/
+
+      - name: Type check with mypy
+        run: mypy backend/src/ --ignore-missing-imports
+
+  # ===========================================================================
+  # Frontend Linting
+  # ===========================================================================
+  lint-frontend:
+    name: Lint Frontend (TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Type check with TypeScript
+        run: npx tsc --noEmit
+
+  # ===========================================================================
+  # Backend Tests
+  # ===========================================================================
+  test-backend:
+    name: Test Backend (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run tests with coverage
+        run: pytest backend/tests/ -v --cov=backend/src --cov-report=xml --cov-report=term-missing
+        env:
+          # Minimal env vars for tests (mocked external services)
+          ENVIRONMENT: local
+          AWS_REGION: us-east-1
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 7
+
+  # ===========================================================================
+  # Terraform Validation
+  # ===========================================================================
+  terraform-validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive terraform/
+
+      - name: Initialize Terraform (no backend)
+        working-directory: terraform/environments/dev
+        run: terraform init -backend=false
+
+      - name: Validate Terraform configuration
+        working-directory: terraform/environments/dev
+        run: terraform validate
+
+  # ===========================================================================
+  # Docker Build Test
+  # ===========================================================================
+  build-docker:
+    name: Build Docker Image (Test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend Docker image (test only)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: backend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ===========================================================================
+  # Security Scanning
+  # ===========================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Security scan is advisory - don't block PRs on security warnings
+    # Issues are still reported via artifacts and gitleaks findings
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for gitleaks
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit security scan
+        id: bandit
+        run: |
+          bandit -r backend/src/ -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 7
+
+      - name: Report Bandit findings
+        if: steps.bandit.outcome == 'failure'
+        run: |
+          echo "::warning::Bandit found security issues. Check the bandit-report artifact for details."
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1483,12 +1483,28 @@ Post-creation:
 2. Settings → Secrets and variables → Actions
 3. Click "New repository secret" for each:
 
+**Required Secrets:**
 | Secret Name | Value | Source |
 |-------------|-------|--------|
 | AWS_ACCESS_KEY_ID | Your IAM access key | AWS Console → IAM |
 | AWS_SECRET_ACCESS_KEY | Your IAM secret key | AWS Console → IAM |
-| AWS_REGION | us-east-1 | Fixed value |
-| AWS_ACCOUNT_ID | Your 12-digit account ID | `aws sts get-caller-identity` |
+| APP_RUNNER_URL | Your App Runner URL | `https://xxx.us-east-1.awsapprunner.com` from Terraform output |
+| FRONTEND_S3_BUCKET | S3 bucket name | Terraform output (e.g., `enterprise-agentic-ai-frontend-xxx`) |
+
+**Optional Secrets (for full smoke testing):**
+| Secret Name | Value | Source |
+|-------------|-------|--------|
+| CLOUDFRONT_DISTRIBUTION_ID | Distribution ID | Terraform output (e.g., `E1234ABCD5678`) |
+| CLOUDFRONT_URL | CloudFront URL | `https://xxx.cloudfront.net` from Terraform output |
+
+**Note:** `AWS_REGION` and `AWS_ACCOUNT_ID` are NOT needed - the region is hardcoded (`us-east-1`) and the ECR login action provides the account ID automatically.
+
+**Security Note (Public Repositories):**
+- GitHub secrets are encrypted and never exposed in logs (shown as `***`)
+- Forks do NOT have access to your secrets - only your repository does
+- PRs from forks run with restricted permissions and cannot access secrets
+- Only users with write access can trigger the manual deploy workflow
+- Your AWS resources are safe - forks can only affect their own environments
 
 ### 9.4 Create Workflow Directories
 

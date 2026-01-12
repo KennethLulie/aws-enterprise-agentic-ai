@@ -1,0 +1,324 @@
+# =============================================================================
+# CD Pipeline - Continuous Deployment
+# =============================================================================
+# Manual deployment workflow triggered via GitHub Actions UI.
+# Builds and deploys backend to AWS App Runner and frontend to S3/CloudFront.
+#
+# How to use:
+# 1. Go to GitHub → Actions tab
+# 2. Select "Deploy" workflow
+# 3. Click "Run workflow" button
+# 4. Select environment and confirm
+#
+# Job execution order:
+# 1. build-and-deploy-backend: Build Docker image, push to ECR (parallel)
+# 2. build-and-deploy-frontend: Build Next.js, sync to S3, invalidate CloudFront (parallel)
+# 3. smoke-test: Verify deployment health (runs after both deploy jobs complete)
+# =============================================================================
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+
+# Explicitly declare minimal permissions (security best practice)
+permissions:
+  contents: read
+  id-token: write  # Required for OIDC authentication (if used in future)
+
+# Prevent concurrent deployments
+concurrency:
+  group: deploy-${{ github.event.inputs.environment }}
+  cancel-in-progress: false  # Don't cancel in-progress deployments
+
+# Environment variables used across jobs
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: enterprise-agentic-ai-backend
+
+jobs:
+  # ===========================================================================
+  # Build and Deploy Backend
+  # ===========================================================================
+  build-and-deploy-backend:
+    name: Build & Deploy Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ github.event.inputs.environment }}
+
+    outputs:
+      image-tag: ${{ steps.build.outputs.image-tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: build
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Building Docker image..."
+          
+          # Build the image
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f backend/Dockerfile \
+            backend/
+          
+          echo "Pushing Docker image to ECR..."
+          
+          # Push both tags
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "✅ Docker image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Trigger App Runner deployment
+        env:
+          IMAGE_TAG: ${{ steps.build.outputs.image-tag }}
+        run: |
+          echo "Triggering App Runner deployment..."
+          
+          # Get the App Runner service ARN
+          SERVICE_ARN=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='enterprise-agentic-ai-backend'].ServiceArn" \
+            --output text)
+          
+          if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" == "None" ]; then
+            echo "⚠️ App Runner service not found. Skipping deployment trigger."
+            echo "Note: App Runner will auto-deploy when configured for ECR image updates."
+            exit 0
+          fi
+          
+          echo "Found App Runner service: $SERVICE_ARN"
+          
+          # Start deployment
+          aws apprunner start-deployment --service-arn "$SERVICE_ARN"
+          
+          echo "✅ App Runner deployment triggered"
+
+  # ===========================================================================
+  # Build and Deploy Frontend
+  # ===========================================================================
+  build-and-deploy-frontend:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Get App Runner URL
+        id: get-api-url
+        run: |
+          # Use the known App Runner URL from deployment
+          # This could be dynamically fetched from AWS or Terraform outputs
+          API_URL="${{ secrets.APP_RUNNER_URL }}"
+          
+          if [ -z "$API_URL" ]; then
+            echo "⚠️ APP_RUNNER_URL secret not set. Using placeholder."
+            API_URL="https://your-app-runner-url.us-east-1.awsapprunner.com"
+          fi
+          
+          echo "api-url=$API_URL" >> $GITHUB_OUTPUT
+          echo "Using API URL: $API_URL"
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ steps.get-api-url.outputs.api-url }}
+        run: |
+          echo "Building Next.js static export..."
+          echo "API URL: $NEXT_PUBLIC_API_URL"
+          npm run build
+          
+          # Verify build output
+          if [ ! -d "out" ]; then
+            echo "❌ Build failed: 'out' directory not found"
+            exit 1
+          fi
+          
+          echo "✅ Frontend build complete"
+          ls -la out/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        env:
+          S3_BUCKET: ${{ secrets.FRONTEND_S3_BUCKET }}
+        run: |
+          if [ -z "$S3_BUCKET" ]; then
+            echo "❌ FRONTEND_S3_BUCKET secret not set"
+            exit 1
+          fi
+          
+          echo "Syncing to S3 bucket: $S3_BUCKET"
+          
+          aws s3 sync frontend/out/ "s3://$S3_BUCKET/" \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*.html" \
+            --exclude "_next/data/*"
+          
+          # HTML files should not be cached aggressively
+          aws s3 sync frontend/out/ "s3://$S3_BUCKET/" \
+            --exclude "*" \
+            --include "*.html" \
+            --cache-control "public, max-age=0, must-revalidate"
+          
+          # Next.js data files should have short cache
+          aws s3 sync frontend/out/ "s3://$S3_BUCKET/" \
+            --exclude "*" \
+            --include "_next/data/*" \
+            --cache-control "public, max-age=60"
+          
+          echo "✅ S3 sync complete"
+
+      - name: Invalidate CloudFront cache
+        env:
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          if [ -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
+            echo "⚠️ CLOUDFRONT_DISTRIBUTION_ID secret not set. Skipping invalidation."
+            exit 0
+          fi
+          
+          echo "Creating CloudFront invalidation..."
+          
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/*" \
+            --query "Invalidation.Id" \
+            --output text)
+          
+          echo "✅ CloudFront invalidation created: $INVALIDATION_ID"
+          echo "Note: Invalidation may take a few minutes to complete globally."
+
+  # ===========================================================================
+  # Smoke Test
+  # ===========================================================================
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build-and-deploy-backend, build-and-deploy-frontend]
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Wait for deployment propagation
+        run: |
+          echo "Waiting 60 seconds for deployment to propagate..."
+          sleep 60
+
+      - name: Test backend health endpoint
+        env:
+          APP_RUNNER_URL: ${{ secrets.APP_RUNNER_URL }}
+        run: |
+          if [ -z "$APP_RUNNER_URL" ]; then
+            echo "⚠️ APP_RUNNER_URL secret not set. Skipping backend health check."
+            exit 0
+          fi
+          
+          echo "Testing backend health endpoint..."
+          
+          # Retry up to 5 times with 10 second intervals
+          for i in {1..5}; do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$APP_RUNNER_URL/health" || echo "000")
+            
+            if [ "$HTTP_STATUS" == "200" ]; then
+              echo "✅ Backend health check passed (HTTP $HTTP_STATUS)"
+              
+              # Show health response
+              curl -s "$APP_RUNNER_URL/health" | head -c 500
+              echo ""
+              exit 0
+            fi
+            
+            echo "Attempt $i/5: HTTP $HTTP_STATUS (waiting 10s...)"
+            sleep 10
+          done
+          
+          echo "❌ Backend health check failed after 5 attempts"
+          exit 1
+
+      - name: Test frontend availability
+        env:
+          CLOUDFRONT_URL: ${{ secrets.CLOUDFRONT_URL }}
+        run: |
+          if [ -z "$CLOUDFRONT_URL" ]; then
+            echo "⚠️ CLOUDFRONT_URL secret not set. Skipping frontend check."
+            exit 0
+          fi
+          
+          echo "Testing frontend availability..."
+          
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -I "$CLOUDFRONT_URL" || echo "000")
+          
+          if [ "$HTTP_STATUS" == "200" ] || [ "$HTTP_STATUS" == "304" ]; then
+            echo "✅ Frontend check passed (HTTP $HTTP_STATUS)"
+          else
+            echo "❌ Frontend check failed (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
+
+      - name: Deployment summary
+        if: always()
+        env:
+          APP_RUNNER_URL: ${{ secrets.APP_RUNNER_URL }}
+          CLOUDFRONT_URL: ${{ secrets.CLOUDFRONT_URL }}
+        run: |
+          echo "============================================="
+          echo "         DEPLOYMENT SUMMARY"
+          echo "============================================="
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo ""
+          echo "Endpoints:"
+          echo "  Backend API: ${APP_RUNNER_URL:-'Not configured'}"
+          echo "  Frontend:    ${CLOUDFRONT_URL:-'Not configured'}"
+          echo "============================================="

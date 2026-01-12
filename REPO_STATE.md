@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-12 (Phase 1b: Rate limiting middleware added)
+**Last Updated:** 2026-01-12 (Phase 1b: CI/CD workflows added)
 
 ---
 
@@ -28,6 +28,12 @@
 | .gitleaks.toml | Gitleaks secret scanning rules |
 | .secrets.baseline | detect-secrets baseline |
 | docker-compose.yml | Docker Compose configuration (backend + frontend services) |
+
+### GitHub Actions Workflows
+| File | Purpose |
+|------|---------|
+| .github/workflows/ci.yml | CI pipeline (lint, test, validate, Docker build) - runs on push/PR to main |
+| .github/workflows/deploy.yml | CD pipeline (manual trigger via workflow_dispatch) - deploys to AWS |
 
 ### Cursor Rules Directory (.cursor/rules/)
 | File | Purpose |
@@ -162,8 +168,6 @@
 ### Phase 1b - Production Hardening
 | File | Purpose |
 |------|---------|
-| .github/workflows/ci.yml | CI pipeline (lint, test, validate) |
-| .github/workflows/deploy.yml | CD pipeline (manual trigger via workflow_dispatch) |
 | Note: Using Neon PostgreSQL (external) - no Aurora module needed |
 | Note: LangGraph checkpoint tables are created by PostgresSaver.setup(), not Alembic |
 
