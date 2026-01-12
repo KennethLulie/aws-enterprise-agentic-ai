@@ -1,0 +1,16 @@
+{
+  "assistant": {
+    "permissions": {
+      "network": true,
+      "git_write": true,
+      "filesystem": {
+        "read": true,
+        "write": true,
+        "execute": [
+          "/home/kenneth/Projects/aws-enterprise-agentic-ai/scripts",
+          "/home/kenneth/Projects/aws-enterprise-agentic-ai"
+        ]
+      }
+    }
+  }
+}

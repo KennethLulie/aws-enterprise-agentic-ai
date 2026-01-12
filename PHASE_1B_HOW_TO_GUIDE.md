@@ -966,7 +966,7 @@ print(f'Checkpointer: {type(cp).__name__}')
 - [ ] Fallback to MemorySaver works for local dev
 
 ---
-PLACEHOLDER - Resume here
+
 ## 6. Rate Limiting
 
 ### What We're Doing
@@ -1196,7 +1196,7 @@ Verify: docker-compose exec backend python -c "from src.api.main import app; pri
 
 Expected output should include: '/api/v1/chat'
 ```
-
+resume here
 ### 7.4 Update Frontend for V1 API
 
 **Agent Prompt:**

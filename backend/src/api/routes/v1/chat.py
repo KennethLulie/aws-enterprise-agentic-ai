@@ -1,5 +1,9 @@
 """
-Chat endpoints providing POST and SSE streaming.
+V1 Chat endpoints providing POST and SSE streaming.
+
+This module provides versioned chat endpoints at /api/v1/chat. The functionality
+is identical to the legacy /api/chat endpoints but mounted under the v1 namespace
+for API versioning support.
 
 Phase 0 defaults to a lightweight mock streaming path. When Bedrock credentials
 are configured, the endpoints stream real LangGraph responses (LLM + tools).
@@ -23,6 +27,10 @@ Thinking Content:
     as separate "thinking" events so the frontend can display them appropriately
     (e.g., in a collapsible section). The main message content is sent without
     the thinking tags.
+
+Note:
+    The /api/v1 prefix is applied in main.py when including the v1 router.
+    Routes in this module are defined relative to that prefix.
 """
 
 from __future__ import annotations
@@ -80,19 +88,20 @@ def _parse_thinking_content(content: str) -> tuple[str, str | None]:
     return content, None
 
 
-router = APIRouter(prefix="/api", tags=["Chat"])
+# V1 chat router - no prefix here, /api/v1 is applied in main.py
+router = APIRouter(prefix="/chat", tags=["v1", "Chat"])
 
 # In-memory queues keyed by conversation_id. This is sufficient for Phase 0 demos.
-_STREAM_QUEUES: Dict[str, asyncio.Queue[dict[str, Any]]] = {}
+# Note: Using separate namespace from legacy routes to avoid conflicts
+_V1_STREAM_QUEUES: Dict[str, asyncio.Queue[dict[str, Any]]] = {}
 _KEEPALIVE_SECONDS = 15
 
 
 def _get_queue(conversation_id: str) -> asyncio.Queue[dict[str, Any]]:
     """Return (or create) the queue for a conversation."""
-
-    if conversation_id not in _STREAM_QUEUES:
-        _STREAM_QUEUES[conversation_id] = asyncio.Queue()
-    return _STREAM_QUEUES[conversation_id]
+    if conversation_id not in _V1_STREAM_QUEUES:
+        _V1_STREAM_QUEUES[conversation_id] = asyncio.Queue()
+    return _V1_STREAM_QUEUES[conversation_id]
 
 
 class SendMessageRequest(BaseModel):
@@ -121,7 +130,6 @@ class SendMessageResponse(BaseModel):
 
 async def _mock_stream_response(conversation_id: str, user_message: str) -> None:
     """Simulate a short streaming response for Phase 0."""
-
     queue = _get_queue(conversation_id)
     # Simulate incremental chunks
     queue.put_nowait(
@@ -135,7 +143,7 @@ async def _mock_stream_response(conversation_id: str, user_message: str) -> None
     queue.put_nowait(
         {
             "type": "message",
-            "content": f"I heard: “{user_message}”. ",
+            "content": f'I heard: "{user_message}". ',
             "conversationId": conversation_id,
         }
     )
@@ -381,7 +389,6 @@ async def _event_stream(
     conversation_id: str,
 ) -> AsyncIterator[str]:
     """Yield server-sent events for the given conversation."""
-
     queue = _get_queue(conversation_id)
     # Send an initial open event so the client captures the ID
     yield f"data: {json.dumps({'type': 'open', 'conversationId': conversation_id})}\n\n"
@@ -401,14 +408,14 @@ async def _event_stream(
                 break
     finally:
         # Clean up queue to avoid unbounded growth for completed conversations
-        _STREAM_QUEUES.pop(conversation_id, None)
+        _V1_STREAM_QUEUES.pop(conversation_id, None)
 
 
 @router.post(
-    "/chat",
+    "",
     response_model=SendMessageResponse,
     response_model_by_alias=True,
-    summary="Submit a chat message",
+    summary="Submit a chat message (v1)",
     description="Accepts a chat message and enqueues a streaming response (mock or real).",
 )
 @limiter.limit(DEFAULT_RATE_LIMIT)
@@ -418,7 +425,6 @@ async def post_chat(
     _: SessionPayload = Depends(require_session),
 ) -> SendMessageResponse:
     """Accept a chat message and start a streaming response (mock or real)."""
-
     conversation_id = body.conversation_id or str(uuid.uuid4())
     queue = _get_queue(conversation_id)
 
@@ -448,8 +454,8 @@ async def post_chat(
 
 
 @router.get(
-    "/chat",
-    summary="Stream chat updates",
+    "",
+    summary="Stream chat updates (v1)",
     description="Server-Sent Events stream for chat responses.",
 )
 @limiter.limit(DEFAULT_RATE_LIMIT)
@@ -459,7 +465,6 @@ async def stream_chat(
     _: SessionPayload = Depends(require_session),
 ) -> StreamingResponse:
     """Stream chat responses for the provided conversation."""
-
     active_conversation_id = conversation_id or str(uuid.uuid4())
     generator = _event_stream(active_conversation_id)
     return StreamingResponse(

@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-11 (Phase 1b: Agent __init__.py updated with get_agent(), Alembic initialized)
+**Last Updated:** 2026-01-12 (Phase 1b: Rate limiting middleware added)
 
 ---
 
@@ -54,14 +54,16 @@
 | backend/src/config/__init__.py | Configuration package |
 | backend/src/config/settings.py | Pydantic settings with AWS Secrets Manager integration, ALLOWED_ORIGINS |
 | backend/src/api/__init__.py | API package marker |
-| backend/src/api/main.py | FastAPI application factory with CORS for CloudFront |
+| backend/src/api/main.py | FastAPI application factory with CORS, rate limiting, v1 API routes |
 | backend/src/api/middleware/__init__.py | API middleware package |
 | backend/src/api/middleware/logging.py | CloudWatch-compatible structlog configuration |
+| backend/src/api/middleware/rate_limit.py | IP-based rate limiting using slowapi (10 req/min default) |
 | backend/src/api/routes/__init__.py | API routes package |
 | backend/src/api/routes/auth.py | Demo password login route |
-| backend/src/api/routes/chat.py | Chat API endpoints with streaming (fixed IAM role detection) |
+| backend/src/api/routes/chat.py | Chat API endpoints with streaming, rate limiting (10 req/min) |
 | backend/src/api/routes/health.py | Health check endpoint |
-| backend/src/api/routes/v1/__init__.py | Versioned API routes (Phase 1b+) |
+| backend/src/api/routes/v1/__init__.py | V1 router aggregation, includes chat router |
+| backend/src/api/routes/v1/chat.py | Versioned chat endpoints (/api/v1/chat) with rate limiting |
 | backend/src/agent/__init__.py | Agent package with get_agent(), checkpointer exports, tool utilities |
 | backend/src/agent/graph.py | LangGraph graph definition, build_graph(), get_checkpointer() |
 | backend/src/agent/state.py | Agent state schema (TypedDict) |
@@ -162,8 +164,6 @@
 |------|---------|
 | .github/workflows/ci.yml | CI pipeline (lint, test, validate) |
 | .github/workflows/deploy.yml | CD pipeline (build, deploy, test) |
-| backend/src/api/middleware/rate_limit.py | slowapi rate limiting (10 req/min) |
-| backend/src/api/routes/v1/chat.py | Versioned chat endpoints (/api/v1/chat) |
 | Note: Using Neon PostgreSQL (external) - no Aurora module needed |
 | Note: LangGraph checkpoint tables are created by PostgresSaver.setup(), not Alembic |
 
