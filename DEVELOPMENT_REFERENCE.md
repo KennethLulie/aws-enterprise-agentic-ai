@@ -522,6 +522,7 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 
 #### Step 5: GitHub Actions CI/CD
 1. **CI Pipeline** (`.github/workflows/ci.yml`)
+   - Triggers: push to main AND pull_request to main
    - Lint (black, ruff)
    - Type check (mypy)
    - Test (pytest)
@@ -529,11 +530,11 @@ Add production-grade features: persistent state, CI/CD, observability, security 
    - Security scan
 
 2. **CD Pipeline** (`.github/workflows/deploy.yml`)
+   - Triggers: workflow_dispatch (manual trigger via GitHub Actions UI)
    - Build Docker image
    - Push to ECR
    - Build frontend
    - Upload to S3
-   - Terraform apply
    - CloudFront invalidation
    - Health check
 

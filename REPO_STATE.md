@@ -61,7 +61,7 @@
 | backend/src/api/routes/__init__.py | API routes package |
 | backend/src/api/routes/auth.py | Demo password login route |
 | backend/src/api/routes/chat.py | Chat API endpoints with streaming, rate limiting (10 req/min) |
-| backend/src/api/routes/health.py | Health check endpoint |
+| backend/src/api/routes/health.py | Health check with dependency checks (database, Bedrock) |
 | backend/src/api/routes/v1/__init__.py | V1 router aggregation, includes chat router |
 | backend/src/api/routes/v1/chat.py | Versioned chat endpoints (/api/v1/chat) with rate limiting |
 | backend/src/agent/__init__.py | Agent package with get_agent(), checkpointer exports, tool utilities |
@@ -111,7 +111,7 @@
 | frontend/src/components/ui/dialog.tsx | shadcn/ui Dialog component |
 | frontend/src/components/ui/input.tsx | shadcn/ui Input component |
 | frontend/src/components/ui/sonner.tsx | shadcn/ui Sonner toast component |
-| frontend/src/lib/api.ts | API client with SSE support (fixed TypeScript type validation) |
+| frontend/src/lib/api.ts | API client with SSE support, uses V1 API routes (/api/v1/chat) |
 | frontend/src/lib/utils.ts | Utility functions (cn for classnames) |
 
 ### Documentation Directory
@@ -163,7 +163,7 @@
 | File | Purpose |
 |------|---------|
 | .github/workflows/ci.yml | CI pipeline (lint, test, validate) |
-| .github/workflows/deploy.yml | CD pipeline (build, deploy, test) |
+| .github/workflows/deploy.yml | CD pipeline (manual trigger via workflow_dispatch) |
 | Note: Using Neon PostgreSQL (external) - no Aurora module needed |
 | Note: LangGraph checkpoint tables are created by PostgresSaver.setup(), not Alembic |
 

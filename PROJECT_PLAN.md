@@ -1284,24 +1284,25 @@ aws-enterprise-agentic-ai/
 
 ## GitHub Actions Workflows
 
-**Phase gating:** Introduced in Phase 1b (no CI/CD in Phase 0). Triggers are `pull_request` (CI), `push` to `main` (CD), and scheduled/manual dispatch (evaluation).
+**Phase gating:** Introduced in Phase 1b (no CI/CD in Phase 0). Triggers are `push` to `main` + `pull_request` (CI), `workflow_dispatch` manual trigger (CD), and scheduled/manual dispatch (evaluation).
 
-### CI Pipeline (on PR):
-1. Lint and format check (Python: black, ruff | TypeScript: ESLint, Prettier)
-2. Unit tests (pytest for Python, jest for TypeScript)
+### CI Pipeline (on push to main & PRs):
+1. Lint and format check (Python: black, ruff | TypeScript: ESLint, tsc)
+2. Unit tests (pytest for Python)
 3. Terraform validate and plan (no apply)
-4. Security scanning (Checkov for Terraform, Bandit for Python)
+4. Security scanning (Bandit for Python, gitleaks for secrets)
 5. Build Docker image (test build, don't push)
 
-### CD Pipeline (on merge to main):
+### CD Pipeline (manual trigger via GitHub Actions UI):
 1. Build backend Docker image
 2. Push to ECR
 3. Build frontend (Next.js build)
 4. Upload frontend to S3
-5. Terraform apply (with approval for prod)
-6. Invalidate CloudFront cache
-7. Health check (verify deployment)
-8. Run smoke tests
+5. Invalidate CloudFront cache
+6. Health check (verify deployment)
+7. Run smoke tests
+
+**How to deploy:** Go to GitHub → Actions tab → Select "Deploy" workflow → Click "Run workflow" button
 
 ### Evaluation Pipeline (scheduled/manual):
 1. Pull evaluation dataset from S3

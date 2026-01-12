@@ -394,8 +394,8 @@ GitHub Actions automates the entire development lifecycle:
 - **Rollback Capability**: Easy rollback via Terraform state management
 
 ### Planned GitHub Actions (Phase 1b)
-- **CI (pull requests):** black, ruff, mypy; ESLint/Prettier/tsc; pytest; Docker test builds; Terraform fmt/validate/plan (no apply); security scans (Bandit, Checkov, gitleaks).
-- **CD (merge to main):** Build and push backend image to ECR; build Next.js static export; upload frontend to S3; Terraform apply (with approval for prod); CloudFront cache invalidate; post-deploy smoke tests/health checks.
+- **CI (push & pull requests):** black, ruff, mypy; ESLint/tsc; pytest; Docker test builds; Terraform fmt/validate/plan (no apply); security scans (Bandit, gitleaks). Runs automatically on every push to main and on PRs.
+- **CD (manual trigger):** Build and push backend image to ECR; build Next.js static export; upload frontend to S3; CloudFront cache invalidate; post-deploy smoke tests/health checks. **Triggered manually via GitHub Actions UI** - click "Run workflow" when ready to deploy.
 - **Evaluation (scheduled/manual):** Run RAGAS on the eval dataset, publish metrics to Arize Phoenix/CloudWatch, and fail on regressions.
 - **Phase gating:** Workflows are introduced in Phase 1b; none run in Phase 0 beyond placeholders.
 

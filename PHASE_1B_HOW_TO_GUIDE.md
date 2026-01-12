@@ -1196,7 +1196,7 @@ Verify: docker-compose exec backend python -c "from src.api.main import app; pri
 
 Expected output should include: '/api/v1/chat'
 ```
-resume here
+
 ### 7.4 Update Frontend for V1 API
 
 **Agent Prompt:**
@@ -1310,13 +1310,14 @@ Verify: curl http://localhost:8000/health
 ## 9. GitHub Actions CI/CD
 
 ### What We're Doing
-Creating GitHub Actions workflows for continuous integration (on PRs) and continuous deployment (on merge to main).
+Creating GitHub Actions workflows for continuous integration (on every push) and deployment (manual trigger via GitHub UI).
 
 ### Why This Matters
-- **Automation:** No manual deployment steps
-- **Quality:** Every PR is tested
+- **Quality:** Every push is tested automatically
+- **Control:** You decide when to deploy (manual trigger)
 - **Speed:** Faster feedback on issues
 - **Reliability:** Consistent deployment process
+- **Simplicity:** No surprise deployments - push freely, deploy when ready
 
 ### 9.1 Create CI Workflow
 
@@ -1326,7 +1327,7 @@ Create `.github/workflows/ci.yml`
 
 Requirements:
 1. Name: CI
-2. Triggers: pull_request to main branch
+2. Triggers: push to main branch AND pull_request to main branch
 
 Jobs:
 
@@ -1409,7 +1410,9 @@ Create `.github/workflows/deploy.yml`
 
 Requirements:
 1. Name: Deploy
-2. Triggers: push to main branch
+2. Triggers: workflow_dispatch (manual trigger via GitHub Actions UI)
+   - Add input: environment (choice: production, default: production)
+   - This allows you to deploy only when you click "Run workflow" in GitHub
 
 Environment secrets needed (configure in GitHub repo settings):
 - AWS_ACCESS_KEY_ID
@@ -1521,9 +1524,23 @@ git push origin test-ci
 - [ ] CI workflow created at .github/workflows/ci.yml
 - [ ] CD workflow created at .github/workflows/deploy.yml
 - [ ] GitHub secrets configured (AWS credentials)
-- [ ] CI triggers on pull_request
-- [ ] CD triggers on push to main
+- [ ] CI triggers on push to main AND pull_request
+- [ ] CD triggers on workflow_dispatch (manual "Run workflow" button)
 - [ ] Smoke test verifies deployment
+
+### 9.7 How to Deploy (Manual Process)
+
+After CI passes and you're ready to deploy:
+
+1. Go to your repository on GitHub
+2. Click **Actions** tab
+3. Select **Deploy** workflow from the left sidebar
+4. Click **Run workflow** dropdown button (right side)
+5. Select branch: `main`
+6. Click **Run workflow** (green button)
+7. Monitor the deployment progress
+
+This gives you full control over when changes go live to AWS.
 
 ---
 
