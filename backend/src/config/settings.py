@@ -459,7 +459,7 @@ class Settings(BaseSettings):
     # Application Configuration
     # =========================================================================
     backend_host: str = Field(
-        default="0.0.0.0",
+        default="0.0.0.0",  # nosec B104 - Required for containerized deployments (Docker/App Runner)
         description="Host address for the backend server to bind to.",
     )
 
