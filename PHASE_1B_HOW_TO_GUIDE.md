@@ -1482,7 +1482,7 @@ Post-creation:
 1. Go to your repository on GitHub
 2. Settings → Secrets and variables → Actions
 3. Click "New repository secret" for each:
-
+**#**No enviormental secrets necessary**
 **Required Secrets:**
 | Secret Name | Value | Source |
 |-------------|-------|--------|
