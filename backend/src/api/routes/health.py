@@ -261,8 +261,8 @@ async def check_bedrock() -> DependencyCheckResult:
             client = boto3.client(**client_kwargs)
 
             # List foundation models (lightweight operation)
-            # Just check if we can make the API call, limit to 1 result
-            client.list_foundation_models(maxResults=1)
+            # Just check if we can make the API call
+            client.list_foundation_models()
             return True
 
         # Execute with timeout

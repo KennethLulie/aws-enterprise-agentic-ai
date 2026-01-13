@@ -33,8 +33,6 @@ Note:
     Routes in this module are defined relative to that prefix.
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 import re
