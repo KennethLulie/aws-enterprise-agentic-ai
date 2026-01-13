@@ -272,7 +272,10 @@ def _configure_rate_limiting(app: FastAPI) -> None:
 
     # Register our custom exception handler for rate limit errors
     # This provides user-friendly messages instead of technical details
-    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+    # Note: Starlette expects Exception type but we handle RateLimitExceeded specifically
+    app.add_exception_handler(
+        RateLimitExceeded, rate_limit_exceeded_handler  # type: ignore[arg-type]
+    )
 
     logger.info("rate_limiting_configured", default_limit="10/minute")
 

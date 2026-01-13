@@ -127,67 +127,40 @@ logger = structlog.get_logger(__name__)
 # =============================================================================
 
 
-def get_agent(database_url: str | None = None) -> "CompiledStateGraph":
+def get_agent() -> "CompiledStateGraph":
     """
-    Get a configured agent instance.
+    Get a pre-configured agent instance with in-memory checkpointing.
 
-    This is the recommended entry point for obtaining an agent. For simple use
-    cases and local development, call without arguments to get an agent with
-    MemorySaver (in-memory checkpointing).
+    This is a convenience function for local development and testing.
+    Returns the default graph with MemorySaver (in-memory checkpointing).
 
-    For production use with PostgresSaver, prefer using the context manager
-    pattern directly for proper connection lifecycle management:
+    For production use with PostgresSaver (persistent checkpointing),
+    use the context manager pattern in your application lifespan:
 
         from src.agent import get_checkpointer, build_graph
 
-        with get_checkpointer(database_url) as checkpointer:
-            agent = build_graph(checkpointer)
-            # Use agent within this context
-
-    Args:
-        database_url: Optional PostgreSQL connection string. If provided and
-            langgraph-checkpoint-postgres is installed, attempts to use
-            PostgresSaver. Falls back to MemorySaver on failure.
+        @asynccontextmanager
+        async def lifespan(app: FastAPI):
+            with get_checkpointer(settings.database_url) as checkpointer:
+                app.state.graph = build_graph(checkpointer)
+                yield
 
     Returns:
         A compiled LangGraph agent ready for invocation.
 
-    Note:
-        When using PostgresSaver, the returned agent is only valid while the
-        database connection is active. For long-running applications (like
-        FastAPI), use the context manager pattern in the application lifespan.
-
     Example:
-        # Simple usage (MemorySaver)
+        # Simple usage (MemorySaver - for local dev/testing)
         agent = get_agent()
 
         # With conversation thread
         config = {"configurable": {"thread_id": "conv-123"}}
         async for chunk in agent.astream(state, config=config):
             print(chunk)
+
+    See Also:
+        - get_checkpointer: Context manager for PostgresSaver support
+        - build_graph: Build agent with a specific checkpointer
     """
-    if database_url and POSTGRES_AVAILABLE:
-        # For simple scripts, we can create a PostgresSaver directly
-        # Note: For production, prefer the context manager pattern
-        try:
-            from langgraph.checkpoint.postgres import PostgresSaver
-
-            saver = PostgresSaver.from_conn_string(database_url)
-            saver.setup()  # Creates checkpoint tables if they don't exist
-            logger.info(
-                "agent_initialized",
-                checkpointer_type="PostgresSaver",
-                message="Using PostgresSaver for persistent checkpointing",
-            )
-            return build_graph(saver)
-        except Exception as e:
-            logger.warning(
-                "postgres_checkpointer_failed",
-                error=str(e),
-                error_type=type(e).__name__,
-                message="Falling back to MemorySaver",
-            )
-
     logger.info(
         "agent_initialized",
         checkpointer_type="MemorySaver",
