@@ -111,7 +111,9 @@ Thumbs.db
 # These patterns catch common secret file types that should never be committed.
 # See docs/SECURITY.md for the complete security guide.
 # =============================================================================
-secrets/
+# Note: Use /secrets/ (with leading slash) to only ignore root-level secrets/
+# This allows terraform/modules/secrets/ to be tracked
+/secrets/
 *.pem
 *.key
 *.crt
