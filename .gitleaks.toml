@@ -28,6 +28,14 @@ paths = [
     '''yarn\.lock$''',
     '''\.git/''',
 ]
+regexes = [
+    # Example/placeholder values in documentation
+    '''tvly-XXXX''',
+    '''xxxxxxxx-xxxx-xxxx''',
+    '''your-.*-here''',
+    '''REPLACE_ME''',
+    '''change-this''',
+]
 
 # =============================================================================
 # Custom Rules for Project-Specific Secrets
@@ -70,14 +78,5 @@ tags = ["aws", "secret-key"]
 # =============================================================================
 # Allowlist Specific False Positives
 # =============================================================================
-
-[[rules.allowlist]]
-description = "Example/placeholder values in documentation"
-regexTarget = "match"
-regexes = [
-  '''tvly-XXXX''',
-    '''xxxxxxxx-xxxx-xxxx''',
-    '''your-.*-here''',
-    '''REPLACE_ME''',
-    '''change-this''',
-]
+# Note: These patterns are added to the global allowlist above.
+# For rule-specific allowlists, add [rules.allowlist] inline with each rule.
