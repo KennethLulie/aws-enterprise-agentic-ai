@@ -52,7 +52,9 @@ from __future__ import annotations
 
 # Version information for the API
 # Increment this when deploying to help verify App Runner has the latest code
-__version__ = "1.0.0"  # Phase 1b - PostgresSaver + System Prompt
+__version__ = (
+    "1.0.2"  # Phase 1b - Added fallback for app.state.graph + rate limit 60/min
+)
 __api_version__ = "v1"
 
 # Public API exports

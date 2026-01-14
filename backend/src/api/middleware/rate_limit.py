@@ -52,9 +52,10 @@ logger = structlog.get_logger(__name__)
 # Rate Limiter Configuration
 # =============================================================================
 
-# Default rate limit: 10 requests per minute per IP address
+# Default rate limit: 60 requests per minute per IP address
+# Increased from 10 to handle SSE reconnections and normal demo usage
 # This can be overridden on specific routes using @limiter.limit("5/minute")
-DEFAULT_RATE_LIMIT = "10/minute"
+DEFAULT_RATE_LIMIT = "60/minute"
 
 # Create limiter instance with IP-based key function
 # Uses X-Forwarded-For header when behind a proxy (App Runner, CloudFront)

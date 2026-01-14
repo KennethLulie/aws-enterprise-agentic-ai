@@ -387,7 +387,12 @@ async def _stream_langgraph_events(
         queue.put_nowait({"type": "complete", "conversationId": conversation_id})
 
     except Exception as exc:
-        log.exception("LangGraph agent stream failed", error=str(exc))
+        log.exception(
+            "LangGraph agent stream failed",
+            error=str(exc),
+            error_type=type(exc).__name__,
+            conversation_id=conversation_id,
+        )
         queue.put_nowait(
             {
                 "type": "error",
@@ -454,7 +459,17 @@ async def post_chat(
 
     if use_real_agent:
         # Get the graph from app.state (initialized with PostgresSaver in lifespan)
-        graph = request.app.state.graph
+        # Fall back to module-level graph if app.state.graph not initialized
+        graph = getattr(request.app.state, "graph", None)
+        if graph is None:
+            # Fallback: import module-level graph (uses MemorySaver)
+            from src.agent.graph import graph as fallback_graph
+
+            logger.warning(
+                "app.state.graph not found, using fallback MemorySaver graph",
+                conversation_id=conversation_id,
+            )
+            graph = fallback_graph
         asyncio.create_task(
             _stream_langgraph_events(conversation_id, message_text, settings, graph)
         )
