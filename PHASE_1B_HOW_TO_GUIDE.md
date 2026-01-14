@@ -1584,7 +1584,7 @@ curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/login \
   -c cookies.txt
 
 # Send a message (note the conversation_id in response)
-curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
+curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/chat \
   -H "Content-Type: application/json" \
   -b cookies.txt \
   -d '{"message": "My name is TestUser. Remember this."}'
@@ -1597,7 +1597,7 @@ curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
 3. **Continue conversation after restart:**
 ```bash
 # Same conversation should remember the name
-curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
+curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/chat \
   -H "Content-Type: application/json" \
   -b cookies.txt \
   -d '{"message": "What is my name?", "conversation_id": "PREVIOUS_CONVERSATION_ID"}'
@@ -1614,7 +1614,7 @@ curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
 for i in {1..15}; do
   echo "Request $i:"
   curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
+    -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/chat \
     -H "Content-Type: application/json" \
     -b cookies.txt \
     -d '{"message": "Test"}'

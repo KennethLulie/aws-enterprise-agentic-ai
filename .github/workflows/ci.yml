@@ -187,8 +187,9 @@ jobs:
           file: ./backend/Dockerfile
           push: false
           tags: backend:test
+          # Only read from cache, don't write (avoids transient cache service failures)
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Note: cache-to removed to prevent CI failures from GitHub cache 502 errors
 
   # ===========================================================================
   # Security Scanning
