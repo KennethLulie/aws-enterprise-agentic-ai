@@ -1095,6 +1095,89 @@ checkpointer_initialized  checkpointer_type=InMemorySaver
 | `postgres_checkpointer_failed` | Connection to Neon failed | Verify Neon connection string format |
 | `checkpointer_type=InMemorySaver` | Fallback triggered | Check DATABASE_URL secret in Secrets Manager |
 
+### 5.8 Frontend: Persist Conversation ID Across Page Refresh
+
+> **⚠️ IMPORTANT:** The backend now correctly persists conversation memory in PostgreSQL, but the frontend must also persist the `conversationId` across page refreshes. Without this, every page refresh generates a NEW conversation_id, starting a fresh conversation with no memory!
+
+**The Problem:** By default, `conversationId` is stored only in React state:
+```typescript
+const [conversationId, setConversationId] = useState<string | null>(null);
+```
+This state is **lost on page refresh**, so each refresh starts a new conversation.
+
+**The Solution:** Persist `conversationId` in `sessionStorage` and add a "New Chat" button.
+
+**Agent Prompt:**
+```
+Update `frontend/src/app/page.tsx` to persist conversationId in sessionStorage
+
+The issue: conversationId is stored only in React state and lost on page refresh.
+Each refresh generates a new conversation, losing memory even though the backend
+correctly persists it in PostgreSQL.
+
+Changes needed:
+
+1. Initialize conversationId from sessionStorage:
+   
+   const [conversationId, setConversationId] = useState<string | null>(() => {
+     if (typeof window !== "undefined") {
+       return sessionStorage.getItem("conversationId");
+     }
+     return null;
+   });
+
+2. Add useEffect to save conversationId when it changes:
+   
+   useEffect(() => {
+     if (conversationId) {
+       sessionStorage.setItem("conversationId", conversationId);
+     }
+   }, [conversationId]);
+
+3. Add a "New Chat" button handler to start fresh conversations:
+   
+   const handleNewConversation = useCallback(() => {
+     sessionStorage.removeItem("conversationId");
+     setConversationId(null);
+     setMessages([]);
+     if (eventSourceRef.current) {
+       eventSourceRef.current.close();
+       eventSourceRef.current = null;
+     }
+   }, []);
+
+4. Add a "New Chat" button to the chat header (in chatHeader useMemo):
+   
+   <button
+     onClick={handleNewConversation}
+     className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
+     title="Start a new conversation"
+   >
+     New Chat
+   </button>
+
+5. Update chatHeader useMemo dependencies to include handleNewConversation:
+   
+   }, [handleNewConversation]);
+
+Verify:
+1. Send: "My favorite food is pizza"
+2. Refresh the page (F5)
+3. Ask: "What's my favorite food?"
+4. AI should remember "pizza"
+5. Click "New Chat" to verify it starts fresh
+```
+
+### 5.9 Memory Persistence Checklist
+
+- [ ] Backend: AsyncPostgresSaver initialized (check startup logs)
+- [ ] Backend: Chat routes use `request.app.state.graph`
+- [ ] Frontend: conversationId initialized from sessionStorage
+- [ ] Frontend: conversationId saved to sessionStorage on change
+- [ ] Frontend: "New Chat" button clears sessionStorage and starts fresh
+- [ ] Test: Memory persists across page refresh (same conversation_id in logs)
+- [ ] Test: "New Chat" creates new conversation_id
+
 ---
 
 ## 6. Rate Limiting
@@ -2120,6 +2203,59 @@ aws logs tail "/aws/apprunner/..." --since 5m | grep -i "checkpointer"
 # Should show: "AsyncPostgresSaver" (not "PostgresSaver")
 ```
 
+### Issue: Memory works in conversation but forgets after page refresh
+
+**Symptoms:**
+- AI correctly remembers earlier messages within the same session
+- After page refresh, AI doesn't remember anything
+- Each refresh shows a different `conversation_id` in logs
+- Logs show `total_messages_from_checkpoint: 1` (only current message)
+
+**Root Cause:**
+The frontend stores `conversationId` only in React state, which is **lost on page refresh**. Each refresh generates a new conversation_id, starting a fresh conversation with no memory.
+
+**Diagnosis:**
+Check logs for different conversation_ids:
+```bash
+aws logs tail "/aws/apprunner/..." --since 30m | grep "conversation_id"
+# If you see different UUIDs for what you thought was the same conversation,
+# the frontend isn't persisting the conversation_id
+```
+
+**Solution:**
+Persist `conversationId` in `sessionStorage`:
+
+```typescript
+// Initialize from sessionStorage
+const [conversationId, setConversationId] = useState<string | null>(() => {
+  if (typeof window !== "undefined") {
+    return sessionStorage.getItem("conversationId");
+  }
+  return null;
+});
+
+// Save to sessionStorage when it changes
+useEffect(() => {
+  if (conversationId) {
+    sessionStorage.setItem("conversationId", conversationId);
+  }
+}, [conversationId]);
+
+// Add "New Chat" button to clear
+const handleNewConversation = useCallback(() => {
+  sessionStorage.removeItem("conversationId");
+  setConversationId(null);
+  setMessages([]);
+}, []);
+```
+
+**Verification:**
+1. Send a message: "My favorite food is pizza"
+2. Refresh the page
+3. Ask: "What's my favorite food?"
+4. AI should remember "pizza"
+5. Check logs: same `conversation_id` across both messages
+
 ---
 
 ## Files Created/Modified in Phase 1b
@@ -2153,8 +2289,9 @@ aws logs tail "/aws/apprunner/..." --since 5m | grep -i "checkpointer"
 | `backend/src/agent/__init__.py` | Checkpointer initialization |
 | `backend/src/api/main.py` | Rate limiting, V1 router |
 | `backend/src/api/routes/health.py` | Enhanced dependency checks |
-| `backend/src/api/routes/chat.py` | Rate limit decorator |
+| `backend/src/api/routes/chat.py` | Rate limit decorator, use app.state.graph |
 | `frontend/src/lib/api.ts` | Use /api/v1/chat endpoints |
+| `frontend/src/app/page.tsx` | Persist conversationId in sessionStorage, add "New Chat" button |
 | `REPO_STATE.md` | Update file inventory |
 
 ### AWS Resources Created

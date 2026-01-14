@@ -27,7 +27,7 @@ import { connectSSE, getHealth, getSession, sendMessage, type ChatEvent } from "
 import { cn } from "@/lib/utils";
 
 // App version - increment when deploying to verify App Runner has latest code
-const APP_VERSION = "1.0.5";
+const APP_VERSION = "1.0.6";
 
 type ChatRole = "user" | "assistant";
 
@@ -51,7 +51,13 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [inputValue, setInputValue] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  // Persist conversationId in sessionStorage so memory survives page refresh
+  const [conversationId, setConversationId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("conversationId");
+    }
+    return null;
+  });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [reconnectAttempt, setReconnectAttempt] = useState<number>(0);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
@@ -79,6 +85,13 @@ export default function ChatPage() {
     };
     void verifySession();
   }, [router]);
+
+  // Persist conversationId to sessionStorage so memory survives page refresh
+  useEffect(() => {
+    if (conversationId) {
+      sessionStorage.setItem("conversationId", conversationId);
+    }
+  }, [conversationId]);
 
   // Health check with cold start detection
   useEffect(() => {
@@ -377,6 +390,18 @@ export default function ChatPage() {
     }
   };
 
+  // Start a new conversation (clears memory)
+  const handleNewConversation = useCallback(() => {
+    sessionStorage.removeItem("conversationId");
+    setConversationId(null);
+    setMessages([]);
+    // Close existing SSE connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  }, []);
+
   const chatHeader = useMemo(
     () => (
       <div className="flex items-center justify-between gap-2">
@@ -392,6 +417,13 @@ export default function ChatPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleNewConversation}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
+            title="Start a new conversation"
+          >
+            New Chat
+          </button>
           <span className="text-xs text-muted-foreground font-mono">
             v{APP_VERSION}
           </span>
@@ -402,7 +434,7 @@ export default function ChatPage() {
         </div>
       </div>
     ),
-    []
+    [handleNewConversation]
   );
 
   const renderMessage = (message: UiMessage) => {
