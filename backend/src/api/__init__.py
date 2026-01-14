@@ -51,7 +51,8 @@ Example:
 from __future__ import annotations
 
 # Version information for the API
-__version__ = "0.1.0"
+# Increment this when deploying to help verify App Runner has the latest code
+__version__ = "1.0.0"  # Phase 1b - PostgresSaver + System Prompt
 __api_version__ = "v1"
 
 # Public API exports

@@ -26,6 +26,9 @@ import { WarmingIndicator } from "@/components/ui/warming-indicator";
 import { connectSSE, getHealth, getSession, sendMessage, type ChatEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+// App version - increment when deploying to verify App Runner has latest code
+const APP_VERSION = "1.0.0";
+
 type ChatRole = "user" | "assistant";
 
 interface UiMessage {
@@ -388,9 +391,14 @@ export default function ChatPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          Live
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground font-mono">
+            v{APP_VERSION}
+          </span>
+          <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Live
+          </div>
         </div>
       </div>
     ),
