@@ -82,20 +82,20 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           echo "Building Docker image..."
-          
+
           # Build the image
           docker build \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             -f backend/Dockerfile \
             backend/
-          
+
           echo "Pushing Docker image to ECR..."
-          
+
           # Push both tags
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          
+
           echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "✅ Docker image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
@@ -104,24 +104,28 @@ jobs:
           IMAGE_TAG: ${{ steps.build.outputs.image-tag }}
         run: |
           echo "Triggering App Runner deployment..."
-          
+
           # Get the App Runner service ARN
+          # Service naming pattern: enterprise-agentic-ai-{env}-backend
+          # For dev environment: enterprise-agentic-ai-dev-backend
           SERVICE_ARN=$(aws apprunner list-services \
-            --query "ServiceSummaryList[?ServiceName=='enterprise-agentic-ai-backend'].ServiceArn" \
+            --query "ServiceSummaryList[?ServiceName=='enterprise-agentic-ai-dev-backend'].ServiceArn" \
             --output text)
-          
+
           if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" == "None" ]; then
-            echo "⚠️ App Runner service not found. Skipping deployment trigger."
-            echo "Note: App Runner will auto-deploy when configured for ECR image updates."
-            exit 0
+            echo "❌ App Runner service 'enterprise-agentic-ai-dev-backend' not found!"
+            echo "Available services:"
+            aws apprunner list-services --query 'ServiceSummaryList[*].ServiceName' --output text
+            exit 1
           fi
-          
+
           echo "Found App Runner service: $SERVICE_ARN"
-          
+
           # Start deployment
           aws apprunner start-deployment --service-arn "$SERVICE_ARN"
-          
+
           echo "✅ App Runner deployment triggered"
+          echo "Note: Deployment takes 3-5 minutes. Monitor in AWS Console or check logs."
 
   # ===========================================================================
   # Build and Deploy Frontend
@@ -153,12 +157,12 @@ jobs:
           # Use the known App Runner URL from deployment
           # This could be dynamically fetched from AWS or Terraform outputs
           API_URL="${{ secrets.APP_RUNNER_URL }}"
-          
+
           if [ -z "$API_URL" ]; then
             echo "⚠️ APP_RUNNER_URL secret not set. Using placeholder."
             API_URL="https://your-app-runner-url.us-east-1.awsapprunner.com"
           fi
-          
+
           echo "api-url=$API_URL" >> $GITHUB_OUTPUT
           echo "Using API URL: $API_URL"
 
@@ -170,13 +174,13 @@ jobs:
           echo "Building Next.js static export..."
           echo "API URL: $NEXT_PUBLIC_API_URL"
           npm run build
-          
+
           # Verify build output
           if [ ! -d "out" ]; then
             echo "❌ Build failed: 'out' directory not found"
             exit 1
           fi
-          
+
           echo "✅ Frontend build complete"
           ls -la out/
 
@@ -195,27 +199,27 @@ jobs:
             echo "❌ FRONTEND_S3_BUCKET secret not set"
             exit 1
           fi
-          
+
           echo "Syncing to S3 bucket: $S3_BUCKET"
-          
+
           aws s3 sync frontend/out/ "s3://$S3_BUCKET/" \
             --delete \
             --cache-control "public, max-age=31536000, immutable" \
             --exclude "*.html" \
             --exclude "_next/data/*"
-          
+
           # HTML files should not be cached aggressively
           aws s3 sync frontend/out/ "s3://$S3_BUCKET/" \
             --exclude "*" \
             --include "*.html" \
             --cache-control "public, max-age=0, must-revalidate"
-          
+
           # Next.js data files should have short cache
           aws s3 sync frontend/out/ "s3://$S3_BUCKET/" \
             --exclude "*" \
             --include "_next/data/*" \
             --cache-control "public, max-age=60"
-          
+
           echo "✅ S3 sync complete"
 
       - name: Invalidate CloudFront cache
@@ -226,15 +230,15 @@ jobs:
             echo "⚠️ CLOUDFRONT_DISTRIBUTION_ID secret not set. Skipping invalidation."
             exit 0
           fi
-          
+
           echo "Creating CloudFront invalidation..."
-          
+
           INVALIDATION_ID=$(aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
             --paths "/*" \
             --query "Invalidation.Id" \
             --output text)
-          
+
           echo "✅ CloudFront invalidation created: $INVALIDATION_ID"
           echo "Note: Invalidation may take a few minutes to complete globally."
 
@@ -262,26 +266,26 @@ jobs:
             echo "⚠️ APP_RUNNER_URL secret not set. Skipping backend health check."
             exit 0
           fi
-          
+
           echo "Testing backend health endpoint..."
-          
+
           # Retry up to 5 times with 10 second intervals
           for i in {1..5}; do
             HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$APP_RUNNER_URL/health" || echo "000")
-            
+
             if [ "$HTTP_STATUS" == "200" ]; then
               echo "✅ Backend health check passed (HTTP $HTTP_STATUS)"
-              
+
               # Show health response
               curl -s "$APP_RUNNER_URL/health" | head -c 500
               echo ""
               exit 0
             fi
-            
+
             echo "Attempt $i/5: HTTP $HTTP_STATUS (waiting 10s...)"
             sleep 10
           done
-          
+
           echo "❌ Backend health check failed after 5 attempts"
           exit 1
 
@@ -293,11 +297,11 @@ jobs:
             echo "⚠️ CLOUDFRONT_URL secret not set. Skipping frontend check."
             exit 0
           fi
-          
+
           echo "Testing frontend availability..."
-          
+
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -I "$CLOUDFRONT_URL" || echo "000")
-          
+
           if [ "$HTTP_STATUS" == "200" ] || [ "$HTTP_STATUS" == "304" ]; then
             echo "✅ Frontend check passed (HTTP $HTTP_STATUS)"
           else

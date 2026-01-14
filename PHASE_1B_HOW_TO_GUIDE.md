@@ -1534,6 +1534,16 @@ Post-creation:
 
 ### 9.2 Create CD Workflow
 
+> **⚠️ CRITICAL: Service Name Mismatch**
+>
+> The ECR repository and App Runner service have **different naming patterns**:
+> - **ECR repository**: `enterprise-agentic-ai-backend` (no environment suffix)
+> - **App Runner service**: `enterprise-agentic-ai-dev-backend` (includes `-dev-` environment suffix)
+>
+> This is because Terraform creates the App Runner service with pattern: `${project_name}-${environment}-backend`
+>
+> **The CD workflow MUST use the correct App Runner service name or the deployment trigger will silently fail!**
+
 **Agent Prompt:**
 ```
 Create `.github/workflows/deploy.yml`
@@ -1569,8 +1579,22 @@ job: build-and-deploy-backend
     - docker tag backend:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/enterprise-agentic-ai-backend:latest
     - docker tag backend:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/enterprise-agentic-ai-backend:${{ github.sha }}
     - docker push (both tags)
-  - Trigger App Runner deployment (optional):
-    - aws apprunner start-deployment --service-arn (from Terraform output)
+  - Trigger App Runner deployment:
+    CRITICAL: Use the correct service name pattern from Terraform!
+    - ECR repo name: enterprise-agentic-ai-backend (NO env suffix)
+    - App Runner service name: enterprise-agentic-ai-dev-backend (WITH env suffix)
+    
+    SERVICE_ARN=$(aws apprunner list-services \
+      --query "ServiceSummaryList[?ServiceName=='enterprise-agentic-ai-dev-backend'].ServiceArn" \
+      --output text)
+    
+    if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" == "None" ]; then
+      echo "❌ App Runner service not found! Check service name."
+      aws apprunner list-services --query 'ServiceSummaryList[*].ServiceName'
+      exit 1
+    fi
+    
+    aws apprunner start-deployment --service-arn "$SERVICE_ARN"
 
 job: build-and-deploy-frontend
 - runs-on: ubuntu-latest
@@ -1672,7 +1696,9 @@ git push origin test-ci
 - [ ] GitHub secrets configured (AWS credentials)
 - [ ] CI triggers on push to main AND pull_request
 - [ ] CD triggers on workflow_dispatch (manual "Run workflow" button)
+- [ ] **App Runner service name in deploy.yml matches Terraform output** (includes `-dev-` suffix!)
 - [ ] Smoke test verifies deployment
+- [ ] Verified: `aws apprunner list-services` shows expected service name
 
 ### 9.7 How to Deploy (Manual Process)
 
@@ -1981,6 +2007,49 @@ psql "YOUR_NEON_CONNECTION_STRING" -c "\dt"
    - S3 write
    - CloudFront invalidation
    - App Runner start-deployment
+
+### Issue: Frontend updates but backend doesn't deploy
+
+**Symptoms:**
+- Frontend shows new version after GitHub Actions deploy
+- Backend still running old code (check logs for old version)
+- GitHub Actions shows "App Runner service not found. Skipping deployment trigger."
+- No App Runner deployment triggered
+
+**Root Cause:**
+The ECR repository and App Runner service have **different naming patterns**:
+- ECR repository: `enterprise-agentic-ai-backend` (no environment suffix)
+- App Runner service: `enterprise-agentic-ai-dev-backend` (WITH `-dev-` environment suffix)
+
+If deploy.yml looks for the wrong service name, it silently skips the deployment!
+
+**Solutions:**
+1. **Verify actual App Runner service name:**
+   ```bash
+   aws apprunner list-services --query 'ServiceSummaryList[*].ServiceName' --output text
+   ```
+
+2. **Fix deploy.yml to use correct service name:**
+   The service name in deploy.yml must match exactly. Update the lookup:
+   ```bash
+   SERVICE_ARN=$(aws apprunner list-services \
+     --query "ServiceSummaryList[?ServiceName=='enterprise-agentic-ai-dev-backend'].ServiceArn" \
+     --output text)
+   ```
+   Note: Includes `-dev-` (from Terraform pattern: `${project_name}-${environment}-backend`)
+
+3. **Trigger deployment manually while fixing workflow:**
+   ```bash
+   aws apprunner start-deployment --service-arn $(aws apprunner list-services \
+     --query 'ServiceSummaryList[?ServiceName==`enterprise-agentic-ai-dev-backend`].ServiceArn' \
+     --output text)
+   ```
+
+4. **Verify deployment worked - check logs for new version:**
+   ```bash
+   aws logs tail "/aws/apprunner/enterprise-agentic-ai-dev-backend/.../application" \
+     --since 5m --format short | grep -i "version\|application_start"
+   ```
 
 3. **Check workflow logs:**
    GitHub → Actions → Failed workflow → View logs
