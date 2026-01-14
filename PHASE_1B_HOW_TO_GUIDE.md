@@ -2086,15 +2086,18 @@ from psycopg_pool import AsyncConnectionPool
 2. **Update graph.py:**
    ```python
    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+   from psycopg.rows import dict_row  # Required for type compatibility
    from psycopg_pool import AsyncConnectionPool
    
    @asynccontextmanager
    async def get_checkpointer(database_url: str | None = None):
        if database_url and POSTGRES_AVAILABLE:
+           # IMPORTANT: row_factory=dict_row is required!
+           # AsyncPostgresSaver expects dict rows, not tuples
            async with AsyncConnectionPool(
                conninfo=database_url,
                max_size=20,
-               kwargs={"autocommit": True},
+               kwargs={"autocommit": True, "row_factory": dict_row},
            ) as pool:
                checkpointer = AsyncPostgresSaver(pool)
                await checkpointer.setup()

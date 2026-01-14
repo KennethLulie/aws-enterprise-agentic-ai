@@ -43,6 +43,7 @@ logger = structlog.get_logger(__name__)
 # MUST use async version for astream()/ainvoke() operations
 try:
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from psycopg.rows import dict_row
     from psycopg_pool import AsyncConnectionPool
 
     POSTGRES_AVAILABLE = True
@@ -50,6 +51,7 @@ except ImportError:
     POSTGRES_AVAILABLE = False
     AsyncPostgresSaver = None  # type: ignore[misc, assignment]
     AsyncConnectionPool = None  # type: ignore[misc, assignment]
+    dict_row = None  # type: ignore[misc, assignment]
 
 # =============================================================================
 # Tool Registry
@@ -118,13 +120,15 @@ async def get_checkpointer(
     if database_url and POSTGRES_AVAILABLE:
         try:
             # AsyncConnectionPool manages connection lifecycle
+            # IMPORTANT: row_factory=dict_row is required for AsyncPostgresSaver
+            # (it expects dict rows, not tuples)
             async with AsyncConnectionPool(
                 conninfo=database_url,
                 max_size=20,
-                kwargs={"autocommit": True},
+                kwargs={"autocommit": True, "row_factory": dict_row},
             ) as pool:
                 checkpointer = AsyncPostgresSaver(pool)
-                # asetup() creates checkpoint tables if they don't exist
+                # setup() creates checkpoint tables if they don't exist
                 await checkpointer.setup()
                 logger.info(
                     "postgres_checkpointer_created",
