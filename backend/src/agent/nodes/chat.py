@@ -37,7 +37,12 @@ from typing import TYPE_CHECKING, Any, Sequence, cast
 
 import structlog
 from langchain_aws import ChatBedrockConverse
-from langchain_core.messages import AIMessage, BaseMessage, AIMessageChunk
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    AIMessageChunk,
+    SystemMessage,
+)
 
 from src.agent.state import AgentState, set_error
 from src.config.settings import get_settings
@@ -55,6 +60,21 @@ logger = structlog.get_logger(__name__)
 # LLM Configuration
 DEFAULT_TEMPERATURE: float = 0.7
 DEFAULT_MAX_TOKENS: int = 4096
+
+# System prompt that gives the AI context about its capabilities
+SYSTEM_PROMPT = """You are an Enterprise Agentic AI Assistant with persistent conversation memory.
+
+Key capabilities:
+- You HAVE memory of this conversation. You can recall what the user said earlier in this conversation.
+- You have access to tools for web search, market data, SQL queries, and document retrieval.
+- You provide helpful, accurate, and contextual responses.
+
+Important:
+- DO NOT say you cannot remember past interactions - you CAN see the full conversation history.
+- Reference previous messages naturally when relevant.
+- Be concise and helpful.
+
+When users share personal information (like their name or preferences), acknowledge it and use that context in future responses within this conversation."""
 
 
 # =============================================================================
@@ -311,6 +331,11 @@ async def _invoke_model(
     Raises:
         Exception: If model invocation fails.
     """
+    # Prepend system message if not already present
+    # This gives the AI context about its capabilities and memory
+    if not messages or not isinstance(messages[0], SystemMessage):
+        messages = [SystemMessage(content=SYSTEM_PROMPT)] + list(messages)
+
     # Sanitize messages to ensure Bedrock compatibility
     # (handles empty content in AIMessages with tool calls)
     sanitized_messages = _sanitize_messages_for_bedrock(messages, log)
