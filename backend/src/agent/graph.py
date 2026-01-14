@@ -7,16 +7,20 @@ to the chat node and tool execution node.
 
 Checkpointing:
     - Local development: MemorySaver (in-memory, no DB dependency)
-    - AWS production: PostgresSaver (persistent, requires Neon PostgreSQL)
+    - AWS production: AsyncPostgresSaver (persistent, requires Neon PostgreSQL)
 
 The graph can be built with a custom checkpointer using build_graph(), or
 use the default MemorySaver via the pre-built `graph` instance.
+
+IMPORTANT: When using async operations (astream, ainvoke), you MUST use
+AsyncPostgresSaver, not the sync PostgresSaver. The sync version will raise
+NotImplementedError when used with async methods.
 """
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, Iterator, Sequence
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, AsyncIterator, Sequence
 
 import structlog
 from langchain_core.tools import BaseTool
@@ -32,17 +36,20 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 # =============================================================================
-# Conditional PostgresSaver Import
+# Conditional AsyncPostgresSaver Import
 # =============================================================================
 
-# PostgresSaver requires langgraph-checkpoint-postgres package
+# AsyncPostgresSaver requires langgraph-checkpoint-postgres package
+# MUST use async version for astream()/ainvoke() operations
 try:
-    from langgraph.checkpoint.postgres import PostgresSaver
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from psycopg_pool import AsyncConnectionPool
 
     POSTGRES_AVAILABLE = True
 except ImportError:
     POSTGRES_AVAILABLE = False
-    PostgresSaver = None  # type: ignore[misc, assignment]
+    AsyncPostgresSaver = None  # type: ignore[misc, assignment]
+    AsyncConnectionPool = None  # type: ignore[misc, assignment]
 
 # =============================================================================
 # Tool Registry
@@ -71,54 +78,59 @@ def get_registered_tools() -> Sequence[BaseTool]:
 # =============================================================================
 
 
-@contextmanager
-def get_checkpointer(
+@asynccontextmanager
+async def get_checkpointer(
     database_url: str | None = None,
-) -> Iterator["BaseCheckpointSaver"]:
+) -> AsyncIterator["BaseCheckpointSaver"]:
     """
-    Context manager that provides the appropriate checkpointer based on environment.
+    Async context manager that provides the appropriate checkpointer based on environment.
 
-    Creates a PostgresSaver for persistent state when a database URL is provided
+    Creates an AsyncPostgresSaver for persistent state when a database URL is provided
     and the package is available. Falls back to MemorySaver for local development
     or when PostgreSQL is unavailable.
 
-    IMPORTANT: PostgresSaver.from_conn_string() is a context manager that manages
-    the database connection lifecycle. This function wraps that behavior so callers
-    can use either checkpointer type uniformly.
+    IMPORTANT: This is an ASYNC context manager because AsyncPostgresSaver requires
+    async setup. When using graph.astream() or graph.ainvoke(), you MUST use the
+    async checkpointer, not the sync PostgresSaver.
 
     Args:
         database_url: PostgreSQL connection string (e.g., from settings.database_url).
-            If provided and valid, uses PostgresSaver. Otherwise falls back to
+            If provided and valid, uses AsyncPostgresSaver. Otherwise falls back to
             MemorySaver.
 
     Yields:
-        A LangGraph checkpointer instance (PostgresSaver or MemorySaver).
+        A LangGraph checkpointer instance (AsyncPostgresSaver or MemorySaver).
 
     Example:
         # In FastAPI lifespan (main.py):
         @asynccontextmanager
         async def lifespan(app: FastAPI):
-            with get_checkpointer(settings.database_url) as checkpointer:
+            async with get_checkpointer(settings.database_url) as checkpointer:
                 app.state.checkpointer = checkpointer
                 app.state.graph = build_graph(checkpointer)
                 yield
 
         # For quick scripts or testing:
-        with get_checkpointer() as checkpointer:
+        async with get_checkpointer() as checkpointer:
             agent = build_graph(checkpointer)
-            # use agent...
+            # use agent with astream/ainvoke...
     """
     if database_url and POSTGRES_AVAILABLE:
         try:
-            # PostgresSaver.from_conn_string is a context manager
-            with PostgresSaver.from_conn_string(database_url) as saver:
-                # setup() creates checkpoint tables if they don't exist
-                saver.setup()
+            # AsyncConnectionPool manages connection lifecycle
+            async with AsyncConnectionPool(
+                conninfo=database_url,
+                max_size=20,
+                kwargs={"autocommit": True},
+            ) as pool:
+                checkpointer = AsyncPostgresSaver(pool)
+                # asetup() creates checkpoint tables if they don't exist
+                await checkpointer.setup()
                 logger.info(
                     "postgres_checkpointer_created",
-                    message="Using PostgresSaver for persistent checkpointing",
+                    message="Using AsyncPostgresSaver for persistent checkpointing",
                 )
-                yield saver
+                yield checkpointer
                 return
         except Exception as e:
             logger.warning(
@@ -134,7 +146,7 @@ def get_checkpointer(
             message="langgraph-checkpoint-postgres not installed, using MemorySaver",
         )
 
-    # MemorySaver doesn't need context management
+    # MemorySaver doesn't need context management and works with both sync/async
     logger.info(
         "memory_checkpointer_created",
         message="Using MemorySaver for in-memory checkpointing",

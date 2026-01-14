@@ -142,8 +142,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         raise
 
     # Initialize checkpointer and graph
-    # get_checkpointer() returns PostgresSaver if database_url is set,
+    # get_checkpointer() returns AsyncPostgresSaver if database_url is set,
     # otherwise falls back to MemorySaver for local development
+    # IMPORTANT: Must use async context manager for AsyncPostgresSaver
     database_url = settings.database_url
     logger.info(
         "initializing_checkpointer",
@@ -151,7 +152,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         environment=settings.environment,
     )
 
-    with get_checkpointer(database_url) as checkpointer:
+    async with get_checkpointer(database_url) as checkpointer:
         # Store checkpointer and graph in app.state for access by routes
         app.state.checkpointer = checkpointer
         app.state.graph = build_graph(checkpointer)
@@ -170,7 +171,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         yield  # Application runs here
 
     # === Shutdown ===
-    # PostgresSaver connection is automatically closed when exiting the context
+    # AsyncPostgresSaver connection pool is automatically closed when exiting the context
     logger.info("application_shutting_down")
     logger.info("application_shutdown_complete")
 

@@ -2051,8 +2051,71 @@ If deploy.yml looks for the wrong service name, it silently skips the deployment
      --since 5m --format short | grep -i "version\|application_start"
    ```
 
-3. **Check workflow logs:**
+5. **Check workflow logs:**
    GitHub → Actions → Failed workflow → View logs
+
+### Issue: LangGraph stream fails with NotImplementedError
+
+**Symptoms:**
+- Chat POST returns 200 but no response streams
+- Logs show: `"error_type": "NotImplementedError"`, `"event": "LangGraph agent stream failed"`
+- Error happens immediately after "Starting LangGraph agent stream"
+
+**Root Cause:**
+Using the **synchronous** `PostgresSaver` with **async** `astream()`. The sync version doesn't implement async methods required by `astream()`.
+
+**Solution:**
+Use `AsyncPostgresSaver` instead of `PostgresSaver`:
+
+```python
+# WRONG - sync version, fails with astream()
+from langgraph.checkpoint.postgres import PostgresSaver
+
+# CORRECT - async version, works with astream()
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
+```
+
+**Required changes:**
+
+1. **Update requirements.txt:**
+   ```
+   psycopg[binary,pool]~=3.2.0  # Need pool extra for AsyncConnectionPool
+   ```
+
+2. **Update graph.py:**
+   ```python
+   from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+   from psycopg_pool import AsyncConnectionPool
+   
+   @asynccontextmanager
+   async def get_checkpointer(database_url: str | None = None):
+       if database_url and POSTGRES_AVAILABLE:
+           async with AsyncConnectionPool(
+               conninfo=database_url,
+               max_size=20,
+               kwargs={"autocommit": True},
+           ) as pool:
+               checkpointer = AsyncPostgresSaver(pool)
+               await checkpointer.setup()
+               yield checkpointer
+               return
+       yield MemorySaver()
+   ```
+
+3. **Update main.py lifespan:**
+   ```python
+   # Change 'with' to 'async with'
+   async with get_checkpointer(database_url) as checkpointer:
+       app.state.graph = build_graph(checkpointer)
+       yield
+   ```
+
+**Verification:**
+```bash
+aws logs tail "/aws/apprunner/..." --since 5m | grep -i "checkpointer"
+# Should show: "AsyncPostgresSaver" (not "PostgresSaver")
+```
 
 ---
 

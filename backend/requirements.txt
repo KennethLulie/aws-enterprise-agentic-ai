@@ -36,7 +36,7 @@ botocore~=1.35.0
 sqlalchemy~=2.0.35
 alembic~=1.13.0
 psycopg2-binary~=2.9.9  # psycopg2 for SQLAlchemy sync operations
-psycopg[binary]~=3.2.0  # psycopg3 binary for PostgresSaver async operations
+psycopg[binary,pool]~=3.2.0  # psycopg3 binary + pool for AsyncPostgresSaver
 langgraph-checkpoint-postgres~=2.0.0  # PostgresSaver for persistent checkpoints
 
 # =============================================================================
