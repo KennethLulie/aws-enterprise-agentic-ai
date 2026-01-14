@@ -53,6 +53,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from slowapi.errors import RateLimitExceeded
 
+from src.agent.graph import build_graph, get_checkpointer
 from src.api import __api_version__, __version__
 from src.api.middleware.logging import configure_logging
 from src.api.middleware.rate_limit import limiter, rate_limit_exceeded_handler
@@ -95,11 +96,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     Startup:
         - Validates configuration settings
+        - Initializes PostgresSaver checkpointer (if database_url configured)
+        - Builds LangGraph agent with persistent state
         - Logs startup information
-        - Initializes any required resources
 
     Shutdown:
-        - Cleans up resources
+        - Cleans up database connections
         - Logs shutdown information
 
     Args:
@@ -135,21 +137,41 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         for warning in validation_result.get("warnings", []):
             logger.warning("config_warning", message=warning)
 
+    except ValueError as e:
+        logger.error("configuration_validation_failed", error=str(e))
+        raise
+
+    # Initialize checkpointer and graph
+    # get_checkpointer() returns PostgresSaver if database_url is set,
+    # otherwise falls back to MemorySaver for local development
+    database_url = settings.database_url
+    logger.info(
+        "initializing_checkpointer",
+        has_database_url=bool(database_url),
+        environment=settings.environment,
+    )
+
+    with get_checkpointer(database_url) as checkpointer:
+        # Store checkpointer and graph in app.state for access by routes
+        app.state.checkpointer = checkpointer
+        app.state.graph = build_graph(checkpointer)
+
+        logger.info(
+            "checkpointer_initialized",
+            checkpointer_type=type(checkpointer).__name__,
+        )
+
         logger.info(
             "application_started",
             version=__version__,
             api_version=__api_version__,
         )
 
-    except ValueError as e:
-        logger.error("configuration_validation_failed", error=str(e))
-        raise
-
-    yield  # Application runs here
+        yield  # Application runs here
 
     # === Shutdown ===
+    # PostgresSaver connection is automatically closed when exiting the context
     logger.info("application_shutting_down")
-    # Add cleanup logic here when needed (e.g., close DB connections)
     logger.info("application_shutdown_complete")
 
 

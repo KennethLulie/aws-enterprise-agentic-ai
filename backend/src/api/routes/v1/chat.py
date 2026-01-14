@@ -45,7 +45,6 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from pydantic import BaseModel, Field
 
-from src.agent.graph import graph
 from src.agent.state import AgentState, create_initial_state
 from src.api.middleware.rate_limit import DEFAULT_RATE_LIMIT, limiter
 from src.api.routes.auth import SessionPayload, require_session
@@ -172,7 +171,7 @@ def _should_use_real_agent(settings: Settings) -> bool:
 
 
 async def _stream_langgraph_events(
-    conversation_id: str, user_message: str, settings: Settings
+    conversation_id: str, user_message: str, settings: Settings, graph: Any
 ) -> None:
     """
     Run the LangGraph agent and push streaming events into the SSE queue.
@@ -187,6 +186,7 @@ async def _stream_langgraph_events(
         conversation_id: Unique identifier for this conversation.
         user_message: The user's chat message to process.
         settings: Application settings (used for configuration).
+        graph: The LangGraph agent instance (from app.state.graph).
     """
     queue = _get_queue(conversation_id)
     log = logger.bind(conversation_id=conversation_id)
@@ -194,7 +194,11 @@ async def _stream_langgraph_events(
     state: AgentState = create_initial_state(conversation_id=conversation_id)
     state["messages"] = [HumanMessage(content=user_message)]
 
-    log.info("Starting LangGraph agent stream", user_message_length=len(user_message))
+    log.info(
+        "Starting LangGraph agent stream",
+        user_message_length=len(user_message),
+        thread_id=conversation_id,
+    )
 
     # Track the position of the user's new message in the conversation.
     # With checkpointing, the graph state includes ALL previous messages.
@@ -205,6 +209,7 @@ async def _stream_langgraph_events(
     try:
         # Use stream_mode="values" to get full state after each step.
         # Default "updates" mode returns per-node dicts, not the full state.
+        is_first_chunk = True
         async for graph_state in graph.astream(
             state,
             config={"configurable": {"thread_id": conversation_id}},
@@ -212,6 +217,15 @@ async def _stream_langgraph_events(
         ):
             messages: Sequence[BaseMessage] = graph_state.get("messages", [])
             last_error = graph_state.get("last_error")
+
+            # Log total message count on first chunk to verify memory is working
+            if is_first_chunk:
+                log.info(
+                    "Memory check: first graph state received",
+                    total_messages_from_checkpoint=len(messages),
+                    thread_id=conversation_id,
+                )
+                is_first_chunk = False
 
             # On first iteration, find the user's new message (last HumanMessage)
             # and set our baseline to only stream messages AFTER it
@@ -439,8 +453,10 @@ async def post_chat(
     use_real_agent = _should_use_real_agent(settings)
 
     if use_real_agent:
+        # Get the graph from app.state (initialized with PostgresSaver in lifespan)
+        graph = request.app.state.graph
         asyncio.create_task(
-            _stream_langgraph_events(conversation_id, message_text, settings)
+            _stream_langgraph_events(conversation_id, message_text, settings, graph)
         )
     else:
         asyncio.create_task(_mock_stream_response(conversation_id, message_text))

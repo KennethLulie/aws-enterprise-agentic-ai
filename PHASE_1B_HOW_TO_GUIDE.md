@@ -961,9 +961,139 @@ print(f'Checkpointer: {type(cp).__name__}')
 
 - [ ] requirements.txt updated with langgraph-checkpoint-postgres (psycopg3 installs as dependency)
 - [ ] graph.py updated with get_checkpointer function
-- [ ] Agent initialization updated to use checkpointer
+- [ ] **main.py lifespan initializes checkpointer and stores graph in app.state** ⚠️ Critical!
+- [ ] **Chat routes use request.app.state.graph instead of module-level import** ⚠️ Critical!
 - [ ] PostgresSaver setup() called for table creation
 - [ ] Fallback to MemorySaver works for local dev
+- [ ] App Runner logs show "checkpointer_type=PostgresSaver" on startup
+
+### 5.6 Critical: Initialize PostgresSaver in Application Lifespan
+
+> **⚠️ IMPORTANT:** The previous steps add PostgresSaver *capability* to `graph.py`, but the application won't actually USE it unless `main.py` is updated to initialize the checkpointer at startup and chat routes are updated to use the graph from `app.state`.
+>
+> **The Problem:** Without this step, the chat routes import the module-level `graph` from `graph.py`, which is created with `MemorySaver()` at import time. Even though `get_checkpointer()` and `build_graph()` exist, they're never called!
+>
+> **The Solution:** Update `main.py` lifespan to initialize PostgresSaver and store the graph in `app.state`, then update chat routes to use `request.app.state.graph`.
+
+**Agent Prompt:**
+```
+Update `backend/src/api/main.py` to initialize PostgresSaver in the lifespan
+
+The issue: While graph.py has get_checkpointer() and build_graph() functions for 
+PostgresSaver support, main.py never calls them. The chat routes import the 
+module-level `graph` which always uses MemorySaver.
+
+Changes to main.py:
+
+1. Add import at the top:
+   from src.agent.graph import build_graph, get_checkpointer
+
+2. Update the lifespan function to initialize the checkpointer:
+   
+   After configuration validation, add:
+   
+   # Initialize checkpointer and graph
+   # get_checkpointer() returns PostgresSaver if database_url is set,
+   # otherwise falls back to MemorySaver for local development
+   database_url = settings.database_url
+   logger.info(
+       "initializing_checkpointer",
+       has_database_url=bool(database_url),
+       environment=settings.environment,
+   )
+
+   with get_checkpointer(database_url) as checkpointer:
+       # Store checkpointer and graph in app.state for access by routes
+       app.state.checkpointer = checkpointer
+       app.state.graph = build_graph(checkpointer)
+
+       logger.info(
+           "checkpointer_initialized",
+           checkpointer_type=type(checkpointer).__name__,
+       )
+
+       logger.info(
+           "application_started",
+           version=__version__,
+           api_version=__api_version__,
+       )
+
+       yield  # Application runs here - keeps checkpointer connection open
+
+   # PostgresSaver connection automatically closes when exiting context
+   logger.info("application_shutting_down")
+
+IMPORTANT: The `yield` must be INSIDE the `with get_checkpointer()` block so the 
+database connection stays open for the lifetime of the application.
+
+Reference:
+- graph.py get_checkpointer() docstring shows the pattern
+- PostgresSaver.from_conn_string() is a context manager
+
+Verify: Check App Runner logs for "checkpointer_initialized" with "checkpointer_type=PostgresSaver"
+```
+
+**Agent Prompt:**
+```
+Update chat routes to use graph from app.state instead of module-level import
+
+The issue: Chat routes import `from src.agent.graph import graph` which is the 
+module-level graph created with MemorySaver. They need to use the graph from 
+app.state which is initialized with PostgresSaver.
+
+Changes to `backend/src/api/routes/chat.py`:
+
+1. Remove the module-level graph import:
+   REMOVE: from src.agent.graph import graph
+
+2. Update _stream_langgraph_events function signature to accept graph:
+   async def _stream_langgraph_events(
+       conversation_id: str, user_message: str, settings: Settings, graph: Any
+   ) -> None:
+
+3. Update the post_chat endpoint to get graph from app.state and pass it:
+   if use_real_agent:
+       # Get the graph from app.state (initialized with PostgresSaver in lifespan)
+       graph = request.app.state.graph
+       asyncio.create_task(
+           _stream_langgraph_events(conversation_id, message_text, settings, graph)
+       )
+
+Apply the same changes to `backend/src/api/routes/v1/chat.py`.
+
+Reference:
+- main.py stores graph in app.state.graph
+- FastAPI request object has app.state accessible
+
+Verify: 
+- docker-compose restart backend
+- Check logs for "checkpointer_initialized" 
+- Test conversation memory persists across messages
+```
+
+### 5.7 Verify PostgresSaver is Active
+
+After deployment, check App Runner logs for these entries:
+
+**Expected startup logs:**
+```
+initializing_checkpointer  has_database_url=True  environment=aws
+postgres_checkpointer_created  message="Using PostgresSaver for persistent checkpointing"
+checkpointer_initialized  checkpointer_type=PostgresSaver
+```
+
+**If you see this instead (problem!):**
+```
+checkpointer_initialized  checkpointer_type=InMemorySaver
+```
+
+**Troubleshooting:**
+
+| Log Entry | Meaning | Solution |
+|-----------|---------|----------|
+| `has_database_url=False` | DATABASE_URL not set | Check App Runner env vars for DATABASE_URL |
+| `postgres_checkpointer_failed` | Connection to Neon failed | Verify Neon connection string format |
+| `checkpointer_type=InMemorySaver` | Fallback triggered | Check DATABASE_URL secret in Secrets Manager |
 
 ---
 
