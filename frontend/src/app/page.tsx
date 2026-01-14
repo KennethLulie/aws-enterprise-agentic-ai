@@ -27,7 +27,7 @@ import { connectSSE, getHealth, getSession, sendMessage, type ChatEvent } from "
 import { cn } from "@/lib/utils";
 
 // App version - increment when deploying to verify App Runner has latest code
-const APP_VERSION = "1.0.4";
+const APP_VERSION = "1.0.5";
 
 type ChatRole = "user" | "assistant";
 

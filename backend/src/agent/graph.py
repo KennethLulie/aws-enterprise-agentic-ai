@@ -127,7 +127,9 @@ async def get_checkpointer(
                 max_size=20,
                 kwargs={"autocommit": True, "row_factory": dict_row},
             ) as pool:
-                checkpointer = AsyncPostgresSaver(pool)
+                # mypy can't infer that row_factory=dict_row changes the pool's
+                # generic type from tuple to dict rows, so we ignore the type error
+                checkpointer = AsyncPostgresSaver(pool)  # type: ignore[arg-type]
                 # setup() creates checkpoint tables if they don't exist
                 await checkpointer.setup()
                 logger.info(

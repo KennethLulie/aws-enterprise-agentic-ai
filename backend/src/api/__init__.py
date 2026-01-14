@@ -52,9 +52,7 @@ from __future__ import annotations
 
 # Version information for the API
 # Increment this when deploying to help verify App Runner has the latest code
-__version__ = (
-    "1.0.4"  # Phase 1b - Fixed row_factory for AsyncPostgresSaver type compatibility
-)
+__version__ = "1.0.5"  # Phase 1b - Added type ignore for AsyncPostgresSaver mypy
 __api_version__ = "v1"
 
 # Public API exports
