@@ -27,7 +27,7 @@ import { connectSSE, getHealth, getSession, sendMessage, type ChatEvent } from "
 import { cn } from "@/lib/utils";
 
 // App version - increment when deploying to verify App Runner has latest code
-const APP_VERSION = "1.0.6";
+const APP_VERSION = "1.0.7";
 
 type ChatRole = "user" | "assistant";
 
@@ -51,10 +51,10 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [inputValue, setInputValue] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  // Persist conversationId in sessionStorage so memory survives page refresh
+  // Persist conversationId in localStorage so memory survives browser sessions
   const [conversationId, setConversationId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
-      return sessionStorage.getItem("conversationId");
+      return localStorage.getItem("conversationId");
     }
     return null;
   });
@@ -86,10 +86,10 @@ export default function ChatPage() {
     void verifySession();
   }, [router]);
 
-  // Persist conversationId to sessionStorage so memory survives page refresh
+  // Persist conversationId to localStorage so memory survives browser sessions
   useEffect(() => {
     if (conversationId) {
-      sessionStorage.setItem("conversationId", conversationId);
+      localStorage.setItem("conversationId", conversationId);
     }
   }, [conversationId]);
 
@@ -392,7 +392,7 @@ export default function ChatPage() {
 
   // Start a new conversation (clears memory)
   const handleNewConversation = useCallback(() => {
-    sessionStorage.removeItem("conversationId");
+    localStorage.removeItem("conversationId");
     setConversationId(null);
     setMessages([]);
     // Close existing SSE connection

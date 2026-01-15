@@ -69,9 +69,18 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 ## 📋 Project Status
 
-**Current Phase:** Phase 1a ✅ Complete (AWS Cloud Deployment)
+**Current Phase:** Phase 2 🚧 In Progress (Core Agent Tools)
 
 > 🚀 **Demo link and password available on request**
+
+**Phase 1b (completed January 13, 2026)** added production hardening:
+- ✅ Neon PostgreSQL integration for persistent state (free tier)
+- ✅ PostgresSaver checkpointing for conversation persistence
+- ✅ GitHub Actions CI/CD pipelines (CI on push/PR, CD manual trigger)
+- ✅ Structured logging with structlog (CloudWatch-compatible JSON)
+- ✅ Enhanced rate limiting (slowapi, 10 req/min per IP)
+- ✅ API versioning (/api/v1/ routes)
+- ✅ Database migrations ready (Alembic configured)
 
 **Phase 1a (completed January 2, 2026)** deployed the system to AWS:
 - ✅ App Runner backend with LangGraph agent and Bedrock (Nova Pro)
@@ -84,9 +93,9 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 **Phase 0 (completed)** established a fully working local development environment with:
 - LangGraph agent with Bedrock (Nova Pro) and streaming responses
-- Tavily search running in mock mode by default; live path enabled only when `TAVILY_API_KEY` is set
-- Financial Modeling Prep (FMP) market data tool running in mock mode by default; live path enabled when `FMP_API_KEY` is set
-- SQL and RAG tools remain stubbed (real implementations in Phase 2)
+- ✅ Tavily search tool (Phase 2a completed early) - live when `TAVILY_API_KEY` is set, mock fallback otherwise
+- ✅ FMP market data tool (Phase 2d completed early) - live when `FMP_API_KEY` is set, mock fallback otherwise
+- SQL and RAG tools stubbed (real implementations in Phase 2b/2c)
 - Docker Compose for all services with hot reload
 - Password-protected web interface
 
@@ -95,16 +104,18 @@ This system goes beyond a simple demo by implementing production-ready features:
 docker-compose build backend && docker-compose up -d backend
 ```
 
-**Next Phase (1b):** Production Hardening - Add persistent database (Neon PostgreSQL, free tier), automated CI/CD with GitHub Actions, enhanced security (rate limiting), and improved observability.
+**Next Phase (2):** Core Agent Tools - SQL queries with Neon PostgreSQL (sample financial dataset), RAG with Pinecone (hybrid search, query expansion, RRF), and S3 document ingestion with Lambda trigger. Note: Tavily Search (2a) and Market Data (2d) were already completed in Phase 0.
 
 ## 📚 Documentation
 
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
 - **[DEVELOPMENT_REFERENCE.md](./DEVELOPMENT_REFERENCE.md)** - Detailed implementation reference for each phase
-- **[PHASE_1B_HOW_TO_GUIDE.md](./PHASE_1B_HOW_TO_GUIDE.md)** - Step-by-step guide for Phase 1b (current) implementation
-- **[docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md)** - Completed Phase 1a guide (AWS Cloud Deployment - archived)
-- **[docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md)** - Completed Phase 0 guide (Local Development - archived)
 - **[docs/SECURITY.md](./docs/SECURITY.md)** - Security and secrets management guide
+
+### Completed Phase Guides (Archived)
+- **[docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md)** - Phase 1b (Production Hardening)
+- **[docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md)** - Phase 1a (AWS Cloud Deployment)
+- **[docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md)** - Phase 0 (Local Development)
 
 ## 🧭 LangGraph Flow (Planned Graph)
 
@@ -302,10 +313,10 @@ docker compose up
 
 ### Development Phases
 
-- **Phase 0:** Local development environment (real Tavily search, FMP market data; SQL/RAG stubbed)
-- **Phase 1a:** Minimal MVP - AWS Cloud Deployment (App Runner + CloudFront)
-- **Phase 1b:** Production hardening (persistent state, Neon PostgreSQL, CI/CD)
-- **Phase 2:** Core agent tools (real SQL with Neon, real RAG with Pinecone)
+- **Phase 0:** ✅ Local development environment (real Tavily search, FMP market data; SQL/RAG stubbed)
+- **Phase 1a:** ✅ Minimal MVP - AWS Cloud Deployment (App Runner + CloudFront)
+- **Phase 1b:** ✅ Production hardening (persistent state, Neon PostgreSQL, CI/CD)
+- **Phase 2:** 🚧 Core agent tools (SQL with Neon, RAG with Pinecone; Search & Market Data done in Phase 0) - **CURRENT**
 - **Phase 3+:** Advanced features (verification, caching, observability, evaluation)
 
 See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for complete details.
@@ -393,11 +404,10 @@ GitHub Actions automates the entire development lifecycle:
 - **Quality Gates**: RAGAS evaluation and smoke tests before production deployment
 - **Rollback Capability**: Easy rollback via Terraform state management
 
-### Planned GitHub Actions (Phase 1b)
+### GitHub Actions (Implemented in Phase 1b)
 - **CI (push & pull requests):** black, ruff, mypy; ESLint/tsc; pytest; Docker test builds; Terraform fmt/validate/plan (no apply); security scans (Bandit, gitleaks). Runs automatically on every push to main and on PRs.
 - **CD (manual trigger):** Build and push backend image to ECR; build Next.js static export; upload frontend to S3; CloudFront cache invalidate; post-deploy smoke tests/health checks. **Triggered manually via GitHub Actions UI** - click "Run workflow" when ready to deploy.
-- **Evaluation (scheduled/manual):** Run RAGAS on the eval dataset, publish metrics to Arize Phoenix/CloudWatch, and fail on regressions.
-- **Phase gating:** Workflows are introduced in Phase 1b; none run in Phase 0 beyond placeholders.
+- **Evaluation (scheduled/manual):** Run RAGAS on the eval dataset, publish metrics to Arize Phoenix/CloudWatch, and fail on regressions (Phase 4+).
 
 ## 🛠️ Technology Stack
 

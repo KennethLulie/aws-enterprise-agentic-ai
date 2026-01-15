@@ -2,7 +2,7 @@
 
 **Purpose:** This document serves as the authoritative reference for implementation details, technology specifications, and development order throughout all phases. Consult this document before implementing any feature to ensure consistency, completeness, and proper integration.  Make sure this document is updated as needed as the project proceeds.
 
-**Last Updated:** Synchronized with current implementation (December 2025) - includes Phase 5 frontend features in Phase 0 baseline
+**Last Updated:** 2026-01-13 (Phase 1b complete, starting Phase 2) - includes Phase 5 frontend features in Phase 0 baseline
 
 ---
 
@@ -83,10 +83,10 @@ Fully working agent locally before any AWS deployment.
 - **Agent Framework:** LangGraph (real, with tool orchestration)
 - **LLM:** AWS Bedrock (Nova Pro/Lite, Titan Embeddings, Claude fallback)
 - **Checkpointing:** MemorySaver (in-memory, no DB)
-- **Web Search:** Real Tavily API (with mock fallback when API key not set)
-- **Market Data:** Real FMP API (with mock fallback when API key not set)
-- **Database:** Stub-only in Phase 0 (SQL tool returns mock data); real DB introduced in cloud phase
-- **Vector Store:** Stub-only in Phase 0 (RAG tool returns mock data); real retrieval deferred to cloud phases
+- **Web Search:** Real Tavily API (with mock fallback when API key not set) - **Phase 2a completed early**
+- **Market Data:** Real FMP API (with mock fallback when API key not set) - **Phase 2d completed early**
+- **Database:** Stub-only in Phase 0 (SQL tool returns mock data); real DB in Phase 2b
+- **Vector Store:** Stub-only in Phase 0 (RAG tool returns mock data); real retrieval in Phase 2c
 - **Logging:** Basic Python logging (upgrade to structlog in Phase 1b)
 
 #### Frontend Stack
@@ -570,16 +570,20 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 ### Goal
 Agent can search the web, query SQL databases, and retrieve from documents.
 
+**Note:** Tools 2a (Tavily Search) and 2d (Market Data) were completed ahead of schedule in Phase 0. Phase 2 focuses on implementing 2b (SQL Query) and 2c (RAG Retrieval).
+
 ### Technology Specifications
 
-#### Tool 2a: Tavily Search
+#### Tool 2a: Tavily Search ✅ *COMPLETED IN PHASE 0*
 - **API:** Tavily Search API
 - **Rate Limit:** 1,000 searches/month (free tier)
 - **Error Handling:** Retry with exponential backoff
 - **Circuit Breaker:** 5 failures → open, recover after 60s
 - **Logging:** Structured logging of queries and results
+- **Implementation:** `backend/src/agent/tools/search.py`
+- **Status:** Fully functional with mock fallback when API key not set
 
-#### Tool 2b: SQL Query
+#### Tool 2b: SQL Query 🚧 *TO BE IMPLEMENTED*
 - **Database:** Neon PostgreSQL (from Phase 1b)
 - **ORM:** SQLAlchemy
 - **Connection Pooling:** Built-in (5 connections, max overflow 10)
@@ -604,12 +608,14 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **Traversal:** 1-2 hop relationship queries
 - **Cost:** ~$0.001/doc ingestion, $0/query (free tier)
 
-#### Tool 2d: Market Data (FMP via MCP)
+#### Tool 2d: Market Data (FMP via MCP) ✅ *COMPLETED IN PHASE 0*
 - **API:** Financial Modeling Prep (free tier ~250 calls/day; batch quotes supported)
 - **Error Handling:** Retry with exponential backoff; handle 429s gracefully
 - **Circuit Breaker:** 5 failures → open, recover after 60s
 - **Input Validation:** Ticker list (1..N), uppercased, trimmed
 - **Output:** price, change, change%, open, previous close, day high/low, volume, currency, exchange, timestamp
+- **Implementation:** `backend/src/agent/tools/market_data.py`
+- **Status:** Fully functional with mock fallback when API key not set
 
 #### Infrastructure Additions
 - **S3 Bucket:** Document storage (separate from frontend bucket)
@@ -659,22 +665,18 @@ class SendMessageRequest(BaseModel):
 
 ### Implementation Order
 
-#### Step 1: Tavily Search Tool
-1. **Tool Implementation** (`backend/src/agent/tools/search.py`)
+#### Step 1: Tavily Search Tool ✅ *COMPLETED IN PHASE 0*
+1. **Tool Implementation** (`backend/src/agent/tools/search.py`) ✅
    - Tavily API client
    - Tool definition for LangGraph
    - Result formatting with citations
    - Error handling with retry
-   - Circuit breaker implementation
+   - Mock fallback when API key not set
    - Structured logging
 
-2. **Circuit Breaker** (`backend/src/utils/circuit_breaker.py`)
-   - Generic circuit breaker class
-   - Failure tracking
-   - Recovery logic
-   - Reusable for all tools
+2. **Circuit Breaker** - Simplified implementation in Phase 0 (full implementation in Phase 2)
 
-#### Step 2: SQL Query Tool
+#### Step 2: SQL Query Tool 🚧 *PHASE 2 PRIORITY*
 1. **Database Schema** (`backend/alembic/versions/002_sample_data.py`)
    - Customers table
    - Accounts table
@@ -780,12 +782,13 @@ class SendMessageRequest(BaseModel):
     - Source citation
     - Error handling with fallbacks
 
-#### Step 4: Market Data Tool
-1. **Tool Implementation** (`backend/src/agent/tools/market_data.py`)
+#### Step 4: Market Data Tool ✅ *COMPLETED IN PHASE 0*
+1. **Tool Implementation** (`backend/src/agent/tools/market_data.py`) ✅
    - FMP client exposed via MCP (mock mode when no API key)
    - Tool definition for LangGraph
    - Input validation (ticker list)
    - Result formatting
+   - **Status:** Fully functional with mock fallback when API key not set
    - Basic batching guidance (comma-separated tickers)
    - Error handling with retry
    - Circuit breaker

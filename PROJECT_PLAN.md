@@ -302,10 +302,10 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 - **Error recovery nodes** for graceful failure handling
 - **Built-in tool calling** via LangGraph tool binding (with Bedrock compatibility check)
 - **Model fallback:** Nova Pro → Claude 3.5 Sonnet if Nova unavailable
-- **Real tool integration:**
-  - Tavily web search (real API with mock fallback)
-  - FMP market data (real API with mock fallback)
-  - SQL and RAG tools stubbed (real implementations in Phase 2)
+- **Real tool integration (Phase 2a and 2d completed ahead of schedule):**
+  - ✅ Tavily web search (real API with mock fallback) - Phase 2a complete
+  - ✅ FMP market data (real API with mock fallback) - Phase 2d complete
+  - SQL and RAG tools stubbed (real implementations in Phase 2b/2c)
 - Chat UI with real-time streaming
 - Basic conversation flow validated
 - Environment variable config for local/cloud switching
@@ -663,17 +663,18 @@ If something isn't working, follow this systematic debugging process:
 
 **Features:**
 
-**2a. Tavily Search Tool**
+**2a. Tavily Search Tool** ✅ *COMPLETED IN PHASE 0*
 - Tavily API integration
 - Tool definition in LangGraph (using built-in tool binding)
 - Result formatting and citation
 - **Comprehensive error handling** with retry logic and exponential backoff
-- **Fallback mechanisms:** Graceful degradation if Tavily unavailable
+- **Fallback mechanisms:** Graceful degradation if Tavily unavailable (mock fallback)
 - **Circuit breaker pattern:** Stop trying after 5 failures, recover after 60s
 - Rate limiting (respect API limits)
 - **Structured logging** of search queries and results
+- *Implementation:* `backend/src/agent/tools/search.py`
 
-**2b. SQL Query Tool**
+**2b. SQL Query Tool** 🚧 *TO BE IMPLEMENTED*
 - **Uses existing Neon PostgreSQL** from Phase 1b (no new provisioning needed)
 - **Connection Pooling:** SQLAlchemy built-in (skip RDS Proxy for demo cost savings)
 - Sample database with financial demo data (transactions, accounts, customers, portfolios)
@@ -687,8 +688,9 @@ If something isn't working, follow this systematic debugging process:
 - Query explanation/justification
 - **Error handling:** Graceful failures with helpful error messages
 - **Circuit breaker:** Prevent repeated failures from overwhelming database
+- *Implementation:* `backend/src/agent/tools/sql.py` (currently stub, needs real implementation)
 
-**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)**
+**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)** 🚧 *TO BE IMPLEMENTED*
 
 **January 2026 State-of-the-Art Techniques:**
 
@@ -746,19 +748,21 @@ If something isn't working, follow this systematic debugging process:
 - Source citation with page/section numbers
 - Metadata filtering (document_type, date_range, etc.)
 - **Fallback mechanisms:** Graceful degradation if Pinecone/KG unavailable
+- *Implementation:* `backend/src/agent/tools/rag.py` (currently stub, needs real implementation)
 
-**2d. Market Data Tool (FMP via MCP)**
+**2d. Market Data Tool (FMP via MCP)** ✅ *COMPLETED IN PHASE 0*
 - Financial Modeling Prep integration exposed via MCP (live calls optional; mock mode when no API key)
 - Tool definition in LangGraph (using built-in tool binding)
 - Result formatting with price, change, change%, open/close, day high/low, volume, currency, exchange, timestamp
 - **Comprehensive error handling** with retry logic and exponential backoff
-- **Fallback mechanisms:** Graceful degradation if API unavailable
+- **Fallback mechanisms:** Graceful degradation if API unavailable (mock fallback)
 - **Circuit breaker pattern:** Stop trying after 5 failures, recover after 60s
 - Rate limiting guidance for free tier (~250 calls/day) with batching for multiple tickers
 - **Structured logging** of market data queries and results
 - Input validation (ticker list, uppercase, comma-separated)
 - **Error handling:** User-friendly messages for invalid tickers
 - **No infrastructure required:** Uses existing App Runner backend, no new AWS services
+- *Implementation:* `backend/src/agent/tools/market_data.py`
 
 **Infrastructure Additions:**
 - **Note:** Uses existing Neon PostgreSQL from Phase 1b (no new provisioning needed)
@@ -1625,9 +1629,9 @@ aws-enterprise-agentic-ai/
 
 Fully working local development environment with:
 - LangGraph agent with Bedrock (Nova Pro) and streaming responses
-- Tavily search with mock fallback
-- FMP market data with mock fallback
-- SQL and RAG tools stubbed (real implementations in Phase 2)
+- ✅ Tavily search tool with mock fallback (Phase 2a completed ahead of schedule)
+- ✅ FMP market data tool with mock fallback (Phase 2d completed ahead of schedule)
+- SQL and RAG tools stubbed (real implementations in Phase 2b/2c)
 - Docker Compose for all services with hot reload
 - Password-protected web interface
 
@@ -1641,6 +1645,18 @@ Deployed to AWS with:
 - Password-protected demo access
 - Infrastructure as Code with Terraform
 - Cost-optimized (~$10-25/month when active)
+
+### ✅ Phase 1b: Production Hardening - COMPLETED (January 13, 2026)
+
+Production-ready infrastructure with:
+- Neon PostgreSQL integration for persistent state (free tier)
+- PostgresSaver checkpointing for conversation persistence
+- GitHub Actions CI/CD pipelines (CI on push/PR, CD manual trigger)
+- Structured logging with structlog (CloudWatch-compatible JSON)
+- Enhanced rate limiting (slowapi, 10 req/min per IP)
+- API versioning (/api/v1/ routes)
+- Database migrations ready (Alembic configured)
+- Comprehensive health checks with dependency validation
 
 ---
 
@@ -1665,13 +1681,14 @@ Deployed to AWS with:
 - ✅ **API Versioning:** /api/v1/ for future compatibility
 - ✅ **Database Migrations:** Alembic for schema management
 
-**Ready to Begin Phase 1b: Production Hardening**
+**Ready to Begin Phase 2: Core Agent Tools**
 
-Phase 1b adds:
-- Persistent database (Neon PostgreSQL)
-- Automated CI/CD (GitHub Actions)
-- Enhanced security (rate limiting)
-- Improved observability
+Phase 2 remaining work (2a and 2d already completed in Phase 0):
+- ✅ **2a. Tavily Search Tool** - Completed in Phase 0 with mock fallback
+- 🚧 **2b. SQL Query Tool** - Real implementation with Neon PostgreSQL (sample financial dataset)
+- 🚧 **2c. RAG Document Tool** - Real implementation with Pinecone (hybrid search, query expansion, RRF)
+- ✅ **2d. Market Data Tool** - Completed in Phase 0 with mock fallback
+- 🚧 S3 document bucket with Lambda trigger for auto-ingestion
 
 **Pre-Phase 0 Checklist (Completed):**
 - [x] Docker Desktop installed and running

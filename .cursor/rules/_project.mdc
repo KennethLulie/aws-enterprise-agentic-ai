@@ -12,17 +12,23 @@ Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestratio
 
 | Setting | Value |
 |---------|-------|
-| **Phase** | 1a (AWS Cloud Deployment) |
-| **Guide** | PHASE_1A_HOW_TO_GUIDE.md |
+| **Phase** | 2 (Core Agent Tools) |
+| **Guide** | PHASE_2_HOW_TO_GUIDE.md (to be created) |
 | **Cost Target** | $20-50/month for demo |
 | **AWS Region** | us-east-1 (always) |
+
+**Phase 2 Scope:**
+- ✅ 2a. Tavily Search Tool - *Completed in Phase 0*
+- 🚧 2b. SQL Query Tool - *To implement with Neon PostgreSQL*
+- 🚧 2c. RAG Document Tool - *To implement with Pinecone*
+- ✅ 2d. Market Data Tool - *Completed in Phase 0*
 
 ## Sources of Truth
 
 | Information | Source | When to Check |
 |-------------|--------|---------------|
 | Project roadmap | PROJECT_PLAN.md | Planning features, understanding scope |
-| Current phase steps | PHASE_1A_HOW_TO_GUIDE.md | Implementation |
+| Current phase steps | PHASE_2_HOW_TO_GUIDE.md | Implementation (create when starting Phase 2) |
 | Package versions | DEVELOPMENT_REFERENCE.md | Adding/updating dependencies |
 | File inventory | REPO_STATE.md | Before referencing files |
 | Environment vars | .env.example | Adding new config |
@@ -34,10 +40,11 @@ Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestratio
 
 | Phase | Database | Checkpointing | API | Tools |
 |-------|----------|---------------|-----|-------|
-| 0 | None | MemorySaver | `/api/chat` | Mock (Search/Market real if keys) |
-| 1a | None | MemorySaver | `/api/chat` | Mock (Search/Market real if keys) |
-| 1b+ | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Real |
-| 4+ | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Real + Cached |
+| 0 | None | MemorySaver | `/api/chat` | Search ✅, Market ✅, SQL stub, RAG stub |
+| 1a | None | MemorySaver | `/api/chat` | Search ✅, Market ✅, SQL stub, RAG stub |
+| 1b | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Search ✅, Market ✅, SQL stub, RAG stub |
+| 2 | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Search ✅, Market ✅, SQL ✅, RAG ✅ |
+| 4+ | Neon PostgreSQL | PostgresSaver | `/api/v1/` | All Real + Cached |
 
 ## Technology Stack
 
