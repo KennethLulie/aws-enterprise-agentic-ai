@@ -25,7 +25,7 @@ This project showcases a production-ready AI agent system with:
 - **Inference caching** for cost optimization
 - **Full observability** with Arize Phoenix
 - **RAG evaluation** with RAGAS
-- **Automated document ingestion** from S3
+- **VLM document extraction** with Claude Vision (handles complex PDFs)
 - **Password-protected** web interface
 - **Infrastructure as Code** with Terraform
 - **CI/CD** with GitHub Actions
@@ -69,9 +69,14 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 ## 📋 Project Status
 
-**Current Phase:** Phase 2 🚧 In Progress (Core Agent Tools)
+**Current Phase:** Phase 2 🚧 In Progress (Core Agent Tools) - How-to guides complete, ready for implementation
 
 > 🚀 **Demo link and password available on request**
+
+**Phase 2 (in progress)** adds core agent tools with comprehensive how-to guides:
+- 📖 Phase 2a: Data Foundation - VLM extraction, SQL tool with 10-K financial data, basic RAG
+- 📖 Phase 2b: Intelligence Layer - Knowledge Graph (Neo4j), hybrid retrieval, multi-tool orchestration
+- See [Current Phase Guides](#current-phase-guides) below for implementation details
 
 **Phase 1b (completed January 13, 2026)** added production hardening:
 - ✅ Neon PostgreSQL integration for persistent state (free tier)
@@ -104,10 +109,18 @@ This system goes beyond a simple demo by implementing production-ready features:
 docker-compose build backend && docker-compose up -d backend
 ```
 
-**Next Phase (2):** Core Agent Tools - SQL queries with Neon PostgreSQL (sample financial dataset), RAG with Pinecone (hybrid search, query expansion, RRF), and S3 document ingestion with Lambda trigger. Note: Tavily Search (2a) and Market Data (2d) were already completed in Phase 0.
+**Phase 2 Overview:** Core Agent Tools implements SQL queries with Neon PostgreSQL (real 10-K financial metrics), RAG with Pinecone (hybrid search + Neo4j knowledge graph), and cross-document analysis. Document extraction uses Claude VLM for all documents (10-Ks + reference docs), with spaCy NER for entity extraction and Titan Embeddings for semantic search. Note: Tavily Search and Market Data were already completed in Phase 0. See [docs/RAG_README.md](./docs/RAG_README.md) for the complete RAG architecture.
 
 ## 📚 Documentation
 
+### Current Phase Guides
+- **[docs/PHASE_2A_HOW_TO_GUIDE.md](./docs/PHASE_2A_HOW_TO_GUIDE.md)** - 📖 **Phase 2a: Data Foundation & Basic Tools** - VLM extraction pipeline, SQL tool with 10-K financial data, basic RAG with Pinecone
+- **[docs/PHASE_2B_HOW_TO_GUIDE.md](./docs/PHASE_2B_HOW_TO_GUIDE.md)** - 📖 **Phase 2b: Intelligence Layer & Full Integration** - Knowledge Graph (Neo4j), hybrid retrieval (BM25 + reranking), multi-tool orchestration, cross-document analysis
+
+### Architecture Deep-Dives
+- **[docs/RAG_README.md](./docs/RAG_README.md)** - 📖 **RAG System Architecture** - Comprehensive guide to our retrieval system including VLM extraction for 10-Ks, hybrid search (dense + BM25), knowledge graph integration, query pipeline, and enterprise feature considerations
+
+### Project References
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
 - **[DEVELOPMENT_REFERENCE.md](./DEVELOPMENT_REFERENCE.md)** - Detailed implementation reference for each phase
 - **[docs/SECURITY.md](./docs/SECURITY.md)** - Security and secrets management guide
@@ -116,6 +129,7 @@ docker-compose build backend && docker-compose up -d backend
 - **[docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md)** - Phase 1b (Production Hardening)
 - **[docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md)** - Phase 1a (AWS Cloud Deployment)
 - **[docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md)** - Phase 0 (Local Development)
+- **[docs/completed-phases/PHASE_2_REQUIREMENTS.md](./docs/completed-phases/PHASE_2_REQUIREMENTS.md)** - Phase 2 Requirements (Archived planning document)
 
 ## 🧭 LangGraph Flow (Planned Graph)
 
@@ -237,16 +251,21 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
           ┌─────────────────────────┼─────────────────────────┐
           ▼                         ▼                         ▼
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│ Neon PostgreSQL  │    │     Pinecone     │    │   S3 Document    │
-│   v2 PostgreSQL  │    │    Serverless    │    │     Bucket       │
-│   (SQL Data)     │    │  (Vector Store)  │    │  (File Upload)   │
+│ Neon PostgreSQL  │    │     Pinecone     │    │     Neo4j        │
+│   v2 PostgreSQL  │    │    Serverless    │    │    AuraDB        │
+│   (SQL Data)     │    │  (Vector Store)  │    │(Knowledge Graph) │
 └──────────────────┘    └──────────────────┘    └──────────────────┘
-                                                         │
-                                                         ▼
-                                               ┌──────────────────┐
-                                               │  Lambda Trigger  │
-                                               │  (Auto-Ingest)   │
-                                               └──────────────────┘
+         ▲                       ▲                       ▲
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌────────────────────────┐
+                    │   Document Ingestion    │
+                    │   (VLM Extraction via   │
+                    │   Claude Vision/Bedrock)│
+                    │   + spaCy NER + Titan   │
+                    │   Embeddings            │
+                    └────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────┐
 │                    EVALUATION & MONITORING                            │
@@ -276,7 +295,7 @@ The system is organized into three layers: **DevOps & Deployment**, **Runtime**,
    - **Backend**: AWS App Runner hosts the LangGraph agent orchestrator with Bedrock Nova LLM, input/output verification, inference caching, and Arize Phoenix tracing
    - **Tools**: Four integrated tools (Tavily web search, Neon SQL queries, Pinecone RAG retrieval, Market Data API) that the agent can intelligently select and use
 
-3. **Data Layer**: Neon PostgreSQL for structured data, Pinecone Serverless for vector storage, S3 for document storage with Lambda-triggered auto-ingestion
+3. **Data Layer**: Neon PostgreSQL for structured data, Pinecone Serverless for vector storage, S3 for document storage (auto-ingestion available for enterprise scaling)
 
 4. **Evaluation & Monitoring**: RAGAS evaluates RAG quality via scheduled Lambda and GitHub Actions, sending metrics to Arize Phoenix and CloudWatch for observability and regression detection
 
@@ -356,12 +375,17 @@ See [docs/SECURITY.md](./docs/SECURITY.md) for the complete security guide.
 The LangGraph agent framework intelligently coordinates multiple tools based on user queries. The agent decides which tools to use, in what order, and how to combine their outputs. For example, a query like "How did AAPL and MSFT move today and how does that compare to our customer data there?" triggers the Market Data MCP connection (FMP via MCP demo) alongside the SQL query tool, with the agent synthesizing the results.
 
 ### Advanced RAG (Retrieval-Augmented Generation)
-Beyond basic vector search, this system implements state-of-the-art RAG techniques:
-- **Hybrid Search**: Combines semantic similarity (dense vectors) with keyword matching (sparse vectors) for superior recall
-- **Query Expansion**: Generates multiple query phrasings to improve retrieval coverage by 20-30%
-- **RRF (Reciprocal Rank Fusion)**: Intelligently merges results from multiple retrieval methods
-- **Contextual Compression**: Reduces noise in retrieved documents before passing to the LLM
-- **Parent Document Retriever**: Uses small chunks for retrieval but returns larger context windows for better understanding
+
+> 📖 **Deep Dive:** See [docs/RAG_README.md](./docs/RAG_README.md) for complete architecture, design decisions, and enterprise considerations.
+
+Beyond basic vector search, this system implements state-of-the-art 2026 RAG techniques:
+- **VLM Document Extraction**: Claude Vision extracts structured data from complex 10-K filings, preserving table structure
+- **Hybrid Search**: Combines semantic similarity (dense vectors) with keyword matching (BM25 sparse vectors)
+- **Knowledge Graph**: Neo4j stores entity relationships for multi-hop reasoning and entity-aware queries
+- **Query Expansion**: Generates 3 alternative phrasings to improve retrieval coverage by 20-30%
+- **RRF (Reciprocal Rank Fusion)**: Intelligently merges results from vector, keyword, and graph searches
+- **Cross-Encoder Reranking**: Nova Lite scores relevance of top results for +20-25% precision
+- **Contextual Enrichment**: Prepends document/section context to chunks before embedding
 
 ### Input/Output Verification
 Small Language Models (SLMs) act as guardrails:
@@ -415,7 +439,16 @@ GitHub Actions automates the entire development lifecycle:
 - **LLM:** AWS Bedrock (Amazon Nova Pro/Lite) - Latest AWS models with cost-effective pay-per-token pricing, excellent AWS integration, and fallback to Claude 3.5 Sonnet for reliability
 - **Agent Framework:** LangGraph - Industry-standard orchestration framework with native streaming, checkpointing for state persistence, and excellent tool integration
 - **Vector Store:** Pinecone Serverless - Fully managed vector database with native hybrid search, free tier (100K vectors), and superior performance vs. pgvector
-- **SQL Database:** Neon PostgreSQL - Serverless PostgreSQL with free tier (0.5GB storage), fully managed, connection pooling, and cost-free for demo workloads
+- **Knowledge Graph:** Neo4j AuraDB Free - Graph database for entity relationships (200K nodes), enables "find all docs about X" queries
+- **SQL Database:** Neon PostgreSQL - Serverless PostgreSQL with free tier (0.5GB storage), fully managed, stores structured 10-K financial metrics
+
+### Document Processing & RAG
+- **VLM Extraction:** Claude Vision (via Bedrock) - Extracts clean text from complex PDFs including tables, handles all document types
+- **Embeddings:** AWS Bedrock Titan Embeddings - 1536-dimensional vectors for semantic search (~$0.0001/1K tokens)
+- **Entity Extraction:** spaCy NER - Cost-efficient entity extraction for Knowledge Graph population (20-50x cheaper than LLM)
+- **Chunking:** Semantic chunking with spaCy sentence boundaries + contextual enrichment
+
+> 📖 **Deep Dive:** See [docs/RAG_README.md](./docs/RAG_README.md) for complete RAG architecture including hybrid search, query expansion, and reranking
 
 ### Infrastructure & DevOps
 - **Compute:** AWS App Runner - Serverless container platform that scales to zero, no timeout limits, simple deployment
@@ -454,15 +487,26 @@ GitHub Actions automates the entire development lifecycle:
 - More complex than single-tool systems, but showcases advanced capabilities
 
 ### Hybrid RAG Strategy
-**Decision**: Combine semantic search (dense vectors) with keyword search (sparse vectors) using RRF
+**Decision**: Combine semantic search, keyword search (BM25), and knowledge graph using RRF fusion
+
+**Data Flow**:
+```
+PDF → Claude VLM → Clean Text → ┬→ Titan Embeddings → Pinecone (semantic search)
+                                ├→ BM25 Index → Pinecone (keyword search)
+                                ├→ spaCy NER → Neo4j (knowledge graph)
+                                └→ Parse Tables → PostgreSQL (SQL queries)
+```
 
 **Rationale**:
-- **Superior Recall**: Captures both semantic meaning and exact keyword matches
-- **Production Best Practice**: Industry-standard approach for high-quality RAG systems
-- **Query Expansion**: Improves retrieval quality by 20-30%
+- **VLM for All Documents**: Claude Vision extracts clean text from complex PDFs (tables, multi-column layouts)
+- **Triple Retrieval**: Semantic + keyword + knowledge graph captures meaning, exact terms, and entity relationships
+- **Cost-Efficient NER**: spaCy extracts entities for knowledge graph (20-50x cheaper than LLM extraction)
+- **Query Enhancement**: Query expansion + cross-encoder reranking improves retrieval by 20-30%
 
 **Trade-offs**:
 - More complex than simple vector search, but significantly better results
+- VLM extraction costs ~$0.03-0.05/page (~$50 total one-time for demo)
+- See [docs/RAG_README.md](./docs/RAG_README.md) for detailed architecture and alternatives
 
 ### Structured Logging
 **Decision**: Use structlog with JSON output instead of plain text logs

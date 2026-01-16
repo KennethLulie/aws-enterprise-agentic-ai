@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-13 (Phase 2 requirements planning document added)
+**Last Updated:** 2026-01-13 (Phase 2 planning complete - RAG architecture finalized)
 
 ---
 
@@ -124,10 +124,13 @@
 | docs/README.md | Documentation directory overview |
 | docs/SECURITY.md | Security and secrets management guide |
 | docs/integration-test-checklist.md | Phase 0 end-to-end test checklist |
-| docs/PHASE_2_REQUIREMENTS.md | Phase 2 requirements planning document (temporary) |
+| docs/RAG_README.md | RAG system architecture, design decisions, and alternatives |
+| docs/PHASE_2A_HOW_TO_GUIDE.md | Phase 2a step-by-step guide (data foundation) |
+| docs/PHASE_2B_HOW_TO_GUIDE.md | Phase 2b step-by-step guide (intelligence layer) |
 | docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md | Completed Phase 0 guide (archived) |
 | docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md | Completed Phase 1a guide (archived) |
 | docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md | Completed Phase 1b guide (archived) |
+| docs/completed-phases/PHASE_2_REQUIREMENTS.md | Phase 2 requirements planning document (archived) |
 
 ### Scripts Directory
 | File | Purpose |

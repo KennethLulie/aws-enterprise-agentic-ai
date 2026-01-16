@@ -9,7 +9,8 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
 - Inference caching for cost optimization
 - Full observability with Arize Phoenix
 - RAG evaluation with RAGAS
-- Automated document ingestion from S3
+- VLM document extraction (Claude Vision for all documents)
+- Hybrid RAG with Knowledge Graph (Neo4j)
 - Password-protected web interface
 - Infrastructure as Code with Terraform
 - CI/CD with GitHub Actions
@@ -69,16 +70,20 @@ This project builds an enterprise-grade agentic AI system on AWS demonstrating:
           ┌─────────────────────────┼─────────────────────────┐
           ▼                         ▼                         ▼
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│ Neon PostgreSQL  │    │     Pinecone     │    │   S3 Document    │
-│  (Free Tier)     │    │    Serverless    │    │     Bucket       │
-│   (SQL Data)     │    │  (Vector Store)  │    │  (File Upload)   │
+│ Neon PostgreSQL  │    │     Pinecone     │    │     Neo4j        │
+│  (Free Tier)     │    │    Serverless    │    │    AuraDB        │
+│ (10-K Metrics)   │    │  (Vector Store)  │    │(Knowledge Graph) │
 └──────────────────┘    └──────────────────┘    └──────────────────┘
-                                                         │
-                                                         ▼
-                                               ┌──────────────────┐
-                                               │  Lambda Trigger  │
-                                               │  (Auto-Ingest)   │
-                                               └──────────────────┘
+         ▲                       ▲                       ▲
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌────────────────────────┐
+                    │   Document Ingestion    │
+                    │   (VLM Extraction via   │
+                    │   Claude Vision/Bedrock)│
+                    │   Local Batch Script    │
+                    └────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    EVALUATION & MONITORING                              │
@@ -661,6 +666,10 @@ If something isn't working, follow this systematic debugging process:
 ### Phase 2: Core Agent Tools
 **Goal:** Agent can search the web, query SQL databases, and retrieve from documents
 
+> **Implementation Guides:** 
+> - `docs/PHASE_2A_HOW_TO_GUIDE.md` - Data Foundation & Basic Tools (VLM, SQL, basic RAG)
+> - `docs/PHASE_2B_HOW_TO_GUIDE.md` - Intelligence Layer (Knowledge Graph, hybrid retrieval, multi-tool orchestration)
+
 **Features:**
 
 **2a. Tavily Search Tool** ✅ *COMPLETED IN PHASE 0*
@@ -676,21 +685,34 @@ If something isn't working, follow this systematic debugging process:
 
 **2b. SQL Query Tool** 🚧 *TO BE IMPLEMENTED*
 - **Uses existing Neon PostgreSQL** from Phase 1b (no new provisioning needed)
+- **Data Source:** Real 10-K financial metrics extracted via VLM (not synthetic data)
+- **Tables:** companies, financial_metrics, segment_revenue, geographic_revenue, risk_factors
 - **Connection Pooling:** SQLAlchemy built-in (skip RDS Proxy for demo cost savings)
-- Sample database with financial demo data (transactions, accounts, customers, portfolios)
-- Natural language to SQL via LLM
-- Query execution with result limits/safety (max rows, read-only)
+- Natural language to SQL via LLM with schema context
+- Query execution with result limits/safety (max 1000 rows, read-only, 30s timeout)
 - **SQL Injection Prevention (Critical):**
   - Parameterized queries only (SQLAlchemy `text()` with parameters)
   - Table/column whitelisting (ALLOWED_TABLES set)
   - Never use string formatting for SQL
   - Query validation before execution
 - Query explanation/justification
+- **Sample Queries:**
+  - "Which company had the highest revenue in 2024?"
+  - "Compare gross margins across tech companies"
+  - "What percentage of Apple's revenue comes from iPhone?"
 - **Error handling:** Graceful failures with helpful error messages
 - **Circuit breaker:** Prevent repeated failures from overwhelming database
 - *Implementation:* `backend/src/agent/tools/sql.py` (currently stub, needs real implementation)
 
 **2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)** 🚧 *TO BE IMPLEMENTED*
+
+> **Full Architecture:** See `docs/RAG_README.md` for comprehensive architecture. Implementation details in `docs/PHASE_2A_HOW_TO_GUIDE.md` (basic RAG) and `docs/PHASE_2B_HOW_TO_GUIDE.md` (hybrid retrieval, knowledge graph).
+
+**Key Decisions:**
+- **VLM for ALL documents** - Claude Vision extracts clean text from all PDFs (10-Ks and reference docs)
+- **Batch script processing** - No Lambda, no timeouts, easier debugging
+- **spaCy for entity extraction** - 20-50x cheaper than LLM for Knowledge Graph population
+- **One-time cost:** ~$40-60 for ~30-40 documents total
 
 **January 2026 State-of-the-Art Techniques:**
 
@@ -725,28 +747,40 @@ If something isn't working, follow this systematic debugging process:
   - Base ontology for financial domain (Policy, Customer, Account, Regulation, Concept)
   - Enhances retrieval with entity relationships
 
-**Ingestion Pipeline:**
-1. Document → Semantic Chunking (spaCy sentence boundaries)
-2. Each chunk → Add Context (title, section, type)
-3. Contextualized chunks → Embed (Titan) → Store (Pinecone)
-4. Document → NLP Entity Extraction (spaCy) → Store in Knowledge Graph
+**Ingestion Pipeline (Batch Script):**
+```
+PDF → Claude VLM → Clean Text → ┬→ Semantic Chunking → Titan Embed → Pinecone
+                                ├→ BM25 Index → Pinecone (sparse)
+                                ├→ spaCy NER → Neo4j (entities)
+                                └→ Parse Tables → PostgreSQL (10-Ks only)
+```
+
+1. Document → VLM Extraction (Claude Vision via Bedrock)
+2. Clean text → Semantic Chunking (spaCy sentence boundaries)
+3. Each chunk → Add Context (title, section, page)
+4. Contextualized chunks → Embed (Titan) + BM25 → Store (Pinecone)
+5. Clean text → spaCy NER → Store entities in Knowledge Graph (Neo4j)
+6. (10-Ks only) Parsed tables → Store metrics in PostgreSQL
 
 **Query Pipeline:**
 1. Query → Expansion (3 variants via Nova Lite)
 2. Parallel: Dense search + Sparse search (BM25) + KG entity lookup
 3. RRF Fusion → Cross-Encoder Rerank → Contextual Compression → Results
 
-**Total query cost: ~$0.035-0.04**
+**Costs:**
+- One-time VLM extraction: ~$40-60 for ~30-40 documents
+- Per-query: ~$0.035-0.04
 
-**Core Features (unchanged):**
-- Pinecone serverless index with hybrid search (dense + sparse)
-- Document embedding pipeline (Bedrock Titan Embeddings)
-- S3 bucket for document uploads with Lambda trigger
-- Query expansion (3 alternative phrasings, +20-30% recall)
-- RRF (Reciprocal Rank Fusion) for combining results
+**Core Features:**
+- Pinecone serverless index with hybrid search (dense + sparse via BM25)
+- Document embedding pipeline (Bedrock Titan Embeddings, 1536 dimensions)
+- **VLM extraction** (Claude Vision) for all documents via batch script
+- Query expansion (3 alternative phrasings via Nova Lite, +20-30% recall)
+- RRF (Reciprocal Rank Fusion) for combining semantic + keyword + graph results
+- Cross-encoder reranking (Nova Lite scores relevance, +20-25% precision)
 - Contextual Compression (LLMChainExtractor)
 - Source citation with page/section numbers
-- Metadata filtering (document_type, date_range, etc.)
+- Metadata filtering (document_type, company, section, etc.)
 - **Fallback mechanisms:** Graceful degradation if Pinecone/KG unavailable
 - *Implementation:* `backend/src/agent/tools/rag.py` (currently stub, needs real implementation)
 
@@ -772,53 +806,58 @@ If something isn't working, follow this systematic debugging process:
   - Pool size: 5 connections (sufficient for demo)
   - Max overflow: 10 connections
   - Fine for low-use demo, upgrade to RDS Proxy only if scaling
-- Pinecone index (via Terraform provider or API)
-- S3 bucket with Lambda trigger
-- **S3 Intelligent-Tiering** for document storage (saves ~40% on storage costs)
-- Lambda function for document processing
-- Additional IAM policies for tool access
-- **Knowledge Graph Infrastructure (2025 Addition):**
+- Pinecone index (via console or API, free tier)
+- S3 bucket (optional) for extracted JSON backup
+- **No Lambda for document ingestion** - batch script approach instead (simpler, no timeouts)
+- Additional IAM policies for tool access (Bedrock Claude for VLM)
+- **Knowledge Graph Infrastructure:**
   - Neo4j AuraDB Free tier (200K nodes, 400K relationships, $0/month)
   - Neo4j in Docker for local development
-  - spaCy for NLP-based entity extraction (no LLM cost)
+  - spaCy for NLP-based entity extraction (no LLM cost, 20-50x cheaper)
+
+**Document Processing (Batch Script):**
+- `scripts/extract_and_index.py` - Main extraction and indexing script
+- `scripts/load_10k_to_sql.py` - Load 10-K financial metrics to PostgreSQL
+- Runs locally (no Lambda timeouts, easier debugging)
+- See `docs/completed-phases/PHASE_2_REQUIREMENTS.md` "Enterprise Scaling" for Lambda approach if needed later
 
 **Sample Data:**
 
-**SQL Database Schema (Financial Dataset):**
+**SQL Database Schema (10-K Financial Metrics - VLM Extracted):**
 ```sql
--- Customers table
-customers (id, name, email, risk_profile, created_date, status)
+-- Companies (one row per 10-K filing)
+companies (id, ticker, name, sector, fiscal_year_end, filing_date, document_id)
+-- ~7 companies: AAPL, MSFT, AMZN, GOOGL, TSLA, JPM, NVDA
 
--- Accounts table  
-accounts (id, customer_id, account_type, balance, opened_date, status)
--- account_type: 'checking', 'savings', 'investment', 'credit'
+-- Annual financial metrics (from income statement, balance sheet)
+financial_metrics (id, company_id, fiscal_year, revenue, net_income, gross_margin, 
+                   operating_margin, net_margin, total_assets, earnings_per_share)
 
--- Transactions table
-transactions (id, account_id, amount, transaction_date, type, description, category)
--- type: 'debit', 'credit', 'transfer'
--- category: 'purchase', 'salary', 'investment', 'fee', etc.
+-- Business segment revenue breakdown
+segment_revenue (id, company_id, fiscal_year, segment_name, revenue, percentage_of_total)
+-- e.g., iPhone, Mac, Services for Apple
 
--- Portfolios table
-portfolios (id, customer_id, name, total_value, last_updated, risk_level)
+-- Geographic revenue breakdown
+geographic_revenue (id, company_id, fiscal_year, region, revenue, percentage_of_total)
+-- e.g., Americas, Europe, Greater China
 
--- Trades table
-trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
--- trade_type: 'buy', 'sell'
--- symbol: Stock ticker symbols (AAPL, MSFT, GOOGL, etc.)
+-- Risk factors (from Item 1A)
+risk_factors (id, company_id, fiscal_year, category, title, summary, severity)
+-- category: 'Supply Chain', 'Regulatory', 'Competition', 'Macroeconomic'
 
 -- Sample queries the agent should handle:
--- "What's the total balance for customer John Doe?"
--- "Show me all transactions over $1000 last month"
--- "Which customers have investment accounts?"
--- "What's the portfolio value for customer ID 123?"
--- "Show me all trades for AAPL in the last 30 days"
+-- "Which company had the highest revenue in 2024?"
+-- "Compare gross margins across tech companies"
+-- "What percentage of Apple's revenue comes from iPhone?"
+-- "Which companies have supply chain risks?"
+-- "Show me Tesla's geographic revenue breakdown"
 ```
 
-**RAG Document Store:**
-- Technical documentation (API docs, system architecture)
-- Company policies (financial policies, compliance docs)
-- Financial reports (quarterly reports, market analysis)
-- FAQs (common customer questions, account management)
+**RAG Document Store (VLM Extracted):**
+- **10-K Filings (~7):** AAPL, MSFT, AMZN, GOOGL, TSLA, JPM, NVDA (FY2024)
+- **Reference Documents (~10-15):** News articles, research reports, market analysis
+- **Source:** SEC EDGAR for 10-Ks, financial news for reference docs
+- **See:** `docs/PHASE_2A_HOW_TO_GUIDE.md` Section 3 for document acquisition details
 
 **Security Hardening (Phase 2):**
 - **SQL Tool Security:**
@@ -840,11 +879,13 @@ trades (id, portfolio_id, symbol, quantity, price, trade_date, trade_type)
 
 **Deliverables:**
 - Agent can search the web and cite sources
-- Agent can query SQL database with natural language
-- Agent can retrieve relevant documents from vector store
+- Agent can query SQL database (10-K financial metrics) with natural language
+- Agent can retrieve relevant documents from vector store (hybrid search + KG)
 - Agent can retrieve current market data (FMP) for requested tickers
-- Documents uploaded to S3 are automatically indexed
+- VLM extraction script processes all documents (batch, not Lambda)
+- Knowledge Graph populated with entities from all documents
 - Tool selection is intelligent and contextual
+- Combined queries work (e.g., "Compare Apple's China revenue to their disclosed risks")
 
 ---
 
@@ -1325,6 +1366,7 @@ aws-enterprise-agentic-ai/
 | Neon PostgreSQL | $0 | $0 | Free tier (0.5GB, 190 compute hours) |
 | Bedrock Nova | $0 | $2-10 | Pay-per-token, varies by usage |
 | Pinecone | $0 | $0 | Free tier (100K vectors) |
+| Neo4j AuraDB | $0 | $0 | Free tier (200K nodes) |
 | S3 + CloudFront | $0 | $1-2 | First 1GB free, then $0.023/GB storage + $0.085/GB transfer |
 | Secrets Manager | $0.40 | $0 | 1 secret |
 | DynamoDB | $0 | $0-2 | Free tier + minimal usage, TTL for auto-cleanup |
@@ -1334,6 +1376,8 @@ aws-enterprise-agentic-ai/
 | Bedrock Embeddings | $0 | $1-3 | $0.0001/1K tokens (query expansion uses 4x) |
 | ECR Storage | $0 | $0-1 | First 500MB free, then $0.10/GB |
 | CloudWatch Logs | $0 | $0-2 | First 5GB free, set 7-day retention |
+| **Phase 2 One-Time:** |
+| VLM Extraction | **$40-60** | $0 | One-time cost for ~30-40 documents (Claude Vision) |
 | **VPC Costs (OPTIONAL - Skip for Demo):** |
 | RDS Proxy | $15-20 | $0 | **SKIP** - Use SQLAlchemy pooling instead |
 | VPC Endpoints | $7-10 each | $0 | **SKIP** - Use public subnets for demo |
@@ -1347,14 +1391,16 @@ aws-enterprise-agentic-ai/
   - ❌ RDS Proxy ($15-20/month) → Use SQLAlchemy connection pooling (free)
   - ❌ VPC Endpoints ($7-10 each) → Use public subnets (free, less secure but fine for demo)
   - ❌ NAT Gateway ($32/month) → Not needed with public subnets
+- **Batch script vs Lambda:** No Lambda infrastructure for document ingestion (simpler, no cost)
 - Neon free tier provides 0.5GB storage and 190 compute hours/month
+- Neo4j AuraDB free tier provides 200K nodes (plenty for demo)
 - App Runner scales to zero when idle
 - DynamoDB on-demand pricing with TTL (no minimum, automatic cleanup)
-- **S3 Intelligent-Tiering** for document storage (saves ~40% on storage)
 - Phoenix on minimal Fargate instance (can skip entirely for MVP)
 - CloudFront caching reduces origin requests
 - Inference cache reduces Bedrock API calls by 30-40%
 - **Bedrock on-demand** (not provisioned throughput) for cost flexibility
+- **VLM extraction is one-time cost** (~$40-60) not monthly
 - **Cost tracking:** Monitor and alert on cost thresholds ($50/month alarm)
 
 **Cost Savings for Demo:**
@@ -1666,7 +1712,7 @@ Production-ready infrastructure with:
 - ✅ AWS Region: us-east-1 (N. Virginia - closest to Austin, TX)
 - ✅ Domain: CloudFront URL (frontend) + App Runner URL (backend API)
 - ✅ Testing: Balanced approach
-- ✅ Sample Data: Financial dataset
+- ✅ Sample Data: 10-K financial metrics (VLM extracted, not synthetic)
 - ✅ Documentation: Comprehensive + basic
 - ✅ Docker: Optimized Compose (5-10s startup)
 - ✅ LangGraph: Checkpointing (MemorySaver dev, PostgresSaver prod) + native streaming
@@ -1681,14 +1727,20 @@ Production-ready infrastructure with:
 - ✅ **API Versioning:** /api/v1/ for future compatibility
 - ✅ **Database Migrations:** Alembic for schema management
 
-**Ready to Begin Phase 2: Core Agent Tools**
+**Phase 2: Core Agent Tools - How-To Guides Complete**
 
-Phase 2 remaining work (2a and 2d already completed in Phase 0):
+Implementation guides are ready:
+- 📖 `docs/PHASE_2A_HOW_TO_GUIDE.md` - Data Foundation (VLM extraction, SQL tool, basic RAG)
+- 📖 `docs/PHASE_2B_HOW_TO_GUIDE.md` - Intelligence Layer (Knowledge Graph, hybrid retrieval, multi-tool orchestration)
+
+Phase 2 component status:
 - ✅ **2a. Tavily Search Tool** - Completed in Phase 0 with mock fallback
-- 🚧 **2b. SQL Query Tool** - Real implementation with Neon PostgreSQL (sample financial dataset)
-- 🚧 **2c. RAG Document Tool** - Real implementation with Pinecone (hybrid search, query expansion, RRF)
+- 🚧 **2b. SQL Query Tool** - How-to guide ready (PHASE_2A Section 6-7)
+- 🚧 **2c. RAG Document Tool** - How-to guide ready (PHASE_2A Section 8-10, PHASE_2B Section 7-11)
 - ✅ **2d. Market Data Tool** - Completed in Phase 0 with mock fallback
-- 🚧 S3 document bucket with Lambda trigger for auto-ingestion
+- 🚧 **VLM extraction scripts** - How-to guide ready (PHASE_2A Section 5)
+- 🚧 **Knowledge Graph** - How-to guide ready (PHASE_2B Section 2-6)
+- 🚧 **Cross-document analysis** - How-to guide ready (PHASE_2B Section 12b)
 
 **Pre-Phase 0 Checklist (Completed):**
 - [x] Docker Desktop installed and running
@@ -1938,13 +1990,13 @@ terraform destroy  # Destroys all resources
    - Manual testing for UI/UX
    - Focus on critical paths, not exhaustive coverage
 
-4. **Sample Data:** Financial dataset
-   - Transactions table (id, account_id, amount, date, type, description)
-   - Accounts table (id, customer_id, account_type, balance, opened_date)
-   - Customers table (id, name, email, risk_profile, created_date)
-   - Portfolios table (id, customer_id, name, total_value, last_updated)
-   - Trades table (id, portfolio_id, symbol, quantity, price, date)
-   - Realistic financial queries: balance inquiries, transaction history, portfolio analysis
+4. **Sample Data:** 10-K Financial Metrics (VLM Extracted)
+   - Companies table (ticker, name, sector, fiscal_year_end, filing_date)
+   - Financial_metrics table (revenue, net_income, margins, EPS by year)
+   - Segment_revenue table (business segment breakdown)
+   - Geographic_revenue table (regional revenue breakdown)
+   - Risk_factors table (categorized risks from Item 1A)
+   - Realistic financial queries: revenue comparisons, margin analysis, risk identification
 
 5. **Documentation:** Comprehensive alongside basic
    - Basic: README.md + QUICKSTART.md (quick reference)

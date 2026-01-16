@@ -2,7 +2,7 @@
 
 **Purpose:** This document serves as the authoritative reference for implementation details, technology specifications, and development order throughout all phases. Consult this document before implementing any feature to ensure consistency, completeness, and proper integration.  Make sure this document is updated as needed as the project proceeds.
 
-**Last Updated:** 2026-01-13 (Phase 1b complete, starting Phase 2) - includes Phase 5 frontend features in Phase 0 baseline
+**Last Updated:** 2026-01-15 (Phase 2 how-to guides complete) - Implementation guides ready: `docs/PHASE_2A_HOW_TO_GUIDE.md` (Data Foundation) and `docs/PHASE_2B_HOW_TO_GUIDE.md` (Intelligence Layer). See `docs/RAG_README.md` for architecture.
 
 ---
 
@@ -572,6 +572,43 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 
 **Note:** Tools 2a (Tavily Search) and 2d (Market Data) were completed ahead of schedule in Phase 0. Phase 2 focuses on implementing 2b (SQL Query) and 2c (RAG Retrieval).
 
+### Data Flow Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    python scripts/extract_and_index.py                       │
+│                         (Local Batch Processing)                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Claude VLM (Bedrock) - ALL Documents                    │
+│                 10-Ks, news articles, research reports, etc.                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Clean structured text + tables
+                                      │
+         ┌────────────────────────────┼────────────────────────────┐
+         ▼                            ▼                            ▼
+┌─────────────────┐        ┌─────────────────┐        ┌─────────────────┐
+│  Titan Embed    │        │   spaCy NER     │        │  Parse Tables   │
+│  + BM25 Index   │        │                 │        │  (10-Ks only)   │
+│                 │        │                 │        │                 │
+│ → Pinecone      │        │ → Neo4j         │        │ → PostgreSQL    │
+│   (RAG Tool)    │        │   (KG queries)  │        │   (SQL Tool)    │
+└─────────────────┘        └─────────────────┘        └─────────────────┘
+```
+
+**Key Decisions:**
+- **VLM for ALL documents** - One extraction pipeline, consistent output
+- **Batch scripts** - No Lambda, no timeouts, easier debugging
+- **spaCy for NER** - 20-50x cheaper than LLM for entity extraction
+
+**Implementation Guides:**
+- `docs/PHASE_2A_HOW_TO_GUIDE.md` - Data Foundation (VLM, SQL tool, basic RAG)
+- `docs/PHASE_2B_HOW_TO_GUIDE.md` - Intelligence Layer (Knowledge Graph, hybrid retrieval, multi-tool)
+- `docs/RAG_README.md` - Architecture overview and design decisions
+
 ### Technology Specifications
 
 #### Tool 2a: Tavily Search ✅ *COMPLETED IN PHASE 0*
@@ -585,28 +622,55 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 
 #### Tool 2b: SQL Query 🚧 *TO BE IMPLEMENTED*
 - **Database:** Neon PostgreSQL (from Phase 1b)
+- **Data Source:** Real 10-K financial metrics extracted via VLM
+- **Tables:** companies, financial_metrics, segment_revenue, geographic_revenue, risk_factors
 - **ORM:** SQLAlchemy
 - **Connection Pooling:** Built-in (5 connections, max overflow 10)
-- **Security:** Parameterized queries, table whitelisting
-- **Safety:** Read-only, max rows limit, query validation
+- **Security:** Parameterized queries, ALLOWED_TABLES whitelisting
+- **Safety:** Read-only, max 1000 rows, 30s query timeout
+- **Use Cases:** "Compare revenue growth", "Which company has highest margins?", "Show segment breakdown"
 
-#### Tool 2c: RAG Retrieval (2025 SOTA)
-- **Vector Store:** Pinecone Serverless
+#### Tool 2c: RAG Retrieval (2026 SOTA)
+
+> **Full Architecture:** See `docs/RAG_README.md` for comprehensive architecture, alternatives, and enterprise features.
+
+**Document Extraction:**
+- **All Documents:** VLM extraction (Claude Vision via Bedrock) - one code path for simplicity
+- **Processing:** Local batch script (no Lambda timeouts or complexity)
+- **Extraction Cost:** ~$0.03-0.05/page for VLM
+- **One-Time Cost:** ~$40-60 for ~30-40 documents total (10-Ks + reference docs)
+
+**Sample Documents:**
+- **10-K Filings (~7):** AAPL, MSFT, AMZN, GOOGL, TSLA, JPM, NVDA (FY2024)
+- **Reference Docs (~10-15):** News articles, research reports, market analysis
+- **Source:** SEC EDGAR for 10-Ks, financial news sites for reference docs
+- **See:** `docs/PHASE_2A_HOW_TO_GUIDE.md` Section 3 for document acquisition details
+
+> **Why VLM for everything?** Simpler codebase (one extraction path), consistent output, negligible cost difference for demo volume. See `docs/PHASE_2A_HOW_TO_GUIDE.md` Section 5 for VLM extraction details.
+
+**Vector Store & Search:**
+- **Vector Store:** Pinecone Serverless (free tier, 100K vectors)
 - **Embeddings:** Bedrock Titan Embeddings (1536 dimensions)
-- **Hybrid Search:** Dense + sparse vectors with RRF
+- **Hybrid Search:** Dense + sparse vectors with RRF fusion
+
+**Ingestion Pipeline:**
 - **Semantic Chunking:** spaCy sentence boundary detection (replaces fixed-size)
 - **Contextual Retrieval:** Prepend doc title/type/section to chunks before embedding
 - **Parent Document Retriever:** Small chunks for search, large context for response
+
+**Query Pipeline:**
 - **Query Expansion:** Generate 3 alternative phrasings (+20-30% recall)
-- **Cross-Encoder Reranking:** LLM scores relevance after RRF (+20-25% precision)
+- **Cross-Encoder Reranking:** Nova Lite scores relevance after RRF (+20-25% precision)
 - **Compression:** LLMChainExtractor for contextual compression
 
 #### Tool 2c-KG: Knowledge Graph Integration
-- **Store:** Neo4j AuraDB Free (200K nodes, $0/month)
-- **Entity Extraction:** spaCy NER + dependency parsing (no LLM needed)
-- **Ontology:** Financial domain (Policy, Customer, Account, Regulation, Concept, Person)
+- **Store:** Neo4j AuraDB Free (200K nodes, 400K relationships, $0/month)
+- **Entity Extraction:** spaCy NER + custom financial patterns (no LLM needed)
+- **Entity Types:** Document, Organization, Person, Location, Regulation, Concept, Product, Metric
+- **Relationship Types:** MENTIONS, RELATED_TO, GOVERNED_BY, REPORTED
 - **Traversal:** 1-2 hop relationship queries
 - **Cost:** ~$0.001/doc ingestion, $0/query (free tier)
+- **See:** `docs/RAG_README.md` Knowledge Graph section for full ontology
 
 #### Tool 2d: Market Data (FMP via MCP) ✅ *COMPLETED IN PHASE 0*
 - **API:** Financial Modeling Prep (free tier ~250 calls/day; batch quotes supported)
@@ -618,12 +682,98 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **Status:** Fully functional with mock fallback when API key not set
 
 #### Infrastructure Additions
-- **S3 Bucket:** Document storage (separate from frontend bucket)
-- **Lambda:** Document ingestion trigger
-- **IAM Policies:** Tool access permissions
+
+**AWS Resources:**
+- **S3 Bucket (optional):** Document storage, extracted JSON backup
+- **IAM Policies:** Tool access permissions, Bedrock Claude access
+
+> **Note:** No Lambda infrastructure for document ingestion. All documents processed via local batch script for simplicity. See `docs/completed-phases/PHASE_2_REQUIREMENTS.md` "Enterprise Scaling" for Lambda-based approach.
+
+**External Services:**
 - **Neo4j AuraDB Free:** Knowledge graph storage (200K nodes, $0/month)
-- **Neo4j Docker:** Local development graph database
+- **Pinecone Serverless:** Vector store (free tier, 100K vectors)
+
+**Local Development:**
+- **Neo4j Docker:** neo4j:5-community for local graph database
 - **spaCy Model:** en_core_web_sm for NLP entity extraction
+
+**New Python Dependencies (Phase 2):**
+```
+# Document Processing
+pdf2image~=1.17.0           # PDF to images for VLM extraction
+Pillow~=10.4.0              # Image processing
+
+# Vector Store & Knowledge Graph
+pinecone-client~=5.0.0      # Vector store (matches Package Versions section)
+neo4j~=5.25.0               # Knowledge graph (matches Package Versions section)
+spacy~=3.8.0                # NLP for entity extraction and chunking
+```
+
+**Note:** Version numbers should match the [Package Versions](#package-versions) section. If updating, change both places.
+
+**System Dependencies (Dockerfile):**
+```dockerfile
+# PDF processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# spaCy model for entity extraction and sentence boundary detection
+RUN python -m spacy download en_core_web_sm
+```
+
+**Local Development (if not using Docker):**
+```bash
+# Ubuntu/Debian
+sudo apt-get install poppler-utils
+
+# macOS  
+brew install poppler
+
+# spaCy model (required for NER and chunking)
+python -m spacy download en_core_web_sm
+```
+
+**Docker Compose Addition:**
+```yaml
+neo4j:
+  image: neo4j:5-community
+  ports:
+    - "7474:7474"  # HTTP browser
+    - "7687:7687"  # Bolt protocol
+  environment:
+    - NEO4J_AUTH=neo4j/localdevpassword
+    - NEO4J_PLUGINS=["apoc"]
+  volumes:
+    - neo4j_data:/data
+```
+
+**Phase 2 Environment Variables:**
+
+Add to `.env.example` and `.env`:
+
+```bash
+# =============================================================================
+# Phase 2: Vector Store & Knowledge Graph
+# =============================================================================
+
+# Pinecone (Vector Store)
+PINECONE_API_KEY=your_pinecone_api_key        # From https://pinecone.io console
+PINECONE_INDEX_NAME=enterprise-agentic-ai     # Create in Pinecone console
+PINECONE_ENVIRONMENT=us-east-1                # AWS region
+
+# Neo4j (Knowledge Graph)
+NEO4J_URI=neo4j://localhost:7687              # Local Docker (or neo4j+s://xxx.databases.neo4j.io for AuraDB)
+NEO4J_USER=neo4j                              # Default user
+NEO4J_PASSWORD=localdevpassword               # Match docker-compose (or AuraDB password)
+```
+
+**AWS Secrets Manager (Production):**
+
+| Secret Name | Key | Purpose |
+|-------------|-----|---------|
+| `enterprise-agentic-ai/pinecone` | `api_key` | Pinecone API key |
+| `enterprise-agentic-ai/neo4j` | `uri`, `user`, `password` | Neo4j connection |
 
 #### Security Hardening (Phase 2)
 
@@ -677,109 +827,145 @@ class SendMessageRequest(BaseModel):
 2. **Circuit Breaker** - Simplified implementation in Phase 0 (full implementation in Phase 2)
 
 #### Step 2: SQL Query Tool 🚧 *PHASE 2 PRIORITY*
-1. **Database Schema** (`backend/alembic/versions/002_sample_data.py`)
-   - Customers table
-   - Accounts table
-   - Transactions table
-   - Portfolios table
-   - Trades table
-   - Sample data seeding
 
-2. **Tool Implementation** (`backend/src/agent/tools/sql.py`)
+**Data Source:** Real 10-K financial metrics extracted via VLM (not synthetic Faker data).
+
+1. **Database Schema** (`backend/alembic/versions/002_10k_schema.py`)
+   - `companies` - Company info (ticker, name, sector, filing dates)
+   - `financial_metrics` - Revenue, net income, margins, EPS by year
+   - `segment_revenue` - Revenue breakdown by business segment
+   - `geographic_revenue` - Revenue breakdown by region
+   - `risk_factors` - Categorized risks from Item 1A
+
+2. **Data Loading** (`scripts/load_10k_to_sql.py`)
+   - Parses VLM extraction JSON output
+   - Populates all tables from 10-K data
+   - Handles ~7 companies, ~150 total rows
+
+3. **Tool Implementation** (`backend/src/agent/tools/sql.py`)
    - SQLAlchemy connection
-   - Natural language to SQL (via LLM)
+   - Natural language to SQL (via LLM with schema context)
    - Query execution with safety checks
    - Parameterized queries only
-   - Table whitelisting
+   - Table whitelisting (ALLOWED_TABLES)
    - Result formatting
    - Error handling
 
-3. **SQL Safety** (`backend/src/agent/tools/sql_safety.py`)
-   - ALLOWED_TABLES constant
+4. **SQL Safety** (`backend/src/agent/tools/sql_safety.py`)
+   - ALLOWED_TABLES: companies, financial_metrics, segment_revenue, geographic_revenue, risk_factors
    - Query validation function
    - SQL injection prevention
+   - Read-only enforcement
 
-#### Step 3: RAG Retrieval Tool (2025 SOTA)
+**Sample Queries:**
+- "Which company had the highest revenue in 2024?"
+- "Compare gross margins across tech companies"
+- "What percentage of Apple's revenue comes from iPhone?"
+- "Which companies have supply chain risks?"
 
-**3a. Ingestion Pipeline:**
+#### Step 3: RAG Retrieval Tool (2026 SOTA)
 
-1. **Semantic Chunking** (`backend/src/ingestion/semantic_chunking.py`)
+> **Reference:** See `docs/RAG_README.md` for architecture, `docs/PHASE_2A_HOW_TO_GUIDE.md` for basic RAG, and `docs/PHASE_2B_HOW_TO_GUIDE.md` for hybrid retrieval.
+
+**3a. Document Extraction (VLM for All Documents):**
+
+1. **VLM Extractor** (`backend/src/ingestion/vlm_extractor.py`)
+   - Claude Vision via Bedrock for ALL documents
+   - Converts PDF pages to images (150 DPI)
+   - Extracts structured JSON per page
+   - Preserves table structure as markdown
+   - Identifies sections and cross-references
+   - Cost: ~$0.03-0.05/page
+
+2. **Unified Extraction Script** (`scripts/extract_and_index.py`)
+   - Main batch processing script for all documents
+   - Runs locally (no Lambda timeouts)
+   - Orchestrates: extract → chunk → embed → index
+   - Handles both 10-Ks and reference documents
+
+> **Why VLM for everything?** One code path, consistent output format, and ~$50 total cost for the demo is negligible. See `docs/PHASE_2A_HOW_TO_GUIDE.md` Section 5 for VLM extraction implementation.
+
+**3b. Ingestion Pipeline:**
+
+3. **Document Processor** (`backend/src/ingestion/document_processor.py`)
+   - Orchestrates VLM extraction
+   - Manages chunking and indexing
+   - Metadata extraction
+
+5. **Semantic Chunking** (`backend/src/ingestion/semantic_chunking.py`)
    - spaCy sentence boundary detection
    - Grammar-aware splitting
-   - Configurable max chunk size
+   - Max chunk size: 512 tokens, overlap: 50 tokens
    - Preserves complete thoughts
 
-2. **Contextual Chunking** (`backend/src/ingestion/contextual_chunking.py`)
+6. **Contextual Chunking** (`backend/src/ingestion/contextual_chunking.py`)
    - Prepend document title to each chunk
    - Add section header context
    - Include document type metadata
    - Impact: +15-20% precision
 
-3. **Document Processing** (`backend/src/ingestion/document_processor.py`)
-   - PDF/text parsing
-   - Metadata extraction
-   - Integration with semantic + contextual chunking
-
-4. **Parent Document Retriever** (`backend/src/ingestion/chunking.py`)
+7. **Parent Document Retriever** (`backend/src/ingestion/chunking.py`)
    - Small chunks for retrieval
    - Large context for response
    - Metadata preservation
 
-**3b. Knowledge Graph Pipeline:**
+**3c. Knowledge Graph Pipeline:**
 
-5. **Efficient Entity Extraction** (`backend/src/knowledge_graph/efficient_extractor.py`)
+8. **Efficient Entity Extraction** (`backend/src/knowledge_graph/efficient_extractor.py`)
    - spaCy NER (PERSON, ORG, DATE, MONEY, etc.)
    - Custom financial domain patterns
    - Dependency parsing for relationships
    - Cost: ~$0.001/doc (vs $0.02-0.05 with LLM)
 
-6. **Knowledge Graph Store** (`backend/src/knowledge_graph/store.py`)
+9. **Knowledge Graph Store** (`backend/src/knowledge_graph/store.py`)
    - Neo4j adapter (AuraDB Free in production, Docker locally)
    - Connection pooling
    - Entity/relationship CRUD
 
-7. **Graph Ontology** (`backend/src/knowledge_graph/ontology.py`)
-   - Entity types: Document, Policy, Customer, Account, Concept, Regulation, Person
-   - Relationship types: MENTIONS, RELATES_TO, GOVERNED_BY, APPLIES_TO, SIMILAR_TO
+10. **Graph Ontology** (`backend/src/knowledge_graph/ontology.py`)
+    - Entity types: Document, Organization, Person, Location, Regulation, Concept, Product, Metric
+    - Relationship types: MENTIONS, RELATED_TO, GOVERNED_BY, REPORTED
+    - See `docs/RAG_README.md` Knowledge Graph section for full ontology
 
-8. **Graph Queries** (`backend/src/knowledge_graph/queries.py`)
-   - 1-hop entity lookup
-   - 2-hop relationship traversal
-   - Entity-to-document linking
+11. **Graph Queries** (`backend/src/knowledge_graph/queries.py`)
+    - 1-hop entity lookup
+    - 2-hop relationship traversal
+    - Entity-to-document linking
 
-**3c. Query Pipeline:**
+**3d. Query Pipeline:**
 
-9. **Query Expansion** (`backend/src/ingestion/query_expansion.py`)
-   - Generate 3 alternative phrasings
-   - Multi-query retrieval
-   - Parallel searches
-   - Impact: +20-30% recall
+12. **Query Expansion** (`backend/src/ingestion/query_expansion.py`)
+    - Generate 3 alternative phrasings via Nova Lite
+    - Multi-query retrieval
+    - Parallel searches
+    - Impact: +20-30% recall
 
-10. **Embeddings** (`backend/src/utils/embeddings.py`)
-    - Bedrock Titan integration
+13. **Embeddings** (`backend/src/utils/embeddings.py`)
+    - Bedrock Titan integration (1536 dimensions)
     - Batch embedding generation
     - Caching
 
-11. **RRF Implementation** (`backend/src/utils/rrf.py`)
+14. **RRF Implementation** (`backend/src/utils/rrf.py`)
     - Reciprocal Rank Fusion algorithm
     - Merge vector + sparse + KG results
+    - Score = Σ (1 / (k + rank)), k=60
     - Score normalization
 
-12. **Cross-Encoder Reranking** (`backend/src/utils/reranker.py`)
-    - LLM-based relevance scoring
+15. **Cross-Encoder Reranking** (`backend/src/utils/reranker.py`)
+    - Nova Lite relevance scoring
     - Score top 15 results
     - Return top 5
     - Impact: +20-25% precision
     - Cost: ~$0.015/query
 
-13. **Tool Implementation** (`backend/src/agent/tools/rag.py`)
+16. **Tool Implementation** (`backend/src/agent/tools/rag.py`)
     - Pinecone client for vector search
-    - BM25 for sparse search
+    - BM25 for sparse search (Pinecone hybrid)
     - KG lookup integration
     - RRF fusion of all results
     - Cross-encoder reranking
     - Contextual compression
-    - Source citation
+    - Source citation with page numbers
     - Error handling with fallbacks
 
 #### Step 4: Market Data Tool ✅ *COMPLETED IN PHASE 0*
@@ -805,43 +991,65 @@ class SendMessageRequest(BaseModel):
    - Mock external APIs
    - Error scenario tests
 
-#### Step 6: Document Ingestion Infrastructure
-1. **S3 Bucket** (`terraform/modules/s3/documents.tf`)
-   - S3 bucket for documents
-   - Intelligent-Tiering enabled
-   - Lambda trigger configuration
+#### Step 6: Document Storage & Scripts
 
-2. **Lambda Function** (`lambda/document-ingestion/handler.py`)
-   - S3 event handler
-   - Document processing
-   - Pinecone indexing
-   - Error handling
+**Note:** All documents processed via local batch script. No Lambda infrastructure for this demo. See `docs/completed-phases/PHASE_2_REQUIREMENTS.md` "Enterprise Scaling" for Lambda-based approach if needed later.
 
-3. **Lambda Terraform** (`terraform/modules/lambda/document-ingestion.tf`)
-   - Lambda function
-   - S3 trigger
-   - IAM permissions
-   - Environment variables
+1. **S3 Bucket (Optional)** (`terraform/modules/documents-s3/main.tf`)
+   - S3 bucket for extracted JSON backup
+   - Not required - local files work fine for demo
+   - Folders: `/extracted/`, `/indexed/` (if used)
+
+2. **Unified Extraction Script** (`scripts/extract_and_index.py`)
+   - Main CLI for all document extraction
+   - VLM extraction via Claude Vision (Bedrock)
+   - Semantic chunking → Pinecone indexing
+   - Entity extraction → Neo4j indexing
+   - Handles both 10-Ks and reference documents
+   - Run locally - no timeouts, easy debugging
+
+3. **SQL Loading Script** (`scripts/load_10k_to_sql.py`)
+   - Loads extracted 10-K financial metrics to PostgreSQL
+   - Parses VLM JSON output for structured data
+   - Populates companies, financial_metrics, segments, risks tables
 
 ### Phase 2 Deliverables Checklist
-- [ ] Agent can search the web and cite sources
+
+**Tools:**
+- [x] Agent can search the web and cite sources (Phase 0)
 - [ ] Agent can query SQL database with natural language
 - [ ] Agent can retrieve relevant documents from vector store
-- [ ] Agent can retrieve current market data (FMP)
-- [ ] Documents uploaded to S3 are automatically indexed
+- [x] Agent can retrieve current market data (Phase 0)
+
+**Document Extraction:**
+- [ ] VLM extraction working for ALL documents
+- [ ] ~7 company 10-Ks extracted and indexed
+- [ ] ~10-15 reference documents extracted and indexed
+- [ ] Semantic chunking with spaCy
+- [ ] Contextual enrichment applied
+
+**Infrastructure:**
+- [ ] Pinecone index created and populated
+- [ ] Neo4j AuraDB connected
+- [ ] Batch extraction script (`scripts/extract_and_index.py`) working
+- [ ] SQL loading script (`scripts/load_10k_to_sql.py`) working
+- [ ] Neo4j in docker-compose for local dev
+
+**Quality:**
 - [ ] Tool selection is intelligent and contextual
-- [ ] All tools have circuit breakers
 - [ ] All tools have structured logging
-- [ ] Sample database populated
+- [ ] SQL tool uses ALLOWED_TABLES whitelist
+- [ ] RAG returns citations with page numbers
 
 ### Consistency Checks
 - [ ] All tools follow same error handling pattern
-- [ ] All tools use circuit breaker
-- [ ] All tools have structured logging
-- [ ] SQL tool uses parameterized queries
-- [ ] RAG tool uses hybrid search with RRF
-- [ ] Tool results are properly formatted
-- [ ] Tool citations are included in responses
+- [ ] SQL tool queries 10-K financial metrics (not synthetic data)
+- [ ] SQL tool uses parameterized queries only
+- [ ] RAG tool uses hybrid search (dense + BM25) with RRF
+- [ ] Knowledge graph entities extracted via spaCy (not LLM)
+- [ ] All documents processed via VLM (single extraction path)
+- [ ] Tool results include source citations
+- [ ] VLM extraction preserves table structure
 
 ---
 
@@ -1600,6 +1808,15 @@ def test_agent_with_tool():
 - [ ] DynamoDB on-demand pricing
 - [ ] S3 Intelligent-Tiering
 - [ ] No RDS Proxy (use SQLAlchemy pooling)
+- [ ] Pinecone free tier (100K vectors)
+- [ ] Neo4j AuraDB free tier (200K nodes)
+
+### Phase 2 Costs
+- [ ] VLM extraction for ALL docs: One-time ~$40-60 (not monthly)
+- [ ] No Lambda infrastructure (batch scripts instead)
+- [ ] spaCy NER instead of LLM (20-50x cheaper)
+- [ ] Nova Lite for reranking (cheaper than Nova Pro)
+- [ ] Batch embeddings (reduce API calls)
 
 ### Application
 - [ ] Inference caching (Phase 7+)
