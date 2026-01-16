@@ -878,20 +878,90 @@ Structure:
   - __init__(self, raw_dir: Path, extracted_dir: Path)
   - _detect_doc_type(self, filename: str) -> Literal["10k", "reference"]
   - _get_document_id(self, pdf_path: Path) -> str (unique ID from filename)
+  - _get_file_hash(self, pdf_path: Path) -> str (MD5 hash for change detection)
   - process_document(self, pdf_path: Path) -> dict
   - process_all(self, doc_types: list[str] | None = None) -> list[dict]
   - save_extraction(self, doc_id: str, extraction: dict) -> Path
-  - **_consolidate_financial_data(self, pages: list[dict]) -> dict**  # NEW: Critical for SQL
-  - **_consolidate_reference_data(self, pages: list[dict]) -> dict**  # NEW: For reference docs
+  - _load_manifest(self) -> dict (load or create manifest.json)
+  - _save_manifest(self) -> None (persist manifest to disk)
+  - _update_manifest(self, doc_id: str, pdf_path: Path, extraction: dict, cost: float) -> None
+  - should_process(self, pdf_path: Path, force: bool = False, if_changed: bool = False) -> bool
+  - **_consolidate_financial_data(self, pages: list[dict]) -> dict**  # Critical for SQL
+  - **_consolidate_reference_data(self, pages: list[dict]) -> dict**  # For reference docs
 
 Key Features:
 - Detect document type from filename pattern (contains "_10K_" -> "10k")
 - Generate unique document_id from filename (e.g., "AAPL_10K_2024")
 - Process single document or batch all documents in raw_dir
 - Save extraction results to extracted_dir as JSON
-- Track processing status in processed_dir
-- Skip already-processed documents (check for existing JSON)
+- **Manifest-based tracking** (documents/manifest.json):
+  - Track file hash, extraction date, cost, indexing status
+  - Skip already-processed documents unless --force
+  - Detect content changes via MD5 hash (--if-changed flag)
 - **NEW: Consolidate financial data from multiple pages into SQL-ready structure**
+
+Manifest File Structure (documents/manifest.json):
+{
+  "documents": {
+    "AAPL_10K_2024": {
+      "source_file": "AAPL_10K_2024.pdf",
+      "file_hash": "a1b2c3d4e5f6...",
+      "file_size_bytes": 4523891,
+      "extracted_at": "2025-01-15T10:30:00Z",
+      "page_count": 85,
+      "extraction_cost_usd": 3.82,
+      "indexed_to_pinecone": false,
+      "indexed_at": null,
+      "chunk_count": null
+    }
+  },
+  "totals": {
+    "documents_extracted": 1,
+    "documents_indexed": 0,
+    "total_extraction_cost_usd": 3.82,
+    "last_updated": "2025-01-15T10:30:00Z"
+  }
+}
+
+File Hash Implementation:
+import hashlib
+
+def _get_file_hash(self, pdf_path: Path) -> str:
+    """Compute MD5 hash of file for change detection."""
+    hash_md5 = hashlib.md5()
+    with open(pdf_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+Should Process Logic:
+def should_process(self, pdf_path: Path, force: bool = False, if_changed: bool = False) -> bool:
+    """Determine if document needs processing."""
+    doc_id = self._get_document_id(pdf_path)
+    
+    # Force always processes
+    if force:
+        return True
+    
+    # Check manifest
+    if doc_id not in self.manifest["documents"]:
+        return True  # New document
+    
+    entry = self.manifest["documents"][doc_id]
+    
+    # If if_changed flag, check hash
+    if if_changed:
+        current_hash = self._get_file_hash(pdf_path)
+        if current_hash != entry.get("file_hash"):
+            logger.info(f"{doc_id}: Content changed, will re-extract")
+            return True
+    
+    # Already processed and not changed
+    if entry.get("extracted_at"):
+        logger.info(f"{doc_id}: Already extracted, skipping")
+        return False
+    
+    return True
 
 Document Type Detection:
 - If filename contains "_10K_" or "_10k_": type = "10k"
@@ -1052,15 +1122,37 @@ Structure:
   - --raw-dir: Path to raw documents (default: documents/raw)
   - --extracted-dir: Path for JSON output (default: documents/extracted)
   - --doc-types: Filter by type (10k, reference, or both)
-  - --force: Re-extract even if JSON exists
-  - --dry-run: List documents without processing
+  - --force: Re-extract even if already in manifest
+  - --if-changed: Re-extract only if file hash changed
+  - --dry-run: List documents without processing (shows what would be extracted)
+  - --status: Show manifest status and exit (no API calls)
+  - --doc: Process single document by ID (e.g., --doc AAPL_10K_2024)
 
 Key Features:
 - Load AWS credentials from environment
 - Initialize DocumentProcessor with paths
+- **Use manifest for skip/process decisions** (prevents duplicate extraction)
 - Process documents with progress logging
 - Save extraction results after each document (fault tolerance)
+- **Update manifest after each successful extraction**
 - Summary at end: documents processed, pages extracted, estimated cost
+
+Status Output (--status):
+"Document Extraction Status"
+"=========================="
+"Extracted: 5 documents"
+"  - AAPL_10K_2024 (85 pages, $3.82, 2025-01-15)"
+"  - MSFT_10K_2024 (92 pages, $4.14, 2025-01-15)"
+"  - GOOGL_10K_2024 (78 pages, $3.51, 2025-01-15)"
+"  - AMZN_10K_2024 (88 pages, $3.96, 2025-01-15)"
+"  - META_10K_2024 (95 pages, $4.28, 2025-01-15)"
+""
+"Pending: 2 documents"
+"  - NVDA_10K_2024.pdf (new)"
+"  - TSLA_10K_2024.pdf (new)"
+""
+"Total extraction cost so far: $19.71"
+"Estimated cost for pending: $8.00"
 
 Progress Output:
 "Processing AAPL_10K_2024.pdf..."
@@ -1068,6 +1160,7 @@ Progress Output:
 "  Page 2/85 extracted"
 ...
 "  Saved to documents/extracted/AAPL_10K_2024.json"
+"  Updated manifest (cost: $3.82)"
 "Processing MSFT_10K_2024.pdf..."
 ...
 "Summary: 7 documents, 623 pages, estimated cost: $28.50"
@@ -1076,6 +1169,7 @@ Error Handling:
 - Catch and log errors per document
 - Continue with next document on failure
 - Final summary includes failed documents
+- **Manifest only updated for successful extractions** (failed docs not marked as done)
 
 Reference:
 - DocumentProcessor from 5.2
@@ -1130,7 +1224,10 @@ print('To extract: python scripts/extract_and_index.py')
 ```bash
 cd ~/Projects/aws-enterprise-agentic-ai
 
-# Dry run first to see what will be processed
+# Check current status first (no API calls, reads manifest)
+python scripts/extract_and_index.py --status
+
+# Dry run to see what will be processed
 python scripts/extract_and_index.py --dry-run
 
 # If satisfied, run full extraction
@@ -1139,18 +1236,53 @@ python scripts/extract_and_index.py
 # Monitor progress and estimated cost in output
 ```
 
-**Expected Output:**
+**Status Output (first run, nothing extracted yet):**
+```
+Document Extraction Status
+==========================
+Extracted: 0 documents
+
+Pending: 11 documents
+  - AAPL_10K_2024.pdf (new)
+  - MSFT_10K_2024.pdf (new)
+  - GOOGL_10K_2024.pdf (new)
+  ...
+
+Total extraction cost so far: $0.00
+Estimated cost for pending: ~$31.28
+```
+
+**Expected Output (after full run):**
 ```
 Processing 7 10-K documents and 4 reference documents...
 Processing AAPL_10K_2024.pdf (85 pages)...
   ...
 Saved: documents/extracted/AAPL_10K_2024.json
+Updated manifest (cost: $3.82)
 ...
 Summary:
   Documents processed: 11
   Total pages: 782
   Estimated cost: $31.28
   Output directory: documents/extracted/
+  Manifest: documents/manifest.json
+```
+
+**Safe to Re-run:** If you run the script again, it will skip already-extracted documents:
+```bash
+python scripts/extract_and_index.py
+# Output: "AAPL_10K_2024: Already extracted, skipping"
+# Output: "MSFT_10K_2024: Already extracted, skipping"
+# Output: "Summary: 0 documents processed (11 already extracted)"
+```
+
+**Force Re-extraction (if needed):**
+```bash
+# Re-extract single document
+python scripts/extract_and_index.py --force --doc AAPL_10K_2024
+
+# Re-extract only if PDF content changed
+python scripts/extract_and_index.py --if-changed
 ```
 
 ### 5.7 Verify Extraction Results
@@ -1258,13 +1390,16 @@ Errors: 0
 
 - [ ] vlm_extractor.py created with VLMExtractor class
 - [ ] document_processor.py created with DocumentProcessor class
-- [ ] extract_and_index.py script created with CLI
+- [ ] extract_and_index.py script created with CLI (including --status, --force, --if-changed flags)
 - [ ] ingestion/__init__.py updated with exports
 - [ ] Test import successful
+- [ ] `--status` shows pending documents correctly
 - [ ] Dry run lists all documents correctly
 - [ ] Full extraction completed (~$25-40 cost)
 - [ ] JSON files created in documents/extracted/
+- [ ] **Manifest created** (documents/manifest.json) with extraction tracking
 - [ ] JSON structure contains metadata, pages, total_pages
+- [ ] Re-running script skips already-extracted documents (verify with --status)
 
 ---
 
@@ -2172,8 +2307,17 @@ Vector Format for Upsert (Reference Documents):
 Key Features:
 - Batch upsert (100 vectors per batch for efficiency)
 - Query with optional metadata filter
-- Delete vectors by document_id (for updates)
+- **Delete-before-upsert pattern** - always delete existing vectors by document_id before upserting (prevents duplicates on re-indexing)
 - Connection pooling and retry logic
+
+Delete-Before-Upsert Pattern:
+def upsert_document(self, document_id: str, vectors: list[dict]) -> dict:
+    """Safely upsert vectors, removing any existing ones first."""
+    # Delete existing vectors for this document
+    self.delete_by_metadata({"document_id": document_id})
+    
+    # Then upsert new vectors
+    return self.upsert_vectors(vectors)
 
 **Metadata Fields by Document Type:**
 
@@ -2264,15 +2408,19 @@ New Functions:
 
 Indexing Pipeline Per Document:
 1. Load extracted JSON
-2. Chunk pages using SemanticChunker
-3. Enrich chunks using ContextualEnricher
-4. Generate embeddings using BedrockEmbeddings
-5. Upsert to Pinecone with metadata
-6. Log progress and stats
+2. Check manifest - skip if already indexed (unless --reindex)
+3. Chunk pages using SemanticChunker
+4. Enrich chunks using ContextualEnricher
+5. Generate embeddings using BedrockEmbeddings
+6. **Delete existing vectors for document_id** (prevents duplicates)
+7. Upsert to Pinecone with metadata
+8. **Update manifest** (indexed_to_pinecone=true, indexed_at, chunk_count)
+9. Log progress and stats
 
 CLI Updates:
-- --index-only: Skip extraction, just index existing JSON
-- --reindex: Delete existing vectors and re-index
+- --index-only: Skip extraction, just index existing JSON (checks manifest for unindexed docs)
+- --reindex: Delete existing vectors and re-index all documents
+- --index-doc: Index single document by ID (e.g., --index-doc AAPL_10K_2024)
 
 Progress Output:
 "Indexing AAPL_10K_2024.json..."
@@ -2390,12 +2538,14 @@ for i, r in enumerate(results):
 ### 9.7 RAG Indexing Pipeline Checklist
 
 - [ ] Pinecone connection verified before indexing
-- [ ] pinecone_client.py created with PineconeClient class
+- [ ] pinecone_client.py created with PineconeClient class (with delete-before-upsert pattern)
 - [ ] extract_and_index.py updated with indexing step
 - [ ] --index-only flag works
 - [ ] All documents indexed (check Pinecone stats shows 1400+ vectors)
+- [ ] **Manifest updated** - all documents show `indexed_to_pinecone: true`
 - [ ] Vector search returns relevant results
 - [ ] Metadata (ticker, section, page) included in results
+- [ ] Re-running --index-only skips already-indexed documents
 
 ---
 
@@ -2896,6 +3046,7 @@ with engine.connect() as conn:
 | `documents/raw/10k/*.pdf` | Downloaded 10-K filings |
 | `documents/raw/reference/*.pdf` | Reference documents |
 | `documents/extracted/*.json` | VLM extraction output |
+| `documents/manifest.json` | Extraction/indexing state tracking (prevents duplicate API calls) |
 
 ### Files Modified
 
