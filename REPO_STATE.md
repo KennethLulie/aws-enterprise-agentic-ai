@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-13 (Phase 2 planning complete - RAG architecture finalized)
+**Last Updated:** 2026-01-17 (Phase 2a: Semantic chunking module added)
 
 ---
 
@@ -25,7 +25,7 @@
 | .pre-commit-config.yaml | Pre-commit hooks configuration (black, ruff, mypy, pytest) |
 | .gitleaks.toml | Gitleaks secret scanning rules |
 | .secrets.baseline | detect-secrets baseline |
-| docker-compose.yml | Docker Compose configuration (backend + frontend services) |
+| docker-compose.yml | Docker Compose configuration (backend, frontend, neo4j services) |
 
 ### GitHub Actions Workflows
 | File | Purpose |
@@ -79,12 +79,17 @@
 | backend/src/agent/tools/market_data.py | FMP market data tool (mock-friendly) |
 | backend/src/agent/tools/rag.py | RAG retrieval tool stub |
 | backend/src/agent/tools/search.py | Tavily search tool |
-| backend/src/agent/tools/sql.py | SQL query tool stub |
+| backend/src/agent/tools/sql.py | SQL query tool with NL-to-SQL conversion via Bedrock, query validation, and formatted results |
+| backend/src/agent/tools/sql_safety.py | SQL safety module with query validation, table/column whitelists, and sanitization |
 | backend/src/cache/__init__.py | Cache package (Phase 4+ placeholders) |
 | backend/src/db/__init__.py | Database package exports (SQLAlchemy session management) |
 | backend/src/db/session.py | SQLAlchemy engine, session, connection pooling |
-| backend/src/ingestion/__init__.py | Data ingestion package (Phase 2+ placeholders) |
+| backend/src/ingestion/__init__.py | Data ingestion package exports (VLMExtractor, DocumentProcessor, exceptions) |
+| backend/src/ingestion/vlm_extractor.py | VLM-based PDF extraction using Claude Sonnet 4.5 Vision (Bedrock) with automatic fallback to deprecated Claude 3.5 Sonnet V2 |
+| backend/src/ingestion/document_processor.py | High-level document processor with manifest tracking, consolidation, and batch processing |
+| backend/src/ingestion/semantic_chunking.py | spaCy-based semantic text chunking for RAG indexing |
 | backend/src/utils/__init__.py | Utility helpers package |
+| backend/src/utils/embeddings.py | Bedrock Titan embeddings utility for RAG vectorization |
 | backend/tests/__init__.py | Tests package |
 | backend/tests/test_agent.py | Agent and graph tests |
 | backend/tests/test_api.py | API endpoint tests |
@@ -94,6 +99,7 @@
 | backend/alembic/README | Alembic directory readme |
 | backend/alembic/env.py | Alembic migration environment (dynamic DATABASE_URL) |
 | backend/alembic/script.py.mako | Alembic migration script template |
+| backend/alembic/versions/001_10k_financial_schema.py | 10-K financial data schema migration (companies, financial_metrics, segment_revenue, geographic_revenue, risk_factors) |
 
 ### Frontend Directory
 | File | Purpose |
@@ -139,6 +145,8 @@
 | scripts/setup.sh | One-time setup script |
 | scripts/dev.sh | Dev helper script (start/stop/logs/test/shell/clean) |
 | scripts/validate_setup.py | Prerequisites validation script |
+| scripts/extract_and_index.py | VLM document extraction batch script with CLI (--status, --dry-run, --force, --doc) |
+| scripts/load_10k_to_sql.py | SQL data loading script for 10-K financial data (--validate-only, --dry-run, --ticker, --force) |
 
 ### Terraform Directory
 | File | Purpose |
@@ -177,7 +185,6 @@
 ### Phase 2+ - Advanced Features
 | File | Purpose |
 |------|---------|
-| backend/src/ingestion/semantic_chunking.py | Grammar-aware text chunking (spaCy) |
 | backend/src/ingestion/contextual_chunking.py | Context-preserving chunking |
 | backend/src/knowledge_graph/__init__.py | Knowledge graph package (Neo4j) |
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
@@ -193,7 +200,6 @@
 **Knowledge Graph & 2025 SOTA RAG:**
 | File | Purpose |
 |------|---------|
-| backend/src/ingestion/semantic_chunking.py | Grammar-aware chunking (spaCy) |
 | backend/src/ingestion/contextual_chunking.py | Context prepending for chunks |
 | backend/src/knowledge_graph/__init__.py | KG package (Neo4j) |
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |

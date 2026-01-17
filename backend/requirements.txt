@@ -53,6 +53,15 @@ spacy~=3.8.0
 # Note: After install, download spaCy model: python -m spacy download en_core_web_sm
 
 # =============================================================================
+# Document Processing (Phase 2)
+# =============================================================================
+pdf2image~=1.17.0       # Convert PDF pages to images for VLM extraction
+Pillow~=10.4.0          # Image processing for VLM pipeline
+python-magic~=0.4.27    # File type detection
+# Note: pdf2image requires poppler-utils system package
+# Note: Run 'python -m spacy download en_core_web_sm' after install
+
+# =============================================================================
 # Logging (Phase 1b+ uses structlog, basic logging for Phase 0)
 # =============================================================================
 structlog~=24.4.0

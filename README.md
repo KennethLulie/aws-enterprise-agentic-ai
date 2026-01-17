@@ -436,7 +436,7 @@ GitHub Actions automates the entire development lifecycle:
 ## 🛠️ Technology Stack
 
 ### Core AI & Agent Framework
-- **LLM:** AWS Bedrock (Amazon Nova Pro/Lite) - Latest AWS models with cost-effective pay-per-token pricing, excellent AWS integration, and fallback to Claude 3.5 Sonnet for reliability
+- **LLM:** AWS Bedrock (Amazon Nova Pro/Lite) - Latest AWS models with cost-effective pay-per-token pricing, excellent AWS integration, and fallback to Claude Sonnet 4.5 (with Claude 3.5 Sonnet V2 as deprecated fallback until Feb 2026) for reliability
 - **Agent Framework:** LangGraph - Industry-standard orchestration framework with native streaming, checkpointing for state persistence, and excellent tool integration
 - **Vector Store:** Pinecone Serverless - Fully managed vector database with native hybrid search, free tier (100K vectors), and superior performance vs. pgvector
 - **Knowledge Graph:** Neo4j AuraDB Free - Graph database for entity relationships (200K nodes), enables "find all docs about X" queries
@@ -447,6 +447,8 @@ GitHub Actions automates the entire development lifecycle:
 - **Embeddings:** AWS Bedrock Titan Embeddings - 1536-dimensional vectors for semantic search (~$0.0001/1K tokens)
 - **Entity Extraction:** spaCy NER - Cost-efficient entity extraction for Knowledge Graph population (20-50x cheaper than LLM)
 - **Chunking:** Semantic chunking with spaCy sentence boundaries + contextual enrichment
+
+> 💡 **Design Note:** For SEC filings specifically, an HTML+Markdown approach (downloading from EDGAR as HTML, converting to text) would be ~90% cheaper (~$0.30 vs $4.00 per 10-K). However, we chose PDF+Vision because it's more generally robust—it handles any PDF format, preserves charts/graphs, works with scanned documents, and requires only one extraction pipeline. For a demo with ~10 documents, simplicity wins. See [docs/RAG_README.md](./docs/RAG_README.md) for the full trade-off analysis.
 
 > 📖 **Deep Dive:** See [docs/RAG_README.md](./docs/RAG_README.md) for complete RAG architecture including hybrid search, query expansion, and reranking
 

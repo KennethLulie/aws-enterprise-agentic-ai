@@ -306,7 +306,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
   - Connection pooling via SQLAlchemy (no RDS Proxy needed for demo)
 - **Error recovery nodes** for graceful failure handling
 - **Built-in tool calling** via LangGraph tool binding (with Bedrock compatibility check)
-- **Model fallback:** Nova Pro → Claude 3.5 Sonnet if Nova unavailable
+- **Model fallback:** Nova Pro → Claude Sonnet 4.5 (with Claude 3.5 Sonnet V2 as deprecated fallback until Feb 2026)
 - **Real tool integration (Phase 2a and 2d completed ahead of schedule):**
   - ✅ Tavily web search (real API with mock fallback) - Phase 2a complete
   - ✅ FMP market data (real API with mock fallback) - Phase 2d complete
@@ -336,7 +336,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 1. **Bedrock Model Access (REQUIRED):**
    - Go to AWS Console → Bedrock → Model access
    - Request access to: Amazon Nova Pro, Nova Lite, Titan Embeddings
-   - Also request: Anthropic Claude 3.5 Sonnet (fallback)
+   - Also request: Anthropic Claude Sonnet 4.5 (primary VLM model) + Claude 3.5 Sonnet V2 (deprecated fallback until Feb 2026)
    - Wait for approval (usually instant, can take 1-24 hours)
    - **Common Issue:** Forgetting this step causes "AccessDeniedException"
 
@@ -443,7 +443,8 @@ docker-compose up
 - **LangGraph native streaming** with proper event handling
 - Bedrock Nova integration with fallback:
   - Primary: `amazon.nova-pro-v1:0` (verify availability in us-east-1 - N. Virginia)
-  - Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0` (Bedrock on-demand supported)
+  - Fallback: `us.anthropic.claude-sonnet-4-5-20250929-v1:0` (Claude Sonnet 4.5 - current recommended model)
+  - Deprecated fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0` (retired Oct 2025, shutdown Feb 2026)
 - Server-Sent Events (SSE) streaming from FastAPI to frontend
 - **Cold start UX:** Loading indicator with "Warming up..." message (10-30s estimate). Accept ~30s cold start to minimize cost.
 - **Conversation persistence:** conversation_id in localStorage (state in MemorySaver)
@@ -1722,7 +1723,7 @@ Production-ready infrastructure with:
 - ✅ Error Handling: Fallbacks + circuit breakers + graceful degradation
 - ✅ **Cost Optimization:** Public subnets (skip VPC endpoints), SQLAlchemy pooling (skip RDS Proxy)
 - ✅ **Frontend:** Next.js static export (no server), native SSE client
-- ✅ **Model Fallback:** Nova Pro → Claude 3.5 Sonnet
+- ✅ **Model Fallback:** Nova Pro → Claude Sonnet 4.5 (with Claude 3.5 Sonnet V2 as deprecated fallback)
 - ✅ **Cold Start UX:** Loading indicator for 10-30s cold starts
 - ✅ **API Versioning:** /api/v1/ for future compatibility
 - ✅ **Database Migrations:** Alembic for schema management
@@ -2069,7 +2070,7 @@ The architecture is designed to be:
 1. ✅ **Frontend Architecture:** Clarified - Next.js static export → S3, API calls App Runner
 2. ✅ **Docker Prerequisites:** Fixed - Docker Desktop required for all services
 3. ✅ **Cold Start UX:** Added loading indicator for 10-30s cold starts
-4. ✅ **Bedrock Nova:** Added fallback to Claude 3.5 Sonnet
+4. ✅ **Bedrock Nova:** Added fallback to Claude Sonnet 4.5 (with Claude 3.5 Sonnet V2 as deprecated fallback)
 5. ✅ **Database Migrations:** Added Alembic for schema management
 6. ✅ **LangGraph Checkpointing:** MemorySaver for dev, PostgresSaver for prod
 7. ✅ **Pinecone Hybrid:** Clarified implementation strategy

@@ -1,0 +1,1427 @@
+{
+  "document_id": "2026_NVIDIA_Strategic_Analysis_VRAM_Unbundling_And_Profit_Per_GB_Metrics",
+  "document_type": "reference",
+  "filename": "2026_NVIDIA_Strategic_Analysis_VRAM_Unbundling_And_Profit_Per_GB_Metrics.pdf",
+  "extraction_date": "2026-01-17T02:27:51.387631+00:00",
+  "total_pages": 17,
+  "pages_processed": 17,
+  "pages": [
+    {
+      "page_number": 1,
+      "document_type": "news",
+      "content_type": "narrative",
+      "text": "Gigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of GDDR7 memory could decide what products thrive\n\nNews By Jeffrey Kampman | Contributions from Paul Alcorn published 15 hours ago\n\nCheaper graphics cards with lots of memory are an endangered species\n\n(Image credit: Gigabyte)",
+      "headline": "Gigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of GDDR7 memory could decide what products thrive",
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Gross revenue per gigabyte of GDDR7 memory could decide what GPU products thrive",
+          "entities": [
+            "Nvidia",
+            "GDDR7",
+            "Gigabyte"
+          ]
+        },
+        {
+          "claim": "There are crushing memory shortages affecting GPU supply",
+          "entities": [
+            "Nvidia",
+            "GDDR7"
+          ]
+        },
+        {
+          "claim": "Cheaper graphics cards with lots of memory are an endangered species",
+          "entities": [
+            "graphics cards",
+            "memory"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Gigabyte",
+        "Nvidia",
+        "GDDR7",
+        "Jeffrey Kampman",
+        "Paul Alcorn",
+        "Tom's Hardware"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 2,
+      "document_type": "news",
+      "content_type": "narrative",
+      "text": "Reports and rumors of how Nvidia plans to prioritize production of its RTX 50-series graphics cards in 2026 are swirling after a CES with no new consumer GPU launches, followed by reports that the company is ending the production of some RTX 50-series gaming GPUs and moving them to end-of-life status.\n\nWe've received a comment from Nvidia on the matter. We also spoke with the CEO of Gigabyte during CES, and his comments provide context about the overall situation and outlined a rather simple calculation that Nvidia could use to determine which GPUs it will prioritize.\n\nWe asked Nvidia for comment on the recent news that some models are being cancelled and received the following statement: \"Demand for GeForce RTX GPUs is strong, and memory supply is constrained. We continue to ship all GeForce SKUs and are working closely with our suppliers to maximize memory availability.\"\n\nYOU MAY LIKE\n\nGerman retail supplier allegedly rationing RTX 5070 GPUs\n\nSome Japanese shops start rationing GPUs\n\nGamers face another crushing blow as Nvidia allegedly slashes GPU supply by 20%, leaker claims\n\nWhile that statement suggests that it's full steam ahead for existing RTX 50-series products, there's more to the story. Tom's Hardware's Paul Alcorn was able to sit down with Gigabyte CEO Eddie Lin at CES for a wide-ranging interview that suggests Nvidia will still prioritize production of some of its GPUs over others based on a rather straightforward calculation, and that we should expect some RTX 50-series products to be in relatively short supply as the year progresses.\n\nLin described Nvidia's potential GPU allocation strategy, which focuses on maximizing profit from the limited memory resource, as follows:\n\n\"They cannot produce only high-end or low-end [products]... but they can, for example, they have 1, 2, 3, 4, 5, five segments. They focus on 1, 3, and 5,",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Nvidia plans to prioritize production of its RTX 50-series graphics cards in 2026",
+          "entities": [
+            "Nvidia",
+            "RTX 50-series"
+          ]
+        },
+        {
+          "claim": "Nvidia is ending the production of some RTX 50-series gaming GPUs and moving them to end-of-life status",
+          "entities": [
+            "Nvidia",
+            "RTX 50-series"
+          ]
+        },
+        {
+          "claim": "Demand for GeForce RTX GPUs is strong, and memory supply is constrained",
+          "entities": [
+            "Nvidia",
+            "GeForce RTX"
+          ]
+        },
+        {
+          "claim": "Nvidia allegedly slashes GPU supply by 20%",
+          "entities": [
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "Nvidia will prioritize production of some of its GPUs over others based on maximizing profit from limited memory resource",
+          "entities": [
+            "Nvidia"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "RTX 50-series",
+        "CES",
+        "Gigabyte",
+        "GeForce RTX",
+        "Tom's Hardware",
+        "Paul Alcorn",
+        "Eddie Lin",
+        "RTX 5070",
+        "Germany",
+        "Japan"
+      ],
+      "tables": [],
+      "cross_references": [
+        "German retail supplier allegedly rationing RTX 5070 GPUs",
+        "Some Japanese shops start rationing GPUs",
+        "Gamers face another crushing blow as Nvidia allegedly slashes GPU supply by 20%, leaker claims"
+      ]
+    },
+    {
+      "page_number": 3,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "and reduce the percentage on 2 and 4, because on 2 and 4, the revenue contribution per gigabyte of memory is lower. They will calculate how much revenue [each segment] contributes per gigabyte of memory.\" [Emphasis added]\n\nLin went on to share the example of a $300 GPU (like the RTX 5060), for which \"the memory contributes $35 per GB of revenue, whereas for a $400 8GB GPU, that product would contribute $50 per GB of memory. For a $500 [card] with 16GB of memory, that puts you at only $32 of revenue per GB, then the [contribution] is lower.\"\n\nAdditionally, Lin noted that Gigabyte continues to receive bundled memory from Nvidia with its GPUs. Rumors have swirled that Nvidia is no longer providing board makers with memory, which would portend a dire situation for smaller-scale players if they were forced to buy memory on the open market. Other vendors could be subject to different agreements and conditions with Nvidia, but we haven't received any confirmation from vendors that Nvidia is no longer bundling memory.\n\nStay On the Cutting Edge: Get the Tom's Hardware Newsletter\n\nGet Tom's Hardware's best news and in-depth reviews, straight to your inbox.\n\nYour Email Address\n\nSIGN ME UP\n\nContact me with news and offers from other Future brands\n\nReceive email from us on behalf of our trusted partners or sponsors\n\nBy submitting your information you agree to the Terms & Conditions and Privacy Policy and are aged 16 or over.\n\nUsing Lin's framework, we can understand what graphics cards are likely to be prioritized and deprioritized for allocation in 2026. Consider the following table:\n\nSwipe to scroll horizontally",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "For a $300 GPU like the RTX 5060, the memory contributes $35 per GB of revenue",
+          "entities": [
+            "Nvidia",
+            "RTX 5060",
+            "Lin"
+          ]
+        },
+        {
+          "claim": "For a $400 8GB GPU, that product would contribute $50 per GB of memory",
+          "entities": [
+            "Nvidia",
+            "Lin"
+          ]
+        },
+        {
+          "claim": "For a $500 card with 16GB of memory, that puts you at only $32 of revenue per GB",
+          "entities": [
+            "Nvidia",
+            "Lin"
+          ]
+        },
+        {
+          "claim": "Gigabyte continues to receive bundled memory from Nvidia with its GPUs",
+          "entities": [
+            "Gigabyte",
+            "Nvidia",
+            "Lin"
+          ]
+        },
+        {
+          "claim": "Rumors have swirled that Nvidia is no longer providing board makers with memory",
+          "entities": [
+            "Nvidia"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "Gigabyte",
+        "Lin",
+        "RTX 5060",
+        "Tom's Hardware",
+        "Future brands"
+      ],
+      "tables": [
+        {
+          "table_name": "GPU allocation framework table (incomplete on this page)",
+          "table_type": "other",
+          "headers": [],
+          "rows": []
+        }
+      ],
+      "cross_references": [
+        "Terms & Conditions",
+        "Privacy Policy"
+      ]
+    },
+    {
+      "page_number": 4,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "Model | Memory size (GB) | MSRP | Gross revenue/GB | GPU\n\nRTX 5060 | 8 | $299 | $37.38 | GB206\n\nRTX 5060 Ti 8GB | 8 | $379 | $47.38 | GB206\n\nRTX 5060 Ti 16GB | 16 | $429 | $26.81 | GB206\n\nRTX 5070 | 12 | $549 | $45.75 | GB205\n\nRTX 5070 Ti | 16 | $749 | $46.81 | GB203\n\nRTX 5080 | 16 | $999 | $62.44 | GB203\n\nRTX 5090 | 32 | $1,999 | $62.47 | GB202\n\nRTX Pro 6000 Blackwell | 96 | $8,500 | $88.54 | GB202\n\nAt the lower end of the market, the RTX 5060 Ti 8GB contributes $47.38 of gross revenue per gigabyte of GDDR7 compared to the RTX 5060's $37.38, meaning that the 5060 Ti will likely be prioritized for allocation despite its wildly underwhelming initial reception.\n\nThe RTX 5060 Ti 16GB is the most threatened card of the bunch by this measure, since as a byproduct of its MSRP and higher VRAM capacity, it contributes just $26.81 of revenue per GB of GDDR7 on board — the lowest of any RTX 50-series card.\n\nYOU MAY LIKE\n\nGerman retail supplier allegedly rationing RTX 5070 GPUs\n\nSome Japanese shops start rationing GPUs",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "RTX 5060 has 8GB memory, $299 MSRP, and $37.38 gross revenue per GB",
+          "entities": [
+            "RTX 5060",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "RTX 5060 Ti 8GB has $379 MSRP and $47.38 gross revenue per GB",
+          "entities": [
+            "RTX 5060 Ti 8GB",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "RTX 5060 Ti 16GB has $429 MSRP and $26.81 gross revenue per GB, the lowest of any RTX 50-series card",
+          "entities": [
+            "RTX 5060 Ti 16GB",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "RTX 5070 has 12GB memory, $549 MSRP, and $45.75 gross revenue per GB",
+          "entities": [
+            "RTX 5070",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "RTX 5070 Ti has 16GB memory, $749 MSRP, and $46.81 gross revenue per GB",
+          "entities": [
+            "RTX 5070 Ti",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "RTX 5080 has 16GB memory, $999 MSRP, and $62.44 gross revenue per GB",
+          "entities": [
+            "RTX 5080",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "RTX 5090 has 32GB memory, $1,999 MSRP, and $62.47 gross revenue per GB",
+          "entities": [
+            "RTX 5090",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "RTX Pro 6000 Blackwell has 96GB memory, $8,500 MSRP, and $88.54 gross revenue per GB",
+          "entities": [
+            "RTX Pro 6000 Blackwell",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "The 5060 Ti will likely be prioritized for allocation despite its wildly underwhelming initial reception",
+          "entities": [
+            "RTX 5060 Ti",
+            "Nvidia"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "RTX 5060",
+        "RTX 5060 Ti 8GB",
+        "RTX 5060 Ti 16GB",
+        "RTX 5070",
+        "RTX 5070 Ti",
+        "RTX 5080",
+        "RTX 5090",
+        "RTX Pro 6000 Blackwell",
+        "GB206",
+        "GB205",
+        "GB203",
+        "GB202",
+        "GDDR7",
+        "Gigabyte"
+      ],
+      "tables": [
+        {
+          "table_name": "Nvidia RTX GPU Specifications and Revenue per GB",
+          "table_type": "other",
+          "headers": [
+            "Model",
+            "Memory size (GB)",
+            "MSRP",
+            "Gross revenue/GB",
+            "GPU"
+          ],
+          "rows": [
+            {
+              "label": "RTX 5060",
+              "values": {
+                "Memory size (GB)": "8",
+                "MSRP": "$299",
+                "Gross revenue/GB": "$37.38",
+                "GPU": "GB206"
+              }
+            },
+            {
+              "label": "RTX 5060 Ti 8GB",
+              "values": {
+                "Memory size (GB)": "8",
+                "MSRP": "$379",
+                "Gross revenue/GB": "$47.38",
+                "GPU": "GB206"
+              }
+            },
+            {
+              "label": "RTX 5060 Ti 16GB",
+              "values": {
+                "Memory size (GB)": "16",
+                "MSRP": "$429",
+                "Gross revenue/GB": "$26.81",
+                "GPU": "GB206"
+              }
+            },
+            {
+              "label": "RTX 5070",
+              "values": {
+                "Memory size (GB)": "12",
+                "MSRP": "$549",
+                "Gross revenue/GB": "$45.75",
+                "GPU": "GB205"
+              }
+            },
+            {
+              "label": "RTX 5070 Ti",
+              "values": {
+                "Memory size (GB)": "16",
+                "MSRP": "$749",
+                "Gross revenue/GB": "$46.81",
+                "GPU": "GB203"
+              }
+            },
+            {
+              "label": "RTX 5080",
+              "values": {
+                "Memory size (GB)": "16",
+                "MSRP": "$999",
+                "Gross revenue/GB": "$62.44",
+                "GPU": "GB203"
+              }
+            },
+            {
+              "label": "RTX 5090",
+              "values": {
+                "Memory size (GB)": "32",
+                "MSRP": "$1,999",
+                "Gross revenue/GB": "$62.47",
+                "GPU": "GB202"
+              }
+            },
+            {
+              "label": "RTX Pro 6000 Blackwell",
+              "values": {
+                "Memory size (GB)": "96",
+                "MSRP": "$8,500",
+                "Gross revenue/GB": "$88.54",
+                "GPU": "GB202"
+              }
+            }
+          ]
+        }
+      ],
+      "cross_references": [
+        "German retail supplier allegedly rationing RTX 5070 GPUs",
+        "Some Japanese shops start rationing GPUs"
+      ]
+    },
+    {
+      "page_number": 5,
+      "document_type": "news",
+      "content_type": "narrative",
+      "text": "Moving up the stack, the RTX 5070 and RTX 5070 Ti contribute the same gross revenue per gigabyte, meaning that the cheaper-to-produce 5070 will likely be favored over its Ti sibling (which uses a bigger, more power-hungry GPU and a more complex board design)—or that both cards are likely to be deprioritized in favor of the more profitable RTX 5060 Ti 8GB.\n\nAt the highest end, the RTX 5080 and RTX 5090 contribute nearly the same revenue per gig of VRAM, meaning that the RTX 5080 will likely take precedence for allocation of 2GB GDDR7 chips going forward due to its smaller GPU die (half the size of the RTX 5090's) and much less complex board design. It would also mean that the 32GB of VRAM needed to produce one large 5090 GPU would instead create two 16GB RTX 5080s, which would help with overall supply and possibly lead to more margin.\n\nJust for fun, the RTX 5090 and RTX Pro 6000 Blackwell share the same GB202 GPU (albeit with differing SM counts), but even with 96GB of GDDR7 on board, the RTX Pro 6000 contributes a whopping 41% more revenue per GB of GDDR7 on board versus the 5090.\n\nOf course, the RTX Pro 6000 uses 3GB GDDR7 chips in clamshell mode to achieve its memory capacity rather than the 2GB single-side parts on the RTX 5090, so it's not an apples-to-apples comparison.\n\nBut it does make it obvious why Nvidia may have foregone launching the RTX 50-series Super refresh at CES: the margins afforded by using 3GB packages on RTX Pro products are simply much more attractive than they would have been for GeForce cards that presumably would have sold for near the same MSRPs as non-Super cards did at launch.\n\nGoing forward, we expect that the RTX 5060 Ti 8GB, RTX 5070, and RTX 5080 may be the easiest cards to find on shelves, relatively speaking, while enthusiast favorites like the RTX 5060 Ti 16GB and RTX 5070 Ti will be in short supply. The writing is also on the wall for the RTX 5090 — we can already see the supply situation reflected in today's empty e-tail shelves and dramatically inflated prices from third-party sellers. We'll continue to",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "RTX 5070 and RTX 5070 Ti contribute the same gross revenue per gigabyte",
+          "entities": [
+            "Nvidia",
+            "RTX 5070",
+            "RTX 5070 Ti"
+          ]
+        },
+        {
+          "claim": "RTX 5080 GPU die is half the size of the RTX 5090's",
+          "entities": [
+            "Nvidia",
+            "RTX 5080",
+            "RTX 5090"
+          ]
+        },
+        {
+          "claim": "RTX 5080 and RTX 5090 contribute nearly the same revenue per gig of VRAM",
+          "entities": [
+            "Nvidia",
+            "RTX 5080",
+            "RTX 5090"
+          ]
+        },
+        {
+          "claim": "32GB of VRAM needed to produce one RTX 5090 GPU would instead create two 16GB RTX 5080s",
+          "entities": [
+            "Nvidia",
+            "RTX 5090",
+            "RTX 5080"
+          ]
+        },
+        {
+          "claim": "RTX Pro 6000 contributes 41% more revenue per GB of GDDR7 versus the RTX 5090",
+          "entities": [
+            "Nvidia",
+            "RTX Pro 6000",
+            "RTX 5090"
+          ]
+        },
+        {
+          "claim": "RTX 5090 and RTX Pro 6000 Blackwell share the same GB202 GPU",
+          "entities": [
+            "Nvidia",
+            "RTX 5090",
+            "RTX Pro 6000",
+            "GB202"
+          ]
+        },
+        {
+          "claim": "RTX Pro 6000 has 96GB of GDDR7 on board",
+          "entities": [
+            "Nvidia",
+            "RTX Pro 6000"
+          ]
+        },
+        {
+          "claim": "RTX Pro 6000 uses 3GB GDDR7 chips in clamshell mode",
+          "entities": [
+            "Nvidia",
+            "RTX Pro 6000"
+          ]
+        },
+        {
+          "claim": "RTX 5090 uses 2GB single-side GDDR7 parts",
+          "entities": [
+            "Nvidia",
+            "RTX 5090"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "RTX 5070",
+        "RTX 5070 Ti",
+        "RTX 5060 Ti 8GB",
+        "RTX 5080",
+        "RTX 5090",
+        "RTX Pro 6000",
+        "GB202 GPU",
+        "RTX 5060 Ti 16GB",
+        "GeForce",
+        "CES"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 6,
+      "document_type": "news",
+      "content_type": "narrative",
+      "text": "monitor this situation and update our list of the best GPUs for gaming accordingly.\n\nFollow Tom's Hardware on Google News, or add us as a preferred source, to get our latest news, analysis, & reviews in your feeds.\n\nTOPICS\n\nGeForce\nGDDR7\n\nSEE ALL COMMENTS (18)\n\nJeffrey Kampman Senior Analyst, Graphics\n\nAs the Senior Analyst, Graphics at Tom's Hardware, Jeff Kampman covers everything to do with GPUs, gaming performance, and more. From integrated graphics processors to discrete graphics cards to the hyperscale installations powering our AI future, if it's got a GPU in it, Jeff is on it.\n\nWith contributions from\n\nPaul Alcorn Editor-in-Chief\n\nREAD MORE",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [],
+      "entities_mentioned": [
+        "Tom's Hardware",
+        "Google News",
+        "Jeffrey Kampman",
+        "Paul Alcorn",
+        "GeForce",
+        "GDDR7"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 7,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "German retail supplier allegedly rationing RTX 5070 GPUs\n\nSome Japanese shops start rationing GPUs",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "German retail supplier is allegedly rationing RTX 5070 GPUs",
+          "entities": [
+            "German retail supplier",
+            "RTX 5070",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "Some Japanese shops have started rationing GPUs",
+          "entities": [
+            "Japanese shops",
+            "GPUs"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "German retail supplier",
+        "RTX 5070",
+        "Nvidia",
+        "Japanese shops",
+        "Gigabyte"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 8,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "1/16/26, 8:12 PM\nGigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of ...\n\nGamers face another crushing blow as Nvidia allegedly slashes GPU supply by 20%, leaker claims\n\nNvidia reportedly no longer supplying VRAM to its GPU board partners in response to memory crunch\n\nhttps://www.tomshardware.com/pc-components/gpus/gigabyte-ceo-explains-nvidias-potential-gpu-supply-strategy-amid-crushing-memory-shortages-...\n8/17",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Nvidia allegedly slashes GPU supply by 20%",
+          "entities": [
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "Nvidia reportedly no longer supplying VRAM to its GPU board partners in response to memory crunch",
+          "entities": [
+            "Nvidia"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "Gigabyte",
+        "Tom's Hardware"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 9,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "Nvidia's RTX 5000 Super could be cancelled or get pricier due to AI-induced GDDR7 woes\n\nHere's why HBM is coming for your PC's RAM\n\nLATEST IN GPUS",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Nvidia's RTX 5000 Super could be cancelled or get pricier due to AI-induced GDDR7 woes",
+          "entities": [
+            "Nvidia",
+            "RTX 5000 Super",
+            "GDDR7"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "RTX 5000 Super",
+        "GDDR7",
+        "HBM",
+        "PC",
+        "RAM",
+        "SK hynix"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 10,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "1/16/26, 8:12 PM\nGigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of ...\n\nAsus denies RTX 5070 Ti and RTX 5060 Ti discontinuation after conflicting end-of-life claims\n\nGamers face another crushing blow as Nvidia allegedly slashes GPU supply by 20%, leaker claims\n\nhttps://www.tomshardware.com/pc-components/gpus/gigabyte-ceo-explains-nvidias-potential-gpu-supply-strategy-amid-crushing-memory-shortages...\n10/17",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Nvidia allegedly slashes GPU supply by 20%",
+          "entities": [
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "Asus denies RTX 5070 Ti and RTX 5060 Ti discontinuation after conflicting end-of-life claims",
+          "entities": [
+            "Asus",
+            "RTX 5070 Ti",
+            "RTX 5060 Ti"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Gigabyte",
+        "Nvidia",
+        "Asus",
+        "RTX 5070 Ti",
+        "RTX 5060 Ti"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 11,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "Troublesome 16-pin connector sidelines $30,000 H200 Hopper GPU\n\nDLSS 4.5 Super Resolution\nAvailable now through NVIDIA App.\n\nNvidia DLSS 4.5 Super Resolution leaves beta, available now to Nvidia app users",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "16-pin connector issue affects $30,000 H200 Hopper GPU",
+          "entities": [
+            "H200 Hopper GPU",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "DLSS 4.5 Super Resolution is now available through NVIDIA App",
+          "entities": [
+            "DLSS 4.5",
+            "NVIDIA App",
+            "Nvidia"
+          ]
+        },
+        {
+          "claim": "DLSS 4.5 Super Resolution has left beta",
+          "entities": [
+            "DLSS 4.5",
+            "Nvidia"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "H200 Hopper GPU",
+        "DLSS 4.5",
+        "NVIDIA App",
+        "GeForce RTX"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 12,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "AMD FSR Redstone press Q&A roundtable CES 2026 transcript\n\n42 bewildered Amazon customers duped by $999 RTX 5090 scam, sent fanny packs instead\n\nLATEST IN NEWS",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "42 Amazon customers were scammed with a $999 RTX 5090 purchase and received fanny packs instead",
+          "entities": [
+            "Amazon",
+            "RTX 5090",
+            "42 customers"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "AMD",
+        "FSR Redstone",
+        "CES 2026",
+        "Amazon",
+        "RTX 5090"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 13,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "Nvidia China market share to drastically decrease from 66% to 8%, analysts claim\n\nU.S. slashes Taiwan tariffs in new semiconductor trade deal",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Nvidia China market share to drastically decrease from 66% to 8%",
+          "entities": [
+            "Nvidia",
+            "China"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "China",
+        "U.S.",
+        "Taiwan"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 14,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "Hard drive prices have surged by an average of 46% since September — iconic 24TB Seagate BarraCuda now $500 as AI claims another victim\n\nGigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Hard drive prices have surged by an average of 46% since September",
+          "entities": [
+            "hard drive prices",
+            "September"
+          ]
+        },
+        {
+          "claim": "24TB Seagate BarraCuda now costs $500",
+          "entities": [
+            "Seagate BarraCuda",
+            "24TB",
+            "$500"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Seagate BarraCuda",
+        "Gigabyte",
+        "Nvidia",
+        "AI"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 15,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "1/16/26, 8:12 PM\nGigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of ...\n\nOpenAI CEO Sam Altman raises $252 million for brain computer interface venture — but Merge Labs is still in an early research phase\n\nTrump introduces 25% tariff on export of chips, including Nvidia H200, AMD MI325X\n\n18 COMMENTS\nCOMMENT FROM THE FORUMS ▶\n\nthesyndrome\n\nhttps://www.tomshardware.com/pc-components/gpus/gigabyte-ceo-explains-nvidias-potential-gpu-supply-strategy-amid-crushing-memory-shortages...\n15/17",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "OpenAI CEO Sam Altman raises $252 million for brain computer interface venture",
+          "entities": [
+            "OpenAI",
+            "Sam Altman",
+            "Merge Labs"
+          ]
+        },
+        {
+          "claim": "Trump introduces 25% tariff on export of chips, including Nvidia H200, AMD MI325X",
+          "entities": [
+            "Trump",
+            "Nvidia",
+            "AMD",
+            "H200",
+            "MI325X"
+          ]
+        },
+        {
+          "claim": "Merge Labs is still in an early research phase",
+          "entities": [
+            "Merge Labs"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Gigabyte",
+        "Nvidia",
+        "OpenAI",
+        "Sam Altman",
+        "Merge Labs",
+        "Trump",
+        "AMD",
+        "H200",
+        "MI325X",
+        "thesyndrome",
+        "Tom's Hardware"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 16,
+      "document_type": "news",
+      "content_type": "narrative",
+      "text": "1/16/26, 8:12 PM\nGigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of ...\n\nThat's a lot of text to say:\n\n\"richest company in the world wants to be richer, and will gut it's consumer GPU lineup to prioritise businesses, who are spending ludicrous amounts because they've lost touch with how much things are actually worth and will pay whatever Nvidia says they are worth, regardless of development costs or component costs to manufacture\"\n\nREPLY ►\n\nTerryLaze\n\nthesyndrome said:\n\nbecause they've lost touch with how much things are actually worth\n\nSupply and demand, it's a story as old as time, the more people want a thing more the more it's gonna cost.\nNot even the communist countries sell things at cost.\n\nREPLY ►\n\nNotton\n\nTerryLaze said:\n\nSupply and demand, it's a story as old as time, the more people want a thing more the more it's gonna cost.\nNot even the communist countries sell things at cost.\n\nI'd agree, if it weren't for the fact that...\nhttps://www.techspot.com/images2/news/bigimage/2025/10/2025-10-28-image-32.jpg Nvidia is paying AI companies to artificially inflate demand for their own GPUs.\nThe more Nvidia GPUs gamers buy, the more it goes into AI.\n\nREPLY ►\n\ncall101010\n\nTerryLaze said:\n\nhttps://www.tomshardware.com/pc-components/gpus/gigabyte-ceo-explains-nvidias-potential-gpu-supply-strategy-amid-crushing-memory-shortages...\n16/17",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Nvidia is paying AI companies to artificially inflate demand for their own GPUs",
+          "entities": [
+            "Nvidia",
+            "AI companies"
+          ]
+        },
+        {
+          "claim": "Nvidia will gut its consumer GPU lineup to prioritise businesses",
+          "entities": [
+            "Nvidia"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Nvidia",
+        "Gigabyte",
+        "AI companies",
+        "TerryLaze",
+        "Notton",
+        "call101010",
+        "thesyndrome"
+      ],
+      "tables": [],
+      "cross_references": [
+        "https://www.techspot.com/images2/news/bigimage/2025/10/2025-10-28-image-32.jpg"
+      ]
+    },
+    {
+      "page_number": 17,
+      "document_type": "news",
+      "content_type": "mixed",
+      "text": "1/16/26, 8:12 PM\nGigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of ...\n\nSupply and demand, it's a story as old as time, the more people want a thing more the more it's gonna cost.\nNot even the communist countries sell things at cost.\n\nThis supply and demand theory never convinced me... because when prices go too high you will also lose a huge percentage of buyers who will not afford to buy it any more ...\nyou take more profit in the right hand and lose that same amount with the left hand.\n\nREPLY ▶\n\nSHOW MORE COMMENTS ▶\n\nTom's Hardware is part of Future US Inc, an international media group and leading digital publisher. Visit our corporate site.\n\nAdd as a preferred source on Google\n\nTerms and conditions\nContact Future's experts\nPrivacy policy\nCookies policy\nAccessibility Statement\nAdvertise with us\nAbout us\nCoupons\nCareers\nDo not sell or share my personal information\n\n© Future US, Inc. Full 7th Floor, 130 West 42nd Street, New York, NY 10036.\n\nhttps://www.tomshardware.com/pc-components/gpus/gigabyte-ceo-explains-nvidias-potential-gpu-supply-strategy-amid-crushing-memory-shortages...\n17/17",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "Tom's Hardware",
+      "key_claims": [
+        {
+          "claim": "Gigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages",
+          "entities": [
+            "Gigabyte",
+            "Nvidia",
+            "GPU"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "Gigabyte",
+        "Nvidia",
+        "Tom's Hardware",
+        "Future US Inc",
+        "Google",
+        "New York"
+      ],
+      "tables": [],
+      "cross_references": []
+    }
+  ],
+  "metadata": {
+    "headline": "Gigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of GDDR7 memory could decide what products thrive",
+    "publication_date": "2026-01-16",
+    "source": "Tom's Hardware",
+    "source_type": "news",
+    "entities_mentioned": [
+      "AI",
+      "AI companies",
+      "AMD",
+      "Amazon",
+      "Asus",
+      "CES",
+      "CES 2026",
+      "China",
+      "DLSS 4.5",
+      "Eddie Lin",
+      "FSR Redstone",
+      "Future US Inc",
+      "Future brands",
+      "GB202",
+      "GB202 GPU",
+      "GB203",
+      "GB205",
+      "GB206",
+      "GDDR7",
+      "GeForce",
+      "GeForce RTX",
+      "German retail supplier",
+      "Germany",
+      "Gigabyte",
+      "Google",
+      "Google News",
+      "H200",
+      "H200 Hopper GPU",
+      "HBM",
+      "Japan",
+      "Japanese shops",
+      "Jeffrey Kampman",
+      "Lin",
+      "MI325X",
+      "Merge Labs",
+      "NVIDIA App",
+      "New York",
+      "Notton",
+      "Nvidia",
+      "OpenAI",
+      "PC",
+      "Paul Alcorn",
+      "RAM",
+      "RTX 50-series",
+      "RTX 5000 Super",
+      "RTX 5060",
+      "RTX 5060 Ti",
+      "RTX 5060 Ti 16GB",
+      "RTX 5060 Ti 8GB",
+      "RTX 5070",
+      "RTX 5070 Ti",
+      "RTX 5080",
+      "RTX 5090",
+      "RTX Pro 6000",
+      "RTX Pro 6000 Blackwell",
+      "SK hynix",
+      "Sam Altman",
+      "Seagate BarraCuda",
+      "Taiwan",
+      "TerryLaze",
+      "Tom's Hardware",
+      "Trump",
+      "U.S.",
+      "call101010",
+      "thesyndrome"
+    ]
+  },
+  "consolidated": {
+    "headline": "Gigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages — gross revenue per gigabyte of GDDR7 memory could decide what products thrive",
+    "publication_date": "2026-01-16",
+    "source": "Tom's Hardware",
+    "source_type": "news",
+    "key_claims": [
+      {
+        "claim": "Gross revenue per gigabyte of GDDR7 memory could decide what GPU products thrive",
+        "entities": [
+          "Nvidia",
+          "GDDR7",
+          "Gigabyte"
+        ],
+        "source_page": 1
+      },
+      {
+        "claim": "There are crushing memory shortages affecting GPU supply",
+        "entities": [
+          "Nvidia",
+          "GDDR7"
+        ],
+        "source_page": 1
+      },
+      {
+        "claim": "Cheaper graphics cards with lots of memory are an endangered species",
+        "entities": [
+          "graphics cards",
+          "memory"
+        ],
+        "source_page": 1
+      },
+      {
+        "claim": "Nvidia plans to prioritize production of its RTX 50-series graphics cards in 2026",
+        "entities": [
+          "Nvidia",
+          "RTX 50-series"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "Nvidia is ending the production of some RTX 50-series gaming GPUs and moving them to end-of-life status",
+        "entities": [
+          "Nvidia",
+          "RTX 50-series"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "Demand for GeForce RTX GPUs is strong, and memory supply is constrained",
+        "entities": [
+          "Nvidia",
+          "GeForce RTX"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "Nvidia allegedly slashes GPU supply by 20%",
+        "entities": [
+          "Nvidia"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "Nvidia will prioritize production of some of its GPUs over others based on maximizing profit from limited memory resource",
+        "entities": [
+          "Nvidia"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "For a $300 GPU like the RTX 5060, the memory contributes $35 per GB of revenue",
+        "entities": [
+          "Nvidia",
+          "RTX 5060",
+          "Lin"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "For a $400 8GB GPU, that product would contribute $50 per GB of memory",
+        "entities": [
+          "Nvidia",
+          "Lin"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "For a $500 card with 16GB of memory, that puts you at only $32 of revenue per GB",
+        "entities": [
+          "Nvidia",
+          "Lin"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "Gigabyte continues to receive bundled memory from Nvidia with its GPUs",
+        "entities": [
+          "Gigabyte",
+          "Nvidia",
+          "Lin"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "Rumors have swirled that Nvidia is no longer providing board makers with memory",
+        "entities": [
+          "Nvidia"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "RTX 5060 has 8GB memory, $299 MSRP, and $37.38 gross revenue per GB",
+        "entities": [
+          "RTX 5060",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "RTX 5060 Ti 8GB has $379 MSRP and $47.38 gross revenue per GB",
+        "entities": [
+          "RTX 5060 Ti 8GB",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "RTX 5060 Ti 16GB has $429 MSRP and $26.81 gross revenue per GB, the lowest of any RTX 50-series card",
+        "entities": [
+          "RTX 5060 Ti 16GB",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "RTX 5070 has 12GB memory, $549 MSRP, and $45.75 gross revenue per GB",
+        "entities": [
+          "RTX 5070",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "RTX 5070 Ti has 16GB memory, $749 MSRP, and $46.81 gross revenue per GB",
+        "entities": [
+          "RTX 5070 Ti",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "RTX 5080 has 16GB memory, $999 MSRP, and $62.44 gross revenue per GB",
+        "entities": [
+          "RTX 5080",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "RTX 5090 has 32GB memory, $1,999 MSRP, and $62.47 gross revenue per GB",
+        "entities": [
+          "RTX 5090",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "RTX Pro 6000 Blackwell has 96GB memory, $8,500 MSRP, and $88.54 gross revenue per GB",
+        "entities": [
+          "RTX Pro 6000 Blackwell",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "The 5060 Ti will likely be prioritized for allocation despite its wildly underwhelming initial reception",
+        "entities": [
+          "RTX 5060 Ti",
+          "Nvidia"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "RTX 5070 and RTX 5070 Ti contribute the same gross revenue per gigabyte",
+        "entities": [
+          "Nvidia",
+          "RTX 5070",
+          "RTX 5070 Ti"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "RTX 5080 GPU die is half the size of the RTX 5090's",
+        "entities": [
+          "Nvidia",
+          "RTX 5080",
+          "RTX 5090"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "RTX 5080 and RTX 5090 contribute nearly the same revenue per gig of VRAM",
+        "entities": [
+          "Nvidia",
+          "RTX 5080",
+          "RTX 5090"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "32GB of VRAM needed to produce one RTX 5090 GPU would instead create two 16GB RTX 5080s",
+        "entities": [
+          "Nvidia",
+          "RTX 5090",
+          "RTX 5080"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "RTX Pro 6000 contributes 41% more revenue per GB of GDDR7 versus the RTX 5090",
+        "entities": [
+          "Nvidia",
+          "RTX Pro 6000",
+          "RTX 5090"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "RTX 5090 and RTX Pro 6000 Blackwell share the same GB202 GPU",
+        "entities": [
+          "Nvidia",
+          "RTX 5090",
+          "RTX Pro 6000",
+          "GB202"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "RTX Pro 6000 has 96GB of GDDR7 on board",
+        "entities": [
+          "Nvidia",
+          "RTX Pro 6000"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "RTX Pro 6000 uses 3GB GDDR7 chips in clamshell mode",
+        "entities": [
+          "Nvidia",
+          "RTX Pro 6000"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "RTX 5090 uses 2GB single-side GDDR7 parts",
+        "entities": [
+          "Nvidia",
+          "RTX 5090"
+        ],
+        "source_page": 5
+      },
+      {
+        "claim": "German retail supplier is allegedly rationing RTX 5070 GPUs",
+        "entities": [
+          "German retail supplier",
+          "RTX 5070",
+          "Nvidia"
+        ],
+        "source_page": 7
+      },
+      {
+        "claim": "Some Japanese shops have started rationing GPUs",
+        "entities": [
+          "Japanese shops",
+          "GPUs"
+        ],
+        "source_page": 7
+      },
+      {
+        "claim": "Nvidia allegedly slashes GPU supply by 20%",
+        "entities": [
+          "Nvidia"
+        ],
+        "source_page": 8
+      },
+      {
+        "claim": "Nvidia reportedly no longer supplying VRAM to its GPU board partners in response to memory crunch",
+        "entities": [
+          "Nvidia"
+        ],
+        "source_page": 8
+      },
+      {
+        "claim": "Nvidia's RTX 5000 Super could be cancelled or get pricier due to AI-induced GDDR7 woes",
+        "entities": [
+          "Nvidia",
+          "RTX 5000 Super",
+          "GDDR7"
+        ],
+        "source_page": 9
+      },
+      {
+        "claim": "Nvidia allegedly slashes GPU supply by 20%",
+        "entities": [
+          "Nvidia"
+        ],
+        "source_page": 10
+      },
+      {
+        "claim": "Asus denies RTX 5070 Ti and RTX 5060 Ti discontinuation after conflicting end-of-life claims",
+        "entities": [
+          "Asus",
+          "RTX 5070 Ti",
+          "RTX 5060 Ti"
+        ],
+        "source_page": 10
+      },
+      {
+        "claim": "16-pin connector issue affects $30,000 H200 Hopper GPU",
+        "entities": [
+          "H200 Hopper GPU",
+          "Nvidia"
+        ],
+        "source_page": 11
+      },
+      {
+        "claim": "DLSS 4.5 Super Resolution is now available through NVIDIA App",
+        "entities": [
+          "DLSS 4.5",
+          "NVIDIA App",
+          "Nvidia"
+        ],
+        "source_page": 11
+      },
+      {
+        "claim": "DLSS 4.5 Super Resolution has left beta",
+        "entities": [
+          "DLSS 4.5",
+          "Nvidia"
+        ],
+        "source_page": 11
+      },
+      {
+        "claim": "42 Amazon customers were scammed with a $999 RTX 5090 purchase and received fanny packs instead",
+        "entities": [
+          "Amazon",
+          "RTX 5090",
+          "42 customers"
+        ],
+        "source_page": 12
+      },
+      {
+        "claim": "Nvidia China market share to drastically decrease from 66% to 8%",
+        "entities": [
+          "Nvidia",
+          "China"
+        ],
+        "source_page": 13
+      },
+      {
+        "claim": "Hard drive prices have surged by an average of 46% since September",
+        "entities": [
+          "hard drive prices",
+          "September"
+        ],
+        "source_page": 14
+      },
+      {
+        "claim": "24TB Seagate BarraCuda now costs $500",
+        "entities": [
+          "Seagate BarraCuda",
+          "24TB",
+          "$500"
+        ],
+        "source_page": 14
+      },
+      {
+        "claim": "OpenAI CEO Sam Altman raises $252 million for brain computer interface venture",
+        "entities": [
+          "OpenAI",
+          "Sam Altman",
+          "Merge Labs"
+        ],
+        "source_page": 15
+      },
+      {
+        "claim": "Trump introduces 25% tariff on export of chips, including Nvidia H200, AMD MI325X",
+        "entities": [
+          "Trump",
+          "Nvidia",
+          "AMD",
+          "H200",
+          "MI325X"
+        ],
+        "source_page": 15
+      },
+      {
+        "claim": "Merge Labs is still in an early research phase",
+        "entities": [
+          "Merge Labs"
+        ],
+        "source_page": 15
+      },
+      {
+        "claim": "Nvidia is paying AI companies to artificially inflate demand for their own GPUs",
+        "entities": [
+          "Nvidia",
+          "AI companies"
+        ],
+        "source_page": 16
+      },
+      {
+        "claim": "Nvidia will gut its consumer GPU lineup to prioritise businesses",
+        "entities": [
+          "Nvidia"
+        ],
+        "source_page": 16
+      },
+      {
+        "claim": "Gigabyte CEO explains Nvidia's potential GPU supply strategy amid crushing memory shortages",
+        "entities": [
+          "Gigabyte",
+          "Nvidia",
+          "GPU"
+        ],
+        "source_page": 17
+      }
+    ],
+    "entities_mentioned": [
+      "AI",
+      "AI companies",
+      "AMD",
+      "Amazon",
+      "Asus",
+      "CES",
+      "CES 2026",
+      "China",
+      "DLSS 4.5",
+      "Eddie Lin",
+      "FSR Redstone",
+      "Future US Inc",
+      "Future brands",
+      "GB202",
+      "GB202 GPU",
+      "GB203",
+      "GB205",
+      "GB206",
+      "GDDR7",
+      "GeForce",
+      "GeForce RTX",
+      "German retail supplier",
+      "Germany",
+      "Gigabyte",
+      "Google",
+      "Google News",
+      "H200",
+      "H200 Hopper GPU",
+      "HBM",
+      "Japan",
+      "Japanese shops",
+      "Jeffrey Kampman",
+      "Lin",
+      "MI325X",
+      "Merge Labs",
+      "NVIDIA App",
+      "New York",
+      "Notton",
+      "Nvidia",
+      "OpenAI",
+      "PC",
+      "Paul Alcorn",
+      "RAM",
+      "RTX 50-series",
+      "RTX 5000 Super",
+      "RTX 5060",
+      "RTX 5060 Ti",
+      "RTX 5060 Ti 16GB",
+      "RTX 5060 Ti 8GB",
+      "RTX 5070",
+      "RTX 5070 Ti",
+      "RTX 5080",
+      "RTX 5090",
+      "RTX Pro 6000",
+      "RTX Pro 6000 Blackwell",
+      "SK hynix",
+      "Sam Altman",
+      "Seagate BarraCuda",
+      "Taiwan",
+      "TerryLaze",
+      "Tom's Hardware",
+      "Trump",
+      "U.S.",
+      "call101010",
+      "thesyndrome"
+    ]
+  },
+  "errors": [],
+  "estimated_cost_usd": 0.425
+}

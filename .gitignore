@@ -141,6 +141,10 @@ backend/reports/code_quality_report.md
 *.db
 *.sqlite
 
+# Large document files (PDFs exceed pre-commit size limits)
+# Keep extracted JSON but not raw PDFs in git
+documents/raw/*.pdf
+
 # Documentation builds
 docs/_build/
 site/

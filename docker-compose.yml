@@ -47,3 +47,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s  # Give time for Next.js to compile
+
+  # Neo4j Graph Database for Knowledge Graph (Phase 2)
+  neo4j:
+    image: neo4j:5-community
+    ports:
+      - "7474:7474"  # HTTP browser interface
+      - "7687:7687"  # Bolt protocol for driver connections
+    environment:
+      - NEO4J_AUTH=neo4j/localdevpassword
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s  # Give time for Neo4j to initialize
+
+volumes:
+  neo4j_data:

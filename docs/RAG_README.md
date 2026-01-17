@@ -45,7 +45,7 @@ This RAG system enables natural language querying over complex financial documen
 ### Design Principles
 
 1. **Quality over cost** - For a demo with ~30-40 documents, we optimize for accuracy and simplicity
-2. **VLM for all documents** - Single extraction pipeline using Claude Vision for consistency
+2. **VLM for all documents** - Single extraction pipeline using Claude Sonnet 4.5 Vision for consistency
 3. **Hybrid retrieval** - Combine semantic understanding with keyword matching and graph traversal
 4. **Structured + unstructured** - Preserve table structure while enabling natural language queries
 5. **Traceable answers** - Every response cites specific pages and sections
@@ -112,7 +112,7 @@ This RAG system enables natural language querying over complex financial documen
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Document Extraction | Claude Vision (VLM) via Bedrock | Convert ALL PDF pages to structured text |
+| Document Extraction | Claude Sonnet 4.5 Vision (VLM) via Bedrock | Convert ALL PDF pages to structured text |
 | Entity Extraction | spaCy NER | Extract entities for Knowledge Graph (cost-efficient) |
 | Embeddings | AWS Bedrock Titan | Convert text to 1536-dim semantic vectors |
 | Vector Store | Pinecone Serverless | Semantic (dense) and keyword (BM25) search |
@@ -125,7 +125,7 @@ This RAG system enables natural language querying over complex financial documen
 
 ## Document Ingestion
 
-> **Key Decision:** We use Claude Vision (VLM) for ALL documents - both complex 10-Ks and simple reference documents. This gives us one code path, consistent output, and the highest quality extraction. The cost difference is negligible for our document volume (~$40-60 total).
+> **Key Decision:** We use Claude Sonnet 4.5 Vision (VLM) for ALL documents - both complex 10-Ks and simple reference documents. This gives us one code path, consistent output, and the highest quality extraction. The cost difference is negligible for our document volume (~$40-60 total). Note: Claude 3.5 Sonnet V2 was deprecated in Oct 2025 and will shut down Feb 2026; Claude Sonnet 4.5 is the current recommended model.
 
 ### The Challenge of 10-K Documents
 
@@ -149,7 +149,7 @@ Revenue (2023): $383,285M
 
 ### Our Approach: Vision Language Model Extraction
 
-We use Claude Vision to "see" each page as a human would, understanding:
+We use Claude Sonnet 4.5 Vision to "see" each page as a human would, understanding:
 
 - Which numbers belong to which columns
 - Table headers and row hierarchies
@@ -164,8 +164,9 @@ We use Claude Vision to "see" each page as a human would, understanding:
 └──────────────────────────────────────────────────────────────────────────────┘
                                       │
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   PDF File   │────▶│  Page Images │────▶│ Claude Vision│
-│ (any type)   │     │  (150 DPI)   │     │  (Bedrock)   │
+│   PDF File   │────▶│  Page Images │────▶│ Claude Sonnet│
+│ (any type)   │     │  (150 DPI)   │     │  4.5 Vision  │
+│              │     │              │     │  (Bedrock)   │
 └──────────────┘     └──────────────┘     └──────┬───────┘
                                                  │
                                                  ▼
@@ -200,6 +201,33 @@ We use Claude Vision to "see" each page as a human would, understanding:
 - Batch script processing (no Lambda timeouts)
 
 > **Decision:** We use VLM even for "simple" documents (news articles, policies) because the cost difference is negligible (~$0.10 per article) and maintaining two extraction pipelines adds complexity without meaningful benefit for a demo. See `docs/PHASE_2_REQUIREMENTS.md` "Why Batch Script" section for full rationale.
+
+### Alternative: HTML + Markdown for SEC Filings
+
+For production systems processing thousands of SEC filings, an alternative approach offers significant cost savings:
+
+| Approach | Cost per 10-K | Best For |
+|----------|---------------|----------|
+| **PDF + Vision** (current) | ~$4.00 | Any document type, complex layouts, charts, scanned docs |
+| **HTML + Text API** | ~$0.30 | SEC filings only, high-volume processing |
+
+**How it works:** SEC EDGAR provides 10-K filings as structured HTML. Download HTML → convert to Markdown → send text to LLM (no vision needed) → 90% cost reduction.
+
+**Why we chose PDF + Vision:**
+- Works with ANY document (not just SEC filings)
+- Handles charts, graphs, and images
+- Works with scanned documents and non-standard PDFs
+- More robust to formatting variations
+- Simpler implementation (one pipeline for all document types)
+- Cost difference minimal for demo scale (~$40 vs ~$3 total)
+
+**When to consider HTML approach:**
+- Processing 1000s of SEC filings regularly
+- Cost optimization is critical
+- Chart/graph extraction not needed
+- Want to chunk by SEC section (Item 1, 7, 8)
+
+> **Note:** The HTML approach would require ~2-3 days of additional development to implement SEC EDGAR API integration, HTML parsing, and a parallel text-based extraction pipeline.
 
 ### Semantic Chunking
 
@@ -391,7 +419,7 @@ The knowledge graph captures **what entities exist** and **how they relate**. Th
 Entities are extracted from VLM output using spaCy NLP (not LLM) for cost efficiency:
 
 ```
-PDF → Claude VLM → Clean Text → spaCy NER → Entities → Neo4j
+PDF → Claude Sonnet 4.5 VLM → Clean Text → spaCy NER → Entities → Neo4j
 ```
 
 - **Standard NER:** People, organizations, locations, dates, money
@@ -1215,7 +1243,7 @@ This RAG system combines three retrieval methods (semantic, keyword, graph) with
 
 **Key design decisions for this project:**
 
-1. **VLM extraction for ALL documents** - Single code path using Claude Vision for both 10-Ks and reference documents (~$40-60 one-time cost for ~30-40 documents)
+1. **VLM extraction for ALL documents** - Single code path using Claude Sonnet 4.5 Vision for both 10-Ks and reference documents (~$40-60 one-time cost for ~30-40 documents)
 2. **Batch script processing** - Local scripts instead of Lambda for simplicity and no timeout limits
 3. **Hybrid retrieval** - Combine semantic (Titan embeddings), keyword (BM25), and graph (Neo4j) for robust query handling
 4. **spaCy for entity extraction** - Cost-efficient NER for Knowledge Graph (20-50x cheaper than LLM)
@@ -1223,7 +1251,7 @@ This RAG system combines three retrieval methods (semantic, keyword, graph) with
 
 **Data flow:**
 ```
-PDF → Claude VLM → Clean Text → ┬→ Titan Embeddings → Pinecone (semantic + BM25)
+PDF → Claude Sonnet 4.5 VLM → Clean Text → ┬→ Titan Embeddings → Pinecone (semantic + BM25)
                                 ├→ spaCy NER → Neo4j (knowledge graph)
                                 └→ Parse Tables → PostgreSQL (SQL queries, 10-Ks only)
 ```

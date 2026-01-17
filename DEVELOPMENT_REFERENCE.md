@@ -702,6 +702,7 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 # Document Processing
 pdf2image~=1.17.0           # PDF to images for VLM extraction
 Pillow~=10.4.0              # Image processing
+python-magic~=0.4.27        # File type detection
 
 # Vector Store & Knowledge Graph
 pinecone-client~=5.0.0      # Vector store (matches Package Versions section)
@@ -713,9 +714,10 @@ spacy~=3.8.0                # NLP for entity extraction and chunking
 
 **System Dependencies (Dockerfile):**
 ```dockerfile
-# PDF processing
+# PDF processing and file type detection
 RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # spaCy model for entity extraction and sentence boundary detection
@@ -830,7 +832,7 @@ class SendMessageRequest(BaseModel):
 
 **Data Source:** Real 10-K financial metrics extracted via VLM (not synthetic Faker data).
 
-1. **Database Schema** (`backend/alembic/versions/002_10k_schema.py`)
+1. **Database Schema** (`backend/alembic/versions/001_10k_financial_schema.py`)
    - `companies` - Company info (ticker, name, sector, filing dates)
    - `financial_metrics` - Revenue, net income, margins, EPS by year
    - `segment_revenue` - Revenue breakdown by business segment
@@ -1632,7 +1634,8 @@ terraform {
   - Nova Pro: `amazon.nova-pro-v1:0`
   - Nova Lite: `amazon.nova-lite-v1:0`
   - Titan Embeddings: `amazon.titan-embed-text-v1`
-  - Claude Fallback: `anthropic.claude-3-5-sonnet-20241022-v2:0`
+  - Claude Sonnet 4.5 (Primary VLM): `us.anthropic.claude-sonnet-4-5-20250929-v1:0` (released Sep 2025, current recommended)
+  - Claude Fallback (Deprecated): `anthropic.claude-3-5-sonnet-20241022-v2:0` (retired Oct 2025, shutdown Feb 2026)
 
 ### Neo4j AuraDB (Knowledge Graph)
 - **Tier:** Free (200K nodes, 400K relationships)

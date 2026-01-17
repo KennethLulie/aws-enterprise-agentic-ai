@@ -27,8 +27,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.11-slim AS production
 
 # Install runtime system dependencies only
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    poppler-utils \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
@@ -42,6 +44,9 @@ COPY --from=builder /wheels /wheels
 # Install wheels into virtual environment
 RUN /opt/venv/bin/pip install --no-cache-dir /wheels/*.whl && \
     rm -rf /wheels
+
+# Download spaCy model for NLP entity extraction and sentence boundary detection
+RUN /opt/venv/bin/python -m spacy download en_core_web_sm
 
 ENV PATH="/opt/venv/bin:$PATH"
 

@@ -16,7 +16,8 @@ repos:
             \.env\.example|
             .*\.lock|
             package-lock\.json|
-            .*HOW_TO_GUIDE.*\.md
+            .*HOW_TO_GUIDE.*\.md|
+            documents/extracted/manifest\.json
           )$
 
   # =============================================================================

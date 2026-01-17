@@ -1,0 +1,52 @@
+{
+  "documents": {
+    "2026_NVIDIA_Strategic_Analysis_VRAM_Unbundling_And_Profit_Per_GB_Metrics": {
+      "source_file": "2026_NVIDIA_Strategic_Analysis_VRAM_Unbundling_And_Profit_Per_GB_Metrics.pdf",
+      "file_hash": "70dcf0060f543a638c97a5c75ee0bdd8",
+      "file_size_bytes": 10383873,
+      "extracted_at": "2026-01-17T02:30:57.731530+00:00",
+      "page_count": 17,
+      "pages_processed": 17,
+      "extraction_cost_usd": 0.425,
+      "doc_type": "reference",
+      "indexed_to_pinecone": false,
+      "indexed_at": null,
+      "chunk_count": null,
+      "error_count": 0
+    },
+    "IDC_-_Global_Memory_Shortage_Crisis__Market_Analysis_and_the_Potential_Impact_on_the_Smartphone_and_PC_Markets_in_2026": {
+      "source_file": "IDC - Global Memory Shortage Crisis_ Market Analysis and the Potential Impact on the Smartphone and PC Markets in 2026.pdf",
+      "file_hash": "22b101031c165467f2ce922ea04bf76e",
+      "file_size_bytes": 1491467,
+      "extracted_at": "2026-01-17T02:32:54.235110+00:00",
+      "page_count": 6,
+      "pages_processed": 6,
+      "extraction_cost_usd": 0.15,
+      "doc_type": "reference",
+      "indexed_to_pinecone": false,
+      "indexed_at": null,
+      "chunk_count": null,
+      "error_count": 0
+    },
+    "NVDA_10K_2025": {
+      "source_file": "NVDA_10K_2025.pdf",
+      "file_hash": "a5d042dc131d55e14ea836b257b614ab",
+      "file_size_bytes": 3389515,
+      "extracted_at": "2026-01-17T03:11:15.289015+00:00",
+      "page_count": 119,
+      "pages_processed": 119,
+      "extraction_cost_usd": 4.76,
+      "doc_type": "10k",
+      "indexed_to_pinecone": false,
+      "indexed_at": null,
+      "chunk_count": null,
+      "error_count": 0
+    }
+  },
+  "totals": {
+    "documents_extracted": 3,
+    "documents_indexed": 0,
+    "total_extraction_cost_usd": 5.335,
+    "last_updated": "2026-01-17T03:11:15.290753+00:00"
+  }
+}

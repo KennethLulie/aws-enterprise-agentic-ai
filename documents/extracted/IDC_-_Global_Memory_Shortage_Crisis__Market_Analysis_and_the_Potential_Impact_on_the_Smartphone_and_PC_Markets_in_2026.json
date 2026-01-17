@@ -1,0 +1,755 @@
+{
+  "document_id": "IDC_-_Global_Memory_Shortage_Crisis__Market_Analysis_and_the_Potential_Impact_on_the_Smartphone_and_PC_Markets_in_2026",
+  "document_type": "reference",
+  "filename": "IDC - Global Memory Shortage Crisis_ Market Analysis and the Potential Impact on the Smartphone and PC Markets in 2026.pdf",
+  "extraction_date": "2026-01-17T02:30:57.732793+00:00",
+  "total_pages": 6,
+  "pages_processed": 6,
+  "pages": [
+    {
+      "page_number": 1,
+      "document_type": "research",
+      "content_type": "narrative",
+      "text": "Markets and Trends December 18, 2025 10 min\n\nGlobal Memory Shortage Crisis: Market Analysis and the Potential Impact on the Smartphone and PC Markets in 2026\n\nIn late 2025, the global semiconductor ecosystem is experiencing an unprecedented memory chip shortage with knock-on effects for the device manufacturers and end users that could persist well into 2027. DRAM prices have surged significantly as demand from AI data centers continues to outstrip supply, creating a supply/demand imbalance.\n\nIDC was monitoring the memory situation as we prepared our November device forecasts, and we factored them into the update. The situation, however, has become more acute since publishing, and we feel it's important we address the situation. Although we are maintaining our official forecasts as the situation is still evolving, we will offer here two downside risk scenarios that may play out in two critical markets: Smartphones and Personal Computers.\n\nWhat's causing the shortage? The memory market is at an unprecedented inflexion point, with demand materially outpacing supply. For an industry that has long been characterized by boom-and-bust cycles, this time is different. The rapid expansion of AI infrastructure and workloads is exerting significant pressure on the memory ecosystem. These AI workloads require large amounts of memory, and the shortage, in part, is driven by a reallocation of manufacturing capacity away from consumer electronics toward high-margin memory solutions to support AI. Instead of expanding conventional DRAM and NAND used in smartphones, PCs, and other consumer electronics, major memory makers have shifted production toward memory used in AI data centers, such as high-bandwidth (HBM) and high-capacity DDR5. This has restricted the supply of general-purpose memory modules and driven up prices across the board.",
+      "headline": "Global Memory Shortage Crisis: Market Analysis and the Potential Impact on the Smartphone and PC Markets in 2026",
+      "publication_date": "2025-12-18",
+      "source": "IDC",
+      "key_claims": [
+        {
+          "claim": "The global semiconductor ecosystem is experiencing an unprecedented memory chip shortage in late 2025 with effects that could persist well into 2027",
+          "entities": [
+            "global semiconductor ecosystem",
+            "2025",
+            "2027"
+          ]
+        },
+        {
+          "claim": "DRAM prices have surged significantly as demand from AI data centers continues to outstrip supply",
+          "entities": [
+            "DRAM",
+            "AI data centers"
+          ]
+        },
+        {
+          "claim": "Major memory makers have shifted production toward memory used in AI data centers, such as high-bandwidth (HBM) and high-capacity DDR5",
+          "entities": [
+            "HBM",
+            "DDR5",
+            "AI data centers"
+          ]
+        },
+        {
+          "claim": "The shortage is driven by a reallocation of manufacturing capacity away from consumer electronics toward high-margin memory solutions to support AI",
+          "entities": [
+            "AI",
+            "consumer electronics"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "IDC",
+        "DRAM",
+        "AI data centers",
+        "Smartphones",
+        "Personal Computers",
+        "HBM",
+        "DDR5",
+        "NAND"
+      ],
+      "tables": [],
+      "cross_references": [
+        "November device forecasts"
+      ]
+    },
+    {
+      "page_number": 2,
+      "document_type": "research",
+      "content_type": "narrative",
+      "text": "AI servers and enterprise environments require far more memory per system than consumer devices, so the AI build-out is pulling a disproportionate share of global capacity and creating shortages, as suppliers prioritize orders from hyperscalers and OEMs building AI servers. That dynamic has left less DRAM available for consumer devices, exacerbating price pressure in a tight market.\n\nHowever, this is not just a cyclical shortage driven by a mismatch in supply and demand, but a potentially permanent, strategic reallocation of the world's silicon wafer capacity. For decades, the production of DRAM and NAND Flash for smartphones and PCs was the primary driver for production. Today, that dynamic has inverted. The voracious demand for HBM by hyperscalers, such as Microsoft, Google, Meta and Amazon, has forced the three biggest memory manufacturers (Samsung Electronics, SK Hynix, and Micron Technology) to pivot their limited cleanroom space and capital expenditure towards higher margin enterprise-grade components. This is a zero-sum game: every wafer allocated to an HBM stack for an Nvidia GPU is a wafer denied to the LPDDR5X module of a mid-range smartphone or the SSD of a consumer laptop.\n\nAs a result, IDC expects 2026 DRAM and NAND supply growth to be below historical norms at 16% year-on-year and 17% year-on-year, respectively.\n\nThe Crisis in the Devices Market\n\nThe result of this supply/demand imbalance is twofold: DRAM and NAND/SSD prices have risen sharply in recent months, and the availability of these components is limited, forcing device manufacturers to navigate a fluid situation.\n\nThe Potential Smartphone Market Impact\n\nThe global smartphone market, particularly Android manufacturers, is facing a threat in 2026. The industry's decade-long trend of democratizing specs by bringing flagship features to affordable smartphones is reversing.\n\nThe cost structure of a smartphone is heavily dependent on the memory used. For a mid-range device, memory can represent 15-20% of the total bill of materials (BOM), while for a high-end flagship device, it is around 10-15%. As memory prices continue to surge, OEMs will likely have to raise prices significantly, cut specifications or both.\n\nDifferent Vendors, Different Impacts\n\nThe impact of the shortage is highly asymmetric, creating winners and losers on supply chain resilience and vertical integration.\n\nManufacturers, whose business is mainly in the low end of the market, are likely to suffer significantly. The business models of vendors such as TCL, Transsion, Realme, Xiaomi, Lenovo, Oppo, Vivo, Honor or Huawei are based on thin margins. This increase in cost will hit their margins substantially, and they will have no other option but to pass the cost for pain to end users.\n\nIn the high end of the market, Apple and Samsung face pressure but are structurally hedged. Its cash reserves and long-term supply agreements allow it to secure memory supply 12-24 months in advance. On the other hand, new flagship models in 2026 will likely have no RAM upgrades, sticking to 12GB for Pro models rather than increasing to 16GB. It is also unlikely that current models will see the same price erosion seen after the introduction of the latest model.",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "IDC",
+      "key_claims": [
+        {
+          "claim": "IDC expects 2026 DRAM supply growth to be 16% year-on-year",
+          "entities": [
+            "IDC",
+            "DRAM"
+          ]
+        },
+        {
+          "claim": "IDC expects 2026 NAND supply growth to be 17% year-on-year",
+          "entities": [
+            "IDC",
+            "NAND"
+          ]
+        },
+        {
+          "claim": "Memory can represent 15-20% of the total bill of materials (BOM) for a mid-range smartphone device",
+          "entities": [
+            "smartphone"
+          ]
+        },
+        {
+          "claim": "Memory represents around 10-15% of BOM for a high-end flagship smartphone device",
+          "entities": [
+            "smartphone"
+          ]
+        },
+        {
+          "claim": "Apple and Samsung secure memory supply 12-24 months in advance through long-term supply agreements",
+          "entities": [
+            "Apple",
+            "Samsung"
+          ]
+        },
+        {
+          "claim": "New flagship models in 2026 will likely stick to 12GB RAM for Pro models rather than increasing to 16GB",
+          "entities": [
+            "Apple",
+            "Samsung"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "IDC",
+        "DRAM",
+        "NAND Flash",
+        "HBM",
+        "Microsoft",
+        "Google",
+        "Meta",
+        "Amazon",
+        "Samsung Electronics",
+        "SK Hynix",
+        "Micron Technology",
+        "Nvidia",
+        "LPDDR5X",
+        "SSD",
+        "Android",
+        "TCL",
+        "Transsion",
+        "Realme",
+        "Xiaomi",
+        "Lenovo",
+        "Oppo",
+        "Vivo",
+        "Honor",
+        "Huawei",
+        "Apple",
+        "Samsung"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 3,
+      "document_type": "research",
+      "content_type": "mixed",
+      "text": "Smartphone Market Forecast Scenarios\nUnit Shipments Year-on-Year Growth\n\n2025:\nNov '25 Forecast: 1.5%\n\n2026:\nNov '25 Forecast: -0.9%\nModerate Scenario: -2.9%\nPessimistic Scenario: -5.2%\n\nThe cumulative effect of these pressures is a potential contraction in the global smartphone market alongside an increase in average selling prices (ASP). In 2026, in our moderate downside scenario, we could see the market contract by 2.9%. In our pessimistic downside scenario, it could be as bad as 5.2%. The severity of each scenario depends on how long this situation lasts.\n\nAt the same time, smartphone ASPs could rise by 3% to 5% in the moderate scenario, or by 6% to 8% in the pessimistic scenario. These price rises will be significantly higher in the low end of the market, where margins are extremely tight, and OEMs will have to pass the cost to end users.\n\nBut regardless of the severity of the scenario, longer replacement cycles are likely to occur in markets with rising costs causing lower purchasing power. By contrast, in more mature markets, consumers are likely to rely on financing and instalment plans to absorb higher prices.\n\nWhile there could be significant downside risk to volumes in 2026, we expect 4Q25 to outperform our earlier projections as vendors stocked channels ahead of price increases.\n\nImpact to the PC Market\n\nIf the smartphone market is facing pressure, the PC market is bracing for disruption. The timing of the memory shortage creates a perfect storm for the PC industry, colliding with the Microsoft Windows 10 end-of-life refresh cycle and the AI PC marketing push.\n\nPC vendors are signalling broad price increases as cost pressures intensify into H2 2026. Lenovo, Dell, HP, Acer and ASUS have warned clients of tougher conditions ahead, confirming 15-20% hikes and contract resets as an industry-wide response.\n\nPC vendors with larger shipment volumes should be better positioned to navigate current supply constraints, enabling them to capture market share from smaller and regional brands. Regardless of how much the total market size may be impacted, we expect vendor market shares to shift in favor of the largest vendors armed with inventory and greater leverage with suppliers.\n\nWhite box as well as lower tier (often local) vendors, on the other hand, will bear the greatest burden of the shortage, and that would include DIY systems, oftentimes built by gamers. That in turn represents an opportunity for large OEMs to gain share from smaller assemblers in the gaming space by positioning pre-built systems as offering higher value.",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "IDC",
+      "key_claims": [
+        {
+          "claim": "In 2026, in moderate downside scenario, smartphone market could contract by 2.9%",
+          "entities": [
+            "smartphone market",
+            "2026"
+          ]
+        },
+        {
+          "claim": "In pessimistic downside scenario, smartphone market could contract by 5.2% in 2026",
+          "entities": [
+            "smartphone market",
+            "2026"
+          ]
+        },
+        {
+          "claim": "Smartphone ASPs could rise by 3% to 5% in the moderate scenario",
+          "entities": [
+            "smartphone",
+            "ASP"
+          ]
+        },
+        {
+          "claim": "Smartphone ASPs could rise by 6% to 8% in the pessimistic scenario",
+          "entities": [
+            "smartphone",
+            "ASP"
+          ]
+        },
+        {
+          "claim": "Nov '25 Forecast shows 1.5% year-on-year growth for 2025",
+          "entities": [
+            "smartphone market",
+            "2025"
+          ]
+        },
+        {
+          "claim": "Nov '25 Forecast shows -0.9% year-on-year growth for 2026",
+          "entities": [
+            "smartphone market",
+            "2026"
+          ]
+        },
+        {
+          "claim": "PC vendors confirming 15-20% price hikes into H2 2026",
+          "entities": [
+            "PC vendors",
+            "Lenovo",
+            "Dell",
+            "HP",
+            "Acer",
+            "ASUS",
+            "2026"
+          ]
+        }
+      ],
+      "entities_mentioned": [
+        "IDC",
+        "Microsoft",
+        "Windows 10",
+        "Lenovo",
+        "Dell",
+        "HP",
+        "Acer",
+        "ASUS",
+        "4Q25",
+        "H2 2026",
+        "2025",
+        "2026"
+      ],
+      "tables": [
+        {
+          "table_name": "Smartphone Market Forecast Scenarios - Unit Shipments Year-on-Year Growth",
+          "table_type": "other",
+          "headers": [
+            "Year",
+            "Nov '25 Forecast",
+            "Moderate Scenario",
+            "Pessimistic Scenario"
+          ],
+          "rows": [
+            {
+              "label": "2025",
+              "values": {
+                "Nov '25 Forecast": "1.5%",
+                "Moderate Scenario": null,
+                "Pessimistic Scenario": null
+              }
+            },
+            {
+              "label": "2026",
+              "values": {
+                "Nov '25 Forecast": "-0.9%",
+                "Moderate Scenario": "-2.9%",
+                "Pessimistic Scenario": "-5.2%"
+              }
+            }
+          ]
+        }
+      ],
+      "cross_references": []
+    },
+    {
+      "page_number": 4,
+      "document_type": "research",
+      "content_type": "mixed",
+      "text": "The Impact on AI PC\n\nThe shortage threatens to derail the industry's growth narrative around AI PC. IDC defines the AI PC as any PC with an NPU. Crucially, these devices tend to have more RAM (Microsoft's Copilot+ PCs require a minimum of 16GB). As more small language models and large language models move on device, memory becomes even more important, with many higher-end systems shifting toward 32GB or higher. Just as the industry is seeing a need to add more RAM, it has become prohibitively expensive to do so, even if they can get supply. This will result in higher prices, lower margins, or a potential downmix in the amount of RAM in new systems at the worst possible time for this to occur.\n\nPC Market Forecast Scenarios\nUnit Shipments Year-on-Year Growth\n\n[Chart showing three scenarios for 2025 and 2026:\n2025: Nov '25 Forecast: 6.6%\n2026: Nov '25 Forecast: -2.4%, Moderate Scenario: -4.9%, Pessimistic Scenario: -8.9%]\n\nAs with smartphones, IDC is not changing its official PC forecast. Here again, we offer two potential scenarios for 2026.\n\nIn the more moderate downside scenario, we could see the PC market contract by 4.9% compared with a 2.4% year-on-year decline in the November forecast. Under a more pessimistic scenario, the decline could deepen to 8.9%. The severity of each scenario will largely depend on how long the current supply constraints persist through 2026.\n\nUnder these downside scenarios, PC average selling prices would likely rise, increasing by 4% to 6% in a moderate scenario, and by 6% to 8% in a pessimistic scenario.\n\nAs with smartphones, channels are building inventory in advance to mitigate the impact of further price increases in the months ahead, which is expected to support stronger-than-expected forecast performance in Q4 2025, relative to the November outlook.\n\nConclusion\n\nWhat began as an AI infrastructure boom has now rippled outward, with tightening memory supply, inflating prices, and reshaping product and pricing strategies across both consumer and enterprise devices. As the industry adjusts to this new reality, the smartphone and PC markets are bracing for a period of higher costs, altered product roadmaps, and slower volume growth. The severity and duration of the shortage will be determined by how quickly production capacity can expand and how effectively demand rebalances across segments.\n\nFor consumers and enterprises alike, this signals the end of an era of cheap, abundant memory and storage, at least in the medium term. The year 2026 is shaping up to be one in which technology becomes more expensive, driven by supply constraints rather than demand growth.",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "IDC",
+      "key_claims": [
+        {
+          "claim": "Microsoft's Copilot+ PCs require a minimum of 16GB RAM",
+          "entities": [
+            "Microsoft",
+            "Copilot+"
+          ]
+        },
+        {
+          "claim": "Many higher-end AI PC systems are shifting toward 32GB or higher RAM",
+          "entities": [
+            "AI PC"
+          ]
+        },
+        {
+          "claim": "IDC November 2025 forecast showed PC market year-on-year growth of 6.6% for 2025",
+          "entities": [
+            "IDC"
+          ]
+        },
+        {
+          "claim": "IDC November 2025 forecast showed PC market year-on-year decline of 2.4% for 2026",
+          "entities": [
+            "IDC"
+          ]
+        },
+        {
+          "claim": "Moderate downside scenario projects PC market contraction of 4.9% in 2026",
+          "entities": [
+            "IDC"
+          ]
+        },
+        {
+          "claim": "Pessimistic scenario projects PC market decline of 8.9% in 2026",
+          "entities": [
+            "IDC"
+          ]
+        },
+        {
+          "claim": "PC average selling prices would rise by 4% to 6% in moderate scenario",
+          "entities": []
+        },
+        {
+          "claim": "PC average selling prices would rise by 6% to 8% in pessimistic scenario",
+          "entities": []
+        },
+        {
+          "claim": "Channels are building inventory to support stronger-than-expected Q4 2025 performance",
+          "entities": []
+        }
+      ],
+      "entities_mentioned": [
+        "IDC",
+        "AI PC",
+        "Microsoft",
+        "Copilot+",
+        "NPU",
+        "Q4 2025"
+      ],
+      "tables": [
+        {
+          "table_name": "PC Market Forecast Scenarios - Unit Shipments Year-on-Year Growth",
+          "table_type": "other",
+          "headers": [
+            "Year",
+            "Nov '25 Forecast",
+            "Moderate Scenario",
+            "Pessimistic Scenario"
+          ],
+          "rows": [
+            {
+              "label": "2025",
+              "values": {
+                "Nov '25 Forecast": "6.6%",
+                "Moderate Scenario": null,
+                "Pessimistic Scenario": null
+              }
+            },
+            {
+              "label": "2026",
+              "values": {
+                "Nov '25 Forecast": "-2.4%",
+                "Moderate Scenario": "-4.9%",
+                "Pessimistic Scenario": "-8.9%"
+              }
+            }
+          ]
+        }
+      ],
+      "cross_references": []
+    },
+    {
+      "page_number": 5,
+      "document_type": "research",
+      "content_type": "narrative",
+      "text": "Francisco Jeronimo - Vice President, Data & Analytics - Devices - IDC\n\nAnalyst Profile\n\nFrancisco Jeronimo is VP for Data and Analytics at IDC EMEA. Based in London, he leads the research that covers mobile devices, personal computing devices, emerging technologies and the circular economy trends across EMEA. His team delivers data on personal computers, tablets, smartphones, wearables, PC monitors, PC gaming, enterprise Thin Client devices, smart home, augmented reality and virtual reality, and sales of used devices. He provides in-depth analysis of the strategies and performance of the key industry players.\n\nTom Mainelli - Group Vice President - IDC\n\nAnalyst Profile\n\nTom Mainelli heads the Device & Consumer Research Group, overseeing a wide array of hardware and technology categories that cater to both home and enterprise markets. His team's research spans PCs, tablets, smartphones, wearables, smart home devices, thin clients, displays, and virtual/augmented reality headsets. He also co-manages IDC's supply-side research team, which monitors display and ODM production across various categories. IDC's consumer research, anchored by the Consumer Market Model, employs regular surveys and proprietary models to forecast numerous consumer-focused activities and spending across hardware, software, and services. As Group Vice President, Tom collaborates closely with company representatives, industry contacts, and other IDC analysts to provide comprehensive insights and analysis on a diverse range of commercial and consumer topics. A frequent speaker at public events, he travels extensively, enjoying every opportunity to engage with colleagues and clients worldwide.\n\nBryan Ma - Vice President - IDC\n\nAnalyst Profile\n\nBryan Ma is Vice President of Client Devices research, covering mobile phones, tablets, PCs, AR/VR headsets, wearables, thin clients, and monitors across Asia as well as worldwide. Based in Singapore, Bryan provides insights and advisory services for both vendors and users, and coordinates his team of analysts in building IDC's core market data, analysis, and forecasts in these sectors. Bryan has been quoted in a number of publications, including The Wall Street Journal, The Economist, The Financial Times, BusinessWeek, The South China Morning Post, and The New York Times. He has been a featured speaker at numerous industry",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "IDC",
+      "key_claims": [],
+      "entities_mentioned": [
+        "Francisco Jeronimo",
+        "IDC",
+        "IDC EMEA",
+        "London",
+        "EMEA",
+        "Tom Mainelli",
+        "Device & Consumer Research Group",
+        "Consumer Market Model",
+        "Bryan Ma",
+        "Singapore",
+        "Asia",
+        "The Wall Street Journal",
+        "The Economist",
+        "The Financial Times",
+        "BusinessWeek",
+        "The South China Morning Post",
+        "The New York Times"
+      ],
+      "tables": [],
+      "cross_references": []
+    },
+    {
+      "page_number": 6,
+      "document_type": "research",
+      "content_type": "narrative",
+      "text": "conferences and appears frequently as a guest commentator on television networks such as CNBC, Bloomberg, and the BBC.\n\nRyan Reith - Group Vice President, WW Device Trackers - IDC\n\nAnalyst Profile | LinkedIn\n\nRyan Reith is the Group Vice President for IDC's Worldwide Device Tracker suite, which includes mobile phones, tablets, wearables, and most recently AR/VR. His teams research focuses on the quantitative aspects of the mobile device industry, including market sizing, forecasting, vendor market share analysis, and technology trends. His current responsibilities include engaging with mobile device OEMs, supply chain, distributors, and the financial industry to discuss market trends and forward looking analysis.\n\nJeff Janukowicz - Research Vice President, Solid State Drives and Enabling Technologies - IDC\n\nAnalyst Profile | LinkedIn\n\nJeff Janukowicz is a Research Vice President at IDC where he provides insight and analysis on the SSD market for the Client PC, Enterprise Data Center, and Cloud market segments. In this role, Jeff provides expert opinion, in-depth market research, and strategic analysis on the dynamics, trends, and opportunities facing the industry. His research includes market forecasts, market share reports, and technology trends of clients, investor, suppliers, and manufacturers.",
+      "headline": null,
+      "publication_date": "2026-01-16",
+      "source": "IDC",
+      "key_claims": [],
+      "entities_mentioned": [
+        "CNBC",
+        "Bloomberg",
+        "BBC",
+        "Ryan Reith",
+        "IDC",
+        "Jeff Janukowicz"
+      ],
+      "tables": [],
+      "cross_references": []
+    }
+  ],
+  "metadata": {
+    "headline": "Global Memory Shortage Crisis: Market Analysis and the Potential Impact on the Smartphone and PC Markets in 2026",
+    "publication_date": "2025-12-18",
+    "source": "IDC",
+    "source_type": "news",
+    "entities_mentioned": [
+      "2025",
+      "2026",
+      "4Q25",
+      "AI PC",
+      "AI data centers",
+      "ASUS",
+      "Acer",
+      "Amazon",
+      "Android",
+      "Apple",
+      "Asia",
+      "BBC",
+      "Bloomberg",
+      "Bryan Ma",
+      "BusinessWeek",
+      "CNBC",
+      "Consumer Market Model",
+      "Copilot+",
+      "DDR5",
+      "DRAM",
+      "Dell",
+      "Device & Consumer Research Group",
+      "EMEA",
+      "Francisco Jeronimo",
+      "Google",
+      "H2 2026",
+      "HBM",
+      "HP",
+      "Honor",
+      "Huawei",
+      "IDC",
+      "IDC EMEA",
+      "Jeff Janukowicz",
+      "LPDDR5X",
+      "Lenovo",
+      "London",
+      "Meta",
+      "Micron Technology",
+      "Microsoft",
+      "NAND",
+      "NAND Flash",
+      "NPU",
+      "Nvidia",
+      "Oppo",
+      "Personal Computers",
+      "Q4 2025",
+      "Realme",
+      "Ryan Reith",
+      "SK Hynix",
+      "SSD",
+      "Samsung",
+      "Samsung Electronics",
+      "Singapore",
+      "Smartphones",
+      "TCL",
+      "The Economist",
+      "The Financial Times",
+      "The New York Times",
+      "The South China Morning Post",
+      "The Wall Street Journal",
+      "Tom Mainelli",
+      "Transsion",
+      "Vivo",
+      "Windows 10",
+      "Xiaomi"
+    ]
+  },
+  "consolidated": {
+    "headline": "Global Memory Shortage Crisis: Market Analysis and the Potential Impact on the Smartphone and PC Markets in 2026",
+    "publication_date": "2025-12-18",
+    "source": "IDC",
+    "source_type": "research",
+    "key_claims": [
+      {
+        "claim": "The global semiconductor ecosystem is experiencing an unprecedented memory chip shortage in late 2025 with effects that could persist well into 2027",
+        "entities": [
+          "global semiconductor ecosystem",
+          "2025",
+          "2027"
+        ],
+        "source_page": 1
+      },
+      {
+        "claim": "DRAM prices have surged significantly as demand from AI data centers continues to outstrip supply",
+        "entities": [
+          "DRAM",
+          "AI data centers"
+        ],
+        "source_page": 1
+      },
+      {
+        "claim": "Major memory makers have shifted production toward memory used in AI data centers, such as high-bandwidth (HBM) and high-capacity DDR5",
+        "entities": [
+          "HBM",
+          "DDR5",
+          "AI data centers"
+        ],
+        "source_page": 1
+      },
+      {
+        "claim": "The shortage is driven by a reallocation of manufacturing capacity away from consumer electronics toward high-margin memory solutions to support AI",
+        "entities": [
+          "AI",
+          "consumer electronics"
+        ],
+        "source_page": 1
+      },
+      {
+        "claim": "IDC expects 2026 DRAM supply growth to be 16% year-on-year",
+        "entities": [
+          "IDC",
+          "DRAM"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "IDC expects 2026 NAND supply growth to be 17% year-on-year",
+        "entities": [
+          "IDC",
+          "NAND"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "Memory can represent 15-20% of the total bill of materials (BOM) for a mid-range smartphone device",
+        "entities": [
+          "smartphone"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "Memory represents around 10-15% of BOM for a high-end flagship smartphone device",
+        "entities": [
+          "smartphone"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "Apple and Samsung secure memory supply 12-24 months in advance through long-term supply agreements",
+        "entities": [
+          "Apple",
+          "Samsung"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "New flagship models in 2026 will likely stick to 12GB RAM for Pro models rather than increasing to 16GB",
+        "entities": [
+          "Apple",
+          "Samsung"
+        ],
+        "source_page": 2
+      },
+      {
+        "claim": "In 2026, in moderate downside scenario, smartphone market could contract by 2.9%",
+        "entities": [
+          "smartphone market",
+          "2026"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "In pessimistic downside scenario, smartphone market could contract by 5.2% in 2026",
+        "entities": [
+          "smartphone market",
+          "2026"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "Smartphone ASPs could rise by 3% to 5% in the moderate scenario",
+        "entities": [
+          "smartphone",
+          "ASP"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "Smartphone ASPs could rise by 6% to 8% in the pessimistic scenario",
+        "entities": [
+          "smartphone",
+          "ASP"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "Nov '25 Forecast shows 1.5% year-on-year growth for 2025",
+        "entities": [
+          "smartphone market",
+          "2025"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "Nov '25 Forecast shows -0.9% year-on-year growth for 2026",
+        "entities": [
+          "smartphone market",
+          "2026"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "PC vendors confirming 15-20% price hikes into H2 2026",
+        "entities": [
+          "PC vendors",
+          "Lenovo",
+          "Dell",
+          "HP",
+          "Acer",
+          "ASUS",
+          "2026"
+        ],
+        "source_page": 3
+      },
+      {
+        "claim": "Microsoft's Copilot+ PCs require a minimum of 16GB RAM",
+        "entities": [
+          "Microsoft",
+          "Copilot+"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "Many higher-end AI PC systems are shifting toward 32GB or higher RAM",
+        "entities": [
+          "AI PC"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "IDC November 2025 forecast showed PC market year-on-year growth of 6.6% for 2025",
+        "entities": [
+          "IDC"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "IDC November 2025 forecast showed PC market year-on-year decline of 2.4% for 2026",
+        "entities": [
+          "IDC"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "Moderate downside scenario projects PC market contraction of 4.9% in 2026",
+        "entities": [
+          "IDC"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "Pessimistic scenario projects PC market decline of 8.9% in 2026",
+        "entities": [
+          "IDC"
+        ],
+        "source_page": 4
+      },
+      {
+        "claim": "PC average selling prices would rise by 4% to 6% in moderate scenario",
+        "entities": [],
+        "source_page": 4
+      },
+      {
+        "claim": "PC average selling prices would rise by 6% to 8% in pessimistic scenario",
+        "entities": [],
+        "source_page": 4
+      },
+      {
+        "claim": "Channels are building inventory to support stronger-than-expected Q4 2025 performance",
+        "entities": [],
+        "source_page": 4
+      }
+    ],
+    "entities_mentioned": [
+      "2025",
+      "2026",
+      "4Q25",
+      "AI PC",
+      "AI data centers",
+      "ASUS",
+      "Acer",
+      "Amazon",
+      "Android",
+      "Apple",
+      "Asia",
+      "BBC",
+      "Bloomberg",
+      "Bryan Ma",
+      "BusinessWeek",
+      "CNBC",
+      "Consumer Market Model",
+      "Copilot+",
+      "DDR5",
+      "DRAM",
+      "Dell",
+      "Device & Consumer Research Group",
+      "EMEA",
+      "Francisco Jeronimo",
+      "Google",
+      "H2 2026",
+      "HBM",
+      "HP",
+      "Honor",
+      "Huawei",
+      "IDC",
+      "IDC EMEA",
+      "Jeff Janukowicz",
+      "LPDDR5X",
+      "Lenovo",
+      "London",
+      "Meta",
+      "Micron Technology",
+      "Microsoft",
+      "NAND",
+      "NAND Flash",
+      "NPU",
+      "Nvidia",
+      "Oppo",
+      "Personal Computers",
+      "Q4 2025",
+      "Realme",
+      "Ryan Reith",
+      "SK Hynix",
+      "SSD",
+      "Samsung",
+      "Samsung Electronics",
+      "Singapore",
+      "Smartphones",
+      "TCL",
+      "The Economist",
+      "The Financial Times",
+      "The New York Times",
+      "The South China Morning Post",
+      "The Wall Street Journal",
+      "Tom Mainelli",
+      "Transsion",
+      "Vivo",
+      "Windows 10",
+      "Xiaomi"
+    ]
+  },
+  "errors": [],
+  "estimated_cost_usd": 0.15
+}

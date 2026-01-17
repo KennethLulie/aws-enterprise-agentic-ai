@@ -198,7 +198,7 @@ aws bedrock list-foundation-models \
   --output table
 ```
 
-**Expected Output:** List includes `anthropic.claude-3-5-sonnet-*` or similar Claude model.
+**Expected Output:** List includes `us.anthropic.claude-sonnet-4-5-*` (Claude Sonnet 4.5 - current recommended) or `anthropic.claude-3-5-sonnet-*` (deprecated, shutdown Feb 2026).
 
 **If models not listed:** Request model access in AWS Console → Bedrock → Model access.
 
@@ -748,7 +748,7 @@ Requirements:
 
 Structure:
 - VLMExtractor class with:
-  - __init__(self, model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0")
+  - __init__(self, model_id: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0", fallback_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0")
   - _pdf_to_images(self, pdf_path: Path, dpi: int = 150) -> list[Image]
   - _encode_image(self, image: Image) -> str (base64 encoding)
   - _extract_page(self, image: Image, page_num: int, doc_type: str) -> dict
@@ -1220,11 +1220,14 @@ print('To extract: python scripts/extract_and_index.py')
 
 **⚠️ Cost Warning:** This step will call Claude Vision API for all documents. Estimated cost: ~$25-40 for ~750 pages.
 
+
+**note will run locally in venv, this helps avoid technical complexity for the demo** 
 **Command:**
 ```bash
 cd ~/Projects/aws-enterprise-agentic-ai
 
 # Check current status first (no API calls, reads manifest)
+# install any missing dependencies
 python scripts/extract_and_index.py --status
 
 # Dry run to see what will be processed
@@ -1738,30 +1741,32 @@ Reference:
 - SQLAlchemy patterns for bulk insert and upsert
 - [backend.mdc] for database patterns
 
-Verify: docker-compose exec backend python scripts/load_10k_to_sql.py --validate-only
+Verify (run locally): source .venv/bin/activate && python scripts/load_10k_to_sql.py --validate-only
 ```
 
 ### 6.5 Load Extracted Data
 
+> **Note:** This script runs locally (not in Docker) because it reads from `documents/extracted/` which is not mounted in the container.
+
 **Command:**
 ```bash
 cd ~/Projects/aws-enterprise-agentic-ai
+source .venv/bin/activate
 
 # Dry run to validate parsing (catches issues before writing to DB)
-docker-compose exec backend python scripts/load_10k_to_sql.py --dry-run
+python scripts/load_10k_to_sql.py --dry-run
 ```
 
 **Expected Dry Run Output:**
 ```
-Dry run mode - validating parsing only
-Parsing AAPL_10K_2024.json...
-  Company: Apple Inc. (AAPL)
-  Financial metrics: 2 years found
-  Segments: 5 found
-  Geographic regions: 4 found
-  Risk factors: 12 found
-...
-Dry run complete: 7 documents parsed successfully
+✓ Database connection successful
+
+Dry run - would load 3 documents:
+
+  ○ reference_doc.json - Skip (not 10-K)
+  ✓ NVDA_10K_2025.json
+      Company: NVIDIA Corporation (NVDA)
+      Would load: 1 years, 21 segments, 19 regions, 95 risks
 ```
 
 **If parsing errors:** Fix the extraction or loading script before proceeding.
@@ -1769,7 +1774,7 @@ Dry run complete: 7 documents parsed successfully
 **Command (actual load):**
 ```bash
 # Load all extracted 10-K data
-docker-compose exec backend python scripts/load_10k_to_sql.py
+python scripts/load_10k_to_sql.py
 ```
 
 ### 6.6 Verify Data Loaded Correctly
@@ -2009,13 +2014,16 @@ Verify: docker-compose exec backend python -c "from src.agent.tools.sql import s
 ```bash
 cd ~/Projects/aws-enterprise-agentic-ai
 
-# Test SQL tool directly
+# Test SQL tool directly (async tool requires asyncio)
 docker-compose exec backend python -c "
+import asyncio
 from src.agent.tools.sql import sql_query
 
-# Test query
-result = sql_query('Which company had the highest revenue in 2024?')
-print(result)
+async def test():
+    result = await sql_query.ainvoke({'query': 'Which company had the highest revenue?'})
+    print(result)
+
+asyncio.run(test())
 "
 ```
 
