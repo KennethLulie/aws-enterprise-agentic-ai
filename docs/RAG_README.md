@@ -250,7 +250,9 @@ Key principles:
 - Split at sentence boundaries
 - Keep paragraphs together when possible
 - Preserve context with overlap between chunks
-- Maximum ~512 tokens per chunk
+- Maximum ~256 tokens per child chunk (optimized for precision matching)
+- Parent/child chunking provides larger context (1024 tokens) via parent_text
+- Section-aware boundaries for 10-K documents (never split across Item sections)
 
 ### Contextual Enrichment
 

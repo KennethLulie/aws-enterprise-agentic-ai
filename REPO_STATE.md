@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-17 (Phase 2a: Semantic chunking module added)
+**Last Updated:** 2026-01-18 (Phase 2a: Section boundary detection, company extraction, 256-token chunks)
 
 ---
 
@@ -86,8 +86,8 @@
 | backend/src/db/session.py | SQLAlchemy engine, session, connection pooling |
 | backend/src/ingestion/__init__.py | Data ingestion package exports (VLMExtractor, DocumentProcessor, exceptions) |
 | backend/src/ingestion/vlm_extractor.py | VLM-based PDF extraction using Claude Sonnet 4.5 Vision (Bedrock) with automatic fallback to deprecated Claude 3.5 Sonnet V2 |
-| backend/src/ingestion/document_processor.py | High-level document processor with manifest tracking, consolidation, and batch processing |
-| backend/src/ingestion/semantic_chunking.py | spaCy-based semantic text chunking for RAG indexing |
+| backend/src/ingestion/document_processor.py | High-level document processor with manifest tracking, consolidation, batch processing, and company name extraction from cover page |
+| backend/src/ingestion/semantic_chunking.py | spaCy-based semantic text chunking with section boundary detection for 10-K documents |
 | backend/src/utils/__init__.py | Utility helpers package |
 | backend/src/utils/embeddings.py | Bedrock Titan embeddings utility for RAG vectorization |
 | backend/tests/__init__.py | Tests package |
@@ -137,6 +137,7 @@
 | docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md | Completed Phase 1a guide (archived) |
 | docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md | Completed Phase 1b guide (archived) |
 | docs/completed-phases/PHASE_2_REQUIREMENTS.md | Phase 2 requirements planning document (archived) |
+| docs/completed-phases/RAG_IMPROVEMENTS_DELTA.md | RAG chunking improvements delta (section boundaries, 256-token chunks, company extraction) |
 
 ### Scripts Directory
 | File | Purpose |

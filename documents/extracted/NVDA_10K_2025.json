@@ -9822,7 +9822,8 @@
   "metadata": {
     "ticker": "NVDA",
     "fiscal_year": 2025,
-    "document_type": "SEC 10-K Filing"
+    "document_type": "SEC 10-K Filing",
+    "company": "Nvidia Corporation"
   },
   "consolidated": {
     "financial_metrics_by_year": {

@@ -517,22 +517,27 @@ Verify: Test that chunks from Item 1A don't include Item 1 content
 
 ### 10-K Section Patterns to Detect
 
-| Section | Pattern | Notes |
-|---------|---------|-------|
-| Item 1 | `Item 1.` or `Item 1:` or `ITEM 1` | Business |
-| Item 1A | `Item 1A.` or `Item 1A:` or `ITEM 1A` | Risk Factors |
-| Item 1B | `Item 1B.` | Unresolved Staff Comments |
-| Item 2 | `Item 2.` | Properties |
-| Item 3 | `Item 3.` | Legal Proceedings |
-| Item 4 | `Item 4.` | Mine Safety |
-| Item 5 | `Item 5.` | Market for Registrant |
-| Item 6 | `Item 6.` | [Reserved] |
-| Item 7 | `Item 7.` | MD&A |
-| Item 7A | `Item 7A.` | Quantitative Disclosures |
-| Item 8 | `Item 8.` | Financial Statements |
-| Item 9 | `Item 9.` | Changes in Accountants |
-| Item 9A | `Item 9A.` | Controls |
-| Item 9B | `Item 9B.` | Other Information |
+> **IMPORTANT:** The VLM extraction already produces normalized section names like `"Item 1: Business"` and `"Item 1A: Risk Factors"` in the `page["section"]` field. The section boundary detection compares these **string values directly** - no regex pattern matching is needed at chunking time.
+>
+> The `_is_section_boundary()` function simply checks `prev_section != curr_section`.
+
+**Reference: Section values in extracted data (from NVDA_10K_2025.json):**
+
+| Section Field Value | Description |
+|---------------------|-------------|
+| `"Cover Page"` | SEC cover page |
+| `"Table of Contents"` | TOC page |
+| `"Item 1: Business"` | Business description |
+| `"Item 1A: Risk Factors"` | Risk factors section |
+| `"Item 1B: Unresolved Staff Comments"` | Staff comments |
+| `"Item 1C: Cybersecurity"` | Cybersecurity (newer filings) |
+| `"Item 2: Properties"` | Properties |
+| `"Item 3: Legal Proceedings"` | Legal proceedings |
+| `"Item 7: Management's Discussion..."` | MD&A |
+| `"Item 7A: Quantitative..."` | Market risk disclosures |
+| `"Item 8: Financial Statements..."` | Financial statements |
+
+**Key Point:** Section boundary detection is a simple string comparison, not pattern matching. The VLM has already normalized the section names.
 
 ---
 
@@ -723,9 +728,26 @@ Note: This only affects new indexing runs. Re-indexing required for existing doc
 
 ## Edge Cases and Error Handling
 
+### Edge Case 0: Reference Documents Have No Section Field
+
+**Scenario:** Reference documents (news articles, research reports) do NOT have `section` metadata - only 10-K documents do.
+
+**Evidence from extracted data:**
+- 10-K: `page["section"] = "Item 1A: Risk Factors"`
+- Reference: `page["section"]` does not exist (or is `None`)
+
+**Handling:**
+- Section boundary detection only applies to 10-K documents
+- For reference documents, chunks flow normally without section breaks
+- The `_is_section_boundary()` function handles `None` gracefully (see Edge Case 1)
+
+**This is intentional:** Reference documents (news, research) don't have formal sections like SEC filings, so we chunk them continuously without forced section breaks.
+
+---
+
 ### Edge Case 1: Section is None
 
-**Scenario:** Some pages may not have section metadata (e.g., cover page, table of contents).
+**Scenario:** Some pages may not have section metadata (e.g., cover page, table of contents, or ALL pages in reference documents).
 
 **Handling:**
 ```python
@@ -1327,12 +1349,62 @@ The manifest (`documents/extracted/manifest.json`) should track indexing schema 
     "AAPL_10K_2024": {
       "indexed_to_pinecone": true,
       "indexed_at": "2026-01-17T10:00:00Z",
-      "index_schema_version": "v2_parent_child",  // NEW
+      "index_schema_version": "v2_parent_child",
       "chunk_count": 260,
-      "parent_count": 65  // NEW
+      "parent_count": 65
     }
   }
 }
+```
+
+**Implementation Code for `document_processor._update_manifest()`:**
+
+Add these fields when updating the manifest after indexing:
+
+```python
+# In extract_and_index.py or a new indexing module:
+CURRENT_INDEX_SCHEMA_VERSION = "v2_parent_child"
+
+def update_manifest_after_indexing(
+    manifest: dict,
+    doc_id: str,
+    parent_count: int,
+    child_count: int,
+) -> None:
+    """Update manifest with indexing results."""
+    from datetime import datetime, timezone
+    
+    if doc_id not in manifest["documents"]:
+        raise ValueError(f"Document {doc_id} not in manifest")
+    
+    manifest["documents"][doc_id].update({
+        "indexed_to_pinecone": True,
+        "indexed_at": datetime.now(timezone.utc).isoformat(),
+        "index_schema_version": CURRENT_INDEX_SCHEMA_VERSION,
+        "chunk_count": child_count,  # Number of child chunks (vectors)
+        "parent_count": parent_count,  # Number of parent chunks
+    })
+    
+    # Update totals
+    manifest["totals"]["documents_indexed"] = sum(
+        1 for doc in manifest["documents"].values()
+        if doc.get("indexed_to_pinecone")
+    )
+
+def needs_reindexing(manifest: dict, doc_id: str) -> bool:
+    """Check if document needs re-indexing due to schema change."""
+    if doc_id not in manifest["documents"]:
+        return True
+    
+    doc = manifest["documents"][doc_id]
+    if not doc.get("indexed_to_pinecone"):
+        return True
+    
+    # Re-index if schema version changed
+    if doc.get("index_schema_version") != CURRENT_INDEX_SCHEMA_VERSION:
+        return True
+    
+    return False
 ```
 
 This allows detecting which documents need re-indexing after schema changes.
@@ -1345,19 +1417,19 @@ This allows detecting which documents need re-indexing after schema changes.
 
 ### Risk Assessment Summary
 
-| Risk | Severity | Likelihood | Mitigation |
-|------|----------|------------|------------|
-| 1. Missing `company` metadata | HIGH | CONFIRMED | Update document_processor.py |
-| 2. `__init__.py` export conflicts | MEDIUM | HIGH | Update exports for new modules |
-| 3. Phase 2A guide out of sync | MEDIUM | HIGH | Reconcile section numbers |
-| 4. Pinecone schema migration | HIGH | MEDIUM | Delete-before-upsert pattern |
-| 5. extract_and_index.py integration | MEDIUM | HIGH | Major refactor needed |
+| Risk | Severity | Status | Mitigation |
+|------|----------|--------|------------|
+| 1. Missing `company` metadata | HIGH | ✅ RESOLVED | Company extraction added to document_processor.py |
+| 2. `__init__.py` export conflicts | MEDIUM | ✅ NOT APPLICABLE | Guide uses direct imports |
+| 3. Phase 2A guide out of sync | MEDIUM | ✅ RESOLVED | Used "Delta Addition" naming pattern |
+| 4. Pinecone schema migration | HIGH | DOCUMENTED | Delete-before-upsert pattern (future implementation) |
+| 5. extract_and_index.py integration | MEDIUM | DOCUMENTED | Major refactor needed (future implementation) |
 
 ---
 
 ### Risk 1: Missing `company` Metadata Field (CRITICAL)
 
-**Status:** ⚠️ CONFIRMED - Already an issue in extracted data
+**Status:** ✅ RESOLVED - Company extraction code added to `document_processor.py`, existing JSONs updated
 
 **Evidence:** Looking at `NVDA_10K_2025.json`:
 ```json
@@ -1393,59 +1465,64 @@ The VLM extraction DOES output company info, but `document_processor._extract_me
    - `NVDA` → "NVIDIA Corporation" (lookup table)
    - Quick but brittle
 
-**Action Item:** Add to delta document - update `_extract_metadata()` to extract company from page text.
+**Implementation Code for Option B:**
+
+Add to `document_processor._extract_metadata()` around line 672-684:
+
+```python
+# In _extract_metadata() for 10k documents:
+if doc_type == "10k":
+    # Try to extract company name from first page text
+    if not metadata.get("company") and pages:
+        first_page_text = pages[0].get("text", "")
+        # Pattern: Look for "COMPANY NAME" in all caps near start of cover page
+        # Common patterns: "NVIDIA CORPORATION", "APPLE INC.", "MICROSOFT CORPORATION"
+        import re
+        company_match = re.search(
+            r'\n([A-Z][A-Z\s&,\.]+(?:CORPORATION|CORP|INC|LLC|LTD|COMPANY|CO)\.?)\s*\n',
+            first_page_text[:2000],  # Only search first 2000 chars
+            re.IGNORECASE
+        )
+        if company_match:
+            # Clean up: Title case, remove extra spaces
+            company_name = company_match.group(1).strip()
+            # Convert "NVIDIA CORPORATION" to "NVIDIA Corporation"
+            metadata["company"] = company_name.title().replace("Llc", "LLC").replace("Inc.", "Inc.").replace("Corp.", "Corp.")
+            logger.debug("company_extracted_from_text", company=metadata["company"])
+        else:
+            logger.warning("company_not_found_in_text", document_id=pdf_path.stem)
+```
 
 **Do we need to re-run VLM?** NO - the text data is already extracted. We just need better metadata extraction from the existing JSON.
 
+**To apply to existing documents:** Run `python scripts/extract_and_index.py --force` after updating the code. This will re-process the JSONs with the new metadata extraction (no VLM calls needed since JSONs exist).
+
 ---
 
-### Risk 2: `backend/src/ingestion/__init__.py` Export Conflicts
+### Risk 2: `__init__.py` Export Updates Required
 
-**Status:** Needs update for new modules
+**Status:** ✅ NOT APPLICABLE
 
-**Current State:**
+The Phase 2A guide uses **direct imports** throughout, which do not require `__init__.py` updates:
+
 ```python
-# __init__.py currently exports:
-__all__ = [
-    "VLMExtractor", "VLMExtractionError", ...
-    "DocumentProcessor", "DocumentProcessingError", ...
-    "SemanticChunker", "ChunkingError", "SpaCyLoadError",
-]
+# Guide uses direct imports like these (no __init__.py update needed):
+from src.utils.pinecone_client import PineconeClient
+from src.utils.embeddings import BedrockEmbeddings
+from src.ingestion.semantic_chunking import SemanticChunker
+from src.ingestion.parent_child_chunking import ParentChildChunker
+from src.ingestion.contextual_chunking import ContextualEnricher
 ```
 
-**Required Changes:**
-```python
-# Must add after implementation:
-from src.ingestion.parent_child_chunking import (
-    ParentChildChunker,
-    ParentChildChunkingError,
-)
-from src.ingestion.contextual_chunking import (
-    ContextualEnricher,
-    ContextualEnrichmentError,
-)
+Package-level imports (`from src.utils import PineconeClient`) would require `__init__.py` updates, but the guide does not use this pattern for new modules.
 
-__all__ = [
-    # ... existing ...
-    "ParentChildChunker",
-    "ParentChildChunkingError",
-    "ContextualEnricher",
-    "ContextualEnrichmentError",
-]
-```
-
-**Impact if not updated:**
-- Import statements like `from src.ingestion import ParentChildChunker` will fail
-- Must use full path: `from src.ingestion.parent_child_chunking import ParentChildChunker`
-- Inconsistent with existing patterns
-
-**Friction:** Module docstring in `__init__.py` also needs updating with usage examples.
+**Optional Enhancement:** If you prefer cleaner package-level imports for consistency with VLMExtractor/DocumentProcessor, you can update `__init__.py` files manually. This is not required for the guide to work.
 
 ---
 
 ### Risk 3: Phase 2A Guide Section Numbers Out of Sync
 
-**Status:** Delta document references sections that may shift
+**Status:** ✅ RESOLVED - Used "8.2 Delta Addition" naming pattern to avoid renumbering existing sections
 
 **Current Phase 2A Structure:**
 - Section 8.2: Semantic Chunking (implemented)

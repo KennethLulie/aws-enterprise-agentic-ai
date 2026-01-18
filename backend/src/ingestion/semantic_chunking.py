@@ -9,8 +9,15 @@ improve retrieval quality.
 The chunker is designed for the RAG pipeline, producing chunks that:
 - Never split mid-sentence
 - Respect paragraph boundaries when possible
+- Never cross section boundaries (10-K Item transitions)
 - Include configurable overlap for context continuity
 - Track source page numbers for citation
+
+Section Boundary Detection (Delta Addition):
+    For 10-K documents, the chunker detects section transitions (e.g.,
+    "Item 1: Business" -> "Item 1A: Risk Factors") and forces a new chunk
+    at section boundaries WITHOUT overlap. This prevents risk factor content
+    from being polluted with business description content.
 
 Usage:
     from src.ingestion.semantic_chunking import SemanticChunker
@@ -26,6 +33,7 @@ Usage:
 Reference:
     - spaCy documentation: https://spacy.io/
     - backend.mdc for Python patterns
+    - RAG_IMPROVEMENTS_DELTA.md for section boundary requirements
 """
 
 from __future__ import annotations
@@ -42,7 +50,9 @@ logger = structlog.get_logger(__name__)
 # =============================================================================
 
 # Default chunk configuration
-DEFAULT_MAX_TOKENS = 512
+# 256 tokens provides higher precision for news impact analysis.
+# Parent/child chunking provides larger context (1024 tokens) via parent_text.
+DEFAULT_MAX_TOKENS = 256
 DEFAULT_OVERLAP_TOKENS = 50
 
 # Token estimation constants
@@ -441,6 +451,43 @@ class SemanticChunker:
 
         return overlap
 
+    def _is_section_boundary(
+        self,
+        prev_section: str | None,
+        curr_section: str | None,
+    ) -> bool:
+        """
+        Detect if a section boundary exists between two sections.
+
+        For 10-K documents, sections like "Item 1: Business" and
+        "Item 1A: Risk Factors" should never be mixed in the same chunk.
+        This method detects transitions between sections.
+
+        Rules:
+        - None -> None: Not a boundary (both unknown, e.g., cover pages)
+        - None -> "Item 1A": IS a boundary (entering known section)
+        - "Item 1A" -> None: IS a boundary (leaving known section)
+        - "Item 1A" -> "Item 1A": Not a boundary (same section)
+        - "Item 1A" -> "Item 7": IS a boundary (different sections)
+
+        Args:
+            prev_section: The section of the previous sentence (may be None).
+            curr_section: The section of the current sentence (may be None).
+
+        Returns:
+            True if there is a section boundary, False otherwise.
+        """
+        # Both None - not a boundary (continuous unknown section)
+        if prev_section is None and curr_section is None:
+            return False
+
+        # One is None, other is not - transitioning to/from known section
+        if prev_section is None or curr_section is None:
+            return True
+
+        # Both have values - check if they differ
+        return prev_section != curr_section
+
     def chunk_document(self, pages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Chunk a document's pages into indexed chunks with metadata.
@@ -515,6 +562,30 @@ class SemanticChunker:
             sent_text, page_num, section = sentence_data
             sent_tokens = self._count_tokens(sent_text)
 
+            # Check for section boundary BEFORE adding sentence
+            # This ensures chunks never cross section boundaries (e.g., Item 1 -> Item 1A)
+            if current_chunk_sentences:
+                prev_section = current_chunk_sentences[-1][2]
+                if self._is_section_boundary(prev_section, section):
+                    # Force finalize current chunk WITHOUT overlap
+                    # (overlap would pollute the new section with old section content)
+                    chunk_dict = self._build_chunk_dict(
+                        current_chunk_sentences, chunk_index
+                    )
+                    all_chunks.append(chunk_dict)
+                    chunk_index += 1
+
+                    self._log.debug(
+                        "section_boundary_detected",
+                        from_section=prev_section,
+                        to_section=section,
+                        chunk_index=chunk_index,
+                    )
+
+                    # Start fresh - NO overlap across section boundaries
+                    current_chunk_sentences = []
+                    current_tokens = 0
+
             # Check if adding this sentence exceeds max_tokens
             if (
                 current_tokens + sent_tokens > self.max_tokens
@@ -527,7 +598,7 @@ class SemanticChunker:
                 all_chunks.append(chunk_dict)
                 chunk_index += 1
 
-                # Calculate overlap sentences
+                # Calculate overlap sentences (only within same section)
                 overlap = self._get_overlap_from_sentences(
                     current_chunk_sentences, self.overlap_tokens
                 )
@@ -571,7 +642,7 @@ class SemanticChunker:
 
         Returns:
             Chunk dictionary with text, token_count, start_page, end_page,
-            chunk_index, and optionally section.
+            chunk_index, and section (always included, may be None).
         """
         # Combine sentence texts
         text = " ".join(s[0] for s in sentences)
@@ -581,22 +652,24 @@ class SemanticChunker:
         start_page = min(page_numbers) if page_numbers else 0
         end_page = max(page_numbers) if page_numbers else 0
 
-        # Use the most recent section
-        section = None
+        # Use the most recent non-None section from the sentences
+        # Since section boundary detection ensures all sentences in a chunk
+        # have the same section, we just need the first non-None value
+        section: str | None = None
         for s in reversed(sentences):
             if s[2]:
                 section = s[2]
                 break
 
+        # Always include section in output (may be None for pages without section metadata)
         chunk_dict: dict[str, Any] = {
             "text": text,
             "token_count": self._count_tokens(text),
             "start_page": start_page,
             "end_page": end_page,
             "chunk_index": chunk_index,
+            "section": section,
         }
-        if section:
-            chunk_dict["section"] = section
 
         return chunk_dict
 

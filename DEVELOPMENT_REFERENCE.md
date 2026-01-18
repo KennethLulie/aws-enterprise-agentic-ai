@@ -2,7 +2,7 @@
 
 **Purpose:** This document serves as the authoritative reference for implementation details, technology specifications, and development order throughout all phases. Consult this document before implementing any feature to ensure consistency, completeness, and proper integration.  Make sure this document is updated as needed as the project proceeds.
 
-**Last Updated:** 2026-01-15 (Phase 2 how-to guides complete) - Implementation guides ready: `docs/PHASE_2A_HOW_TO_GUIDE.md` (Data Foundation) and `docs/PHASE_2B_HOW_TO_GUIDE.md` (Intelligence Layer). See `docs/RAG_README.md` for architecture.
+**Last Updated:** 2026-01-18 (Phase 2a delta improvements) - Semantic chunking enhanced with section boundary detection, 256-token chunks, and company extraction. Implementation guides: `docs/PHASE_2A_HOW_TO_GUIDE.md` (Data Foundation) and `docs/PHASE_2B_HOW_TO_GUIDE.md` (Intelligence Layer). See `docs/RAG_README.md` for architecture.
 
 ---
 
@@ -897,7 +897,9 @@ class SendMessageRequest(BaseModel):
 5. **Semantic Chunking** (`backend/src/ingestion/semantic_chunking.py`)
    - spaCy sentence boundary detection
    - Grammar-aware splitting
-   - Max chunk size: 512 tokens, overlap: 50 tokens
+   - Max chunk size: 256 tokens, overlap: 50 tokens (optimized for news impact analysis)
+   - Section boundary detection for 10-K documents
+   - Parent/child chunking provides larger context (1024 tokens) via parent_text
    - Preserves complete thoughts
 
 6. **Contextual Chunking** (`backend/src/ingestion/contextual_chunking.py`)

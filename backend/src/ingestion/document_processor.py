@@ -685,6 +685,42 @@ class DocumentProcessor:
                 if not metadata.get("sector") and page.get("sector"):
                     metadata["sector"] = page["sector"]
 
+            # Delta Improvement: Extract company name from cover page text
+            # VLM doesn't output a "company" field, but the name is in the text
+            # Look for patterns like "NVIDIA CORPORATION" or "APPLE INC."
+            if not metadata.get("company") and pages:
+                first_page_text = pages[0].get("text", "")
+                # Pattern: Company name in all caps followed by corp suffix
+                # Common patterns: "NVIDIA CORPORATION", "APPLE INC.", "MICROSOFT CORPORATION"
+                company_match = re.search(
+                    r"\n([A-Z][A-Z\s&,\.]+(?:CORPORATION|CORP|INC|LLC|LTD|COMPANY|CO)\.?)\s*\n",
+                    first_page_text[
+                        :3000
+                    ],  # Only search first 3000 chars of cover page
+                    re.IGNORECASE,
+                )
+                if company_match:
+                    # Clean up: Title case, fix common suffixes
+                    company_name = company_match.group(1).strip()
+                    # Convert "NVIDIA CORPORATION" to "NVIDIA Corporation"
+                    company_name = company_name.title()
+                    # Fix common suffix capitalization
+                    for suffix in ["Llc", "Inc.", "Corp.", "Ltd.", "Co."]:
+                        company_name = company_name.replace(
+                            suffix, suffix.upper() if suffix == "Llc" else suffix
+                        )
+                    metadata["company"] = company_name
+                    logger.debug(
+                        "company_extracted_from_text",
+                        company=metadata["company"],
+                        document=pdf_path.name,
+                    )
+                else:
+                    logger.warning(
+                        "company_not_found_in_text",
+                        document=pdf_path.name,
+                    )
+
             # Defaults
             metadata.setdefault("document_type", "SEC 10-K Filing")
 
