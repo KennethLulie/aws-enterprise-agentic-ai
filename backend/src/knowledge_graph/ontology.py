@@ -188,35 +188,35 @@ FINANCIAL_PATTERNS: list[dict[str, Any]] = [
     # =========================================================================
     # REGULATION Patterns - Regulatory bodies and frameworks
     # =========================================================================
-    # U.S. Financial Regulators
-    {"label": "REGULATION", "pattern": "SEC"},
+    # U.S. Financial Regulators (case-insensitive for acronyms)
+    {"label": "REGULATION", "pattern": [{"LOWER": "sec"}]},
     {"label": "REGULATION", "pattern": "Securities and Exchange Commission"},
-    {"label": "REGULATION", "pattern": "FINRA"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "finra"}]},
     {"label": "REGULATION", "pattern": "Financial Industry Regulatory Authority"},
-    {"label": "REGULATION", "pattern": "FDIC"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "fdic"}]},
     {"label": "REGULATION", "pattern": "Federal Deposit Insurance Corporation"},
-    {"label": "REGULATION", "pattern": "OCC"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "occ"}]},
     {"label": "REGULATION", "pattern": "Office of the Comptroller of the Currency"},
-    {"label": "REGULATION", "pattern": "CFPB"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "cfpb"}]},
     {"label": "REGULATION", "pattern": "Consumer Financial Protection Bureau"},
     {"label": "REGULATION", "pattern": "Federal Reserve"},
-    {"label": "REGULATION", "pattern": "Fed"},
-    {"label": "REGULATION", "pattern": "FTC"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "fed"}]},
+    {"label": "REGULATION", "pattern": [{"LOWER": "ftc"}]},
     {"label": "REGULATION", "pattern": "Federal Trade Commission"},
-    {"label": "REGULATION", "pattern": "DOJ"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "doj"}]},
     {"label": "REGULATION", "pattern": "Department of Justice"},
-    # Accounting Standards
-    {"label": "REGULATION", "pattern": "GAAP"},
+    # Accounting Standards (case-insensitive for acronyms)
+    {"label": "REGULATION", "pattern": [{"LOWER": "gaap"}]},
     {"label": "REGULATION", "pattern": "Generally Accepted Accounting Principles"},
-    {"label": "REGULATION", "pattern": "IFRS"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "ifrs"}]},
     {"label": "REGULATION", "pattern": "International Financial Reporting Standards"},
-    {"label": "REGULATION", "pattern": "FASB"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "fasb"}]},
     {"label": "REGULATION", "pattern": "Financial Accounting Standards Board"},
-    {"label": "REGULATION", "pattern": "PCAOB"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "pcaob"}]},
     {"label": "REGULATION", "pattern": "Public Company Accounting Oversight Board"},
     # Major Regulations
     {"label": "REGULATION", "pattern": "Sarbanes-Oxley"},
-    {"label": "REGULATION", "pattern": "SOX"},
+    {"label": "REGULATION", "pattern": [{"LOWER": "sox"}]},
     {"label": "REGULATION", "pattern": "Dodd-Frank"},
     {"label": "REGULATION", "pattern": "Basel III"},
     {"label": "REGULATION", "pattern": "Basel IV"},
@@ -234,23 +234,23 @@ FINANCIAL_PATTERNS: list[dict[str, Any]] = [
     # =========================================================================
     # CONCEPT Patterns - Financial metrics and terms
     # =========================================================================
-    # Profitability Metrics
-    {"label": "CONCEPT", "pattern": "EPS"},
+    # Profitability Metrics (case-insensitive for acronyms)
+    {"label": "CONCEPT", "pattern": [{"LOWER": "eps"}]},
     {"label": "CONCEPT", "pattern": "earnings per share"},
-    {"label": "CONCEPT", "pattern": "P/E"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "p/e"}]},
     {"label": "CONCEPT", "pattern": "P/E ratio"},
     {"label": "CONCEPT", "pattern": "price-to-earnings"},
     {"label": "CONCEPT", "pattern": "price to earnings"},
-    {"label": "CONCEPT", "pattern": "ROE"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "roe"}]},
     {"label": "CONCEPT", "pattern": "return on equity"},
-    {"label": "CONCEPT", "pattern": "ROA"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "roa"}]},
     {"label": "CONCEPT", "pattern": "return on assets"},
-    {"label": "CONCEPT", "pattern": "ROIC"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "roic"}]},
     {"label": "CONCEPT", "pattern": "return on invested capital"},
-    {"label": "CONCEPT", "pattern": "ROI"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "roi"}]},
     {"label": "CONCEPT", "pattern": "return on investment"},
-    {"label": "CONCEPT", "pattern": "EBITDA"},
-    {"label": "CONCEPT", "pattern": "EBIT"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "ebitda"}]},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "ebit"}]},
     {"label": "CONCEPT", "pattern": "net income"},
     {"label": "CONCEPT", "pattern": "gross profit"},
     {"label": "CONCEPT", "pattern": "operating income"},
@@ -258,47 +258,47 @@ FINANCIAL_PATTERNS: list[dict[str, Any]] = [
     {"label": "CONCEPT", "pattern": "operating margin"},
     {"label": "CONCEPT", "pattern": "net margin"},
     {"label": "CONCEPT", "pattern": "profit margin"},
-    # Interest Rate Metrics
-    {"label": "CONCEPT", "pattern": "APR"},
+    # Interest Rate Metrics (case-insensitive for acronyms)
+    {"label": "CONCEPT", "pattern": [{"LOWER": "apr"}]},
     {"label": "CONCEPT", "pattern": "annual percentage rate"},
-    {"label": "CONCEPT", "pattern": "APY"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "apy"}]},
     {"label": "CONCEPT", "pattern": "annual percentage yield"},
     {"label": "CONCEPT", "pattern": "interest rate"},
     {"label": "CONCEPT", "pattern": "prime rate"},
     {"label": "CONCEPT", "pattern": "federal funds rate"},
-    {"label": "CONCEPT", "pattern": "LIBOR"},
-    {"label": "CONCEPT", "pattern": "SOFR"},
-    # Valuation Metrics
+    {"label": "CONCEPT", "pattern": [{"LOWER": "libor"}]},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "sofr"}]},
+    # Valuation Metrics (case-insensitive for acronyms)
+    # NOTE: "EV" removed - too ambiguous (electric vehicle). Use "enterprise value" or "EV/EBITDA"
     {"label": "CONCEPT", "pattern": "market cap"},
     {"label": "CONCEPT", "pattern": "market capitalization"},
     {"label": "CONCEPT", "pattern": "enterprise value"},
-    {"label": "CONCEPT", "pattern": "EV"},
-    {"label": "CONCEPT", "pattern": "EV/EBITDA"},
-    {"label": "CONCEPT", "pattern": "P/B"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "ev/ebitda"}]},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "p/b"}]},
     {"label": "CONCEPT", "pattern": "P/B ratio"},
     {"label": "CONCEPT", "pattern": "price-to-book"},
     {"label": "CONCEPT", "pattern": "price to book"},
-    {"label": "CONCEPT", "pattern": "P/S"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "p/s"}]},
     {"label": "CONCEPT", "pattern": "price-to-sales"},
     {"label": "CONCEPT", "pattern": "price to sales"},
     {"label": "CONCEPT", "pattern": "PEG ratio"},
     {"label": "CONCEPT", "pattern": "book value"},
     {"label": "CONCEPT", "pattern": "intrinsic value"},
     {"label": "CONCEPT", "pattern": "fair value"},
-    {"label": "CONCEPT", "pattern": "DCF"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "dcf"}]},
     {"label": "CONCEPT", "pattern": "discounted cash flow"},
-    # Cash Flow & Liquidity
+    # Cash Flow & Liquidity (case-insensitive for acronyms)
     {"label": "CONCEPT", "pattern": "free cash flow"},
-    {"label": "CONCEPT", "pattern": "FCF"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "fcf"}]},
     {"label": "CONCEPT", "pattern": "operating cash flow"},
     {"label": "CONCEPT", "pattern": "cash flow"},
     {"label": "CONCEPT", "pattern": "working capital"},
     {"label": "CONCEPT", "pattern": "current ratio"},
     {"label": "CONCEPT", "pattern": "quick ratio"},
     {"label": "CONCEPT", "pattern": "liquidity"},
-    # Leverage & Debt
+    # Leverage & Debt (case-insensitive for acronyms)
     {"label": "CONCEPT", "pattern": "debt-to-equity"},
-    {"label": "CONCEPT", "pattern": "D/E"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "d/e"}]},
     {"label": "CONCEPT", "pattern": "D/E ratio"},
     {"label": "CONCEPT", "pattern": "leverage ratio"},
     {"label": "CONCEPT", "pattern": "interest coverage"},
@@ -306,23 +306,23 @@ FINANCIAL_PATTERNS: list[dict[str, Any]] = [
     {"label": "CONCEPT", "pattern": "total debt"},
     {"label": "CONCEPT", "pattern": "long-term debt"},
     {"label": "CONCEPT", "pattern": "short-term debt"},
-    # Growth Metrics
-    {"label": "CONCEPT", "pattern": "YoY"},
+    # Growth Metrics (case-insensitive for acronyms)
+    {"label": "CONCEPT", "pattern": [{"LOWER": "yoy"}]},
     {"label": "CONCEPT", "pattern": "year-over-year"},
     {"label": "CONCEPT", "pattern": "year over year"},
-    {"label": "CONCEPT", "pattern": "QoQ"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "qoq"}]},
     {"label": "CONCEPT", "pattern": "quarter-over-quarter"},
-    {"label": "CONCEPT", "pattern": "CAGR"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "cagr"}]},
     {"label": "CONCEPT", "pattern": "compound annual growth rate"},
     {"label": "CONCEPT", "pattern": "revenue growth"},
     {"label": "CONCEPT", "pattern": "earnings growth"},
-    # Dividend Metrics
+    # Dividend Metrics (case-insensitive for acronyms)
     {"label": "CONCEPT", "pattern": "dividend yield"},
     {"label": "CONCEPT", "pattern": "dividend"},
     {"label": "CONCEPT", "pattern": "dividend payout ratio"},
-    {"label": "CONCEPT", "pattern": "DPS"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "dps"}]},
     {"label": "CONCEPT", "pattern": "dividends per share"},
-    # Stock Metrics
+    # Stock Metrics (case-insensitive for acronyms)
     {"label": "CONCEPT", "pattern": "beta"},
     {"label": "CONCEPT", "pattern": "alpha"},
     {"label": "CONCEPT", "pattern": "volatility"},
@@ -331,37 +331,37 @@ FINANCIAL_PATTERNS: list[dict[str, Any]] = [
     {"label": "CONCEPT", "pattern": "52-week high"},
     {"label": "CONCEPT", "pattern": "52-week low"},
     {"label": "CONCEPT", "pattern": "moving average"},
-    {"label": "CONCEPT", "pattern": "RSI"},
-    {"label": "CONCEPT", "pattern": "MACD"},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "rsi"}]},
+    {"label": "CONCEPT", "pattern": [{"LOWER": "macd"}]},
     # =========================================================================
     # PRODUCT Patterns - Financial products and services
     # =========================================================================
-    # Banking Products
+    # Banking Products (case-insensitive for acronyms)
+    # NOTE: "CD" removed - too ambiguous (CD-ROM, music CD). Use "certificate of deposit"
     {"label": "PRODUCT", "pattern": "credit card"},
     {"label": "PRODUCT", "pattern": "debit card"},
     {"label": "PRODUCT", "pattern": "checking account"},
     {"label": "PRODUCT", "pattern": "savings account"},
     {"label": "PRODUCT", "pattern": "money market account"},
     {"label": "PRODUCT", "pattern": "certificate of deposit"},
-    {"label": "PRODUCT", "pattern": "CD"},
-    {"label": "PRODUCT", "pattern": "IRA"},
+    {"label": "PRODUCT", "pattern": [{"LOWER": "ira"}]},
     {"label": "PRODUCT", "pattern": "401(k)"},
     {"label": "PRODUCT", "pattern": "401k"},
     {"label": "PRODUCT", "pattern": "Roth IRA"},
     {"label": "PRODUCT", "pattern": "traditional IRA"},
-    # Loan Products
+    # Loan Products (case-insensitive for acronyms)
     {"label": "PRODUCT", "pattern": "mortgage"},
     {"label": "PRODUCT", "pattern": "home loan"},
     {"label": "PRODUCT", "pattern": "auto loan"},
     {"label": "PRODUCT", "pattern": "car loan"},
     {"label": "PRODUCT", "pattern": "personal loan"},
     {"label": "PRODUCT", "pattern": "student loan"},
-    {"label": "PRODUCT", "pattern": "HELOC"},
+    {"label": "PRODUCT", "pattern": [{"LOWER": "heloc"}]},
     {"label": "PRODUCT", "pattern": "home equity line of credit"},
     {"label": "PRODUCT", "pattern": "line of credit"},
-    # Investment Products
+    # Investment Products (case-insensitive for acronyms)
     {"label": "PRODUCT", "pattern": "mutual fund"},
-    {"label": "PRODUCT", "pattern": "ETF"},
+    {"label": "PRODUCT", "pattern": [{"LOWER": "etf"}]},
     {"label": "PRODUCT", "pattern": "exchange-traded fund"},
     {"label": "PRODUCT", "pattern": "index fund"},
     {"label": "PRODUCT", "pattern": "hedge fund"},
@@ -387,24 +387,30 @@ FINANCIAL_PATTERNS: list[dict[str, Any]] = [
 """
 spaCy EntityRuler patterns for financial domain-specific entities.
 
-These patterns supplement spaCy's built-in NER model (en_core_web_lg) with
-domain-specific entity recognition for financial documents. The patterns
+These patterns supplement spaCy's built-in NER model (en_core_web_sm or larger)
+with domain-specific entity recognition for financial documents. The patterns
 use the EntityRuler component to add rule-based matching for terms that
 the statistical NER model might miss or misclassify.
 
-Pattern Structure:
-    Each pattern is a dict with:
-    - "label": The entity label to assign (maps to our EntityType via FINANCIAL_PATTERNS_LABEL_MAP)
-    - "pattern": The text pattern to match (case-sensitive by default)
+Pattern Types:
+    1. String patterns (case-sensitive): For multi-word phrases and proper names
+       {"label": "REGULATION", "pattern": "Securities and Exchange Commission"}
 
-    For case-insensitive or phrase matching, use token patterns:
-    {"label": "CONCEPT", "pattern": [{"LOWER": "ebitda"}]}
+    2. Token patterns (case-insensitive): For acronyms that may appear in any case
+       {"label": "CONCEPT", "pattern": [{"LOWER": "ebitda"}]}
+
+Design Decisions:
+    - Acronyms use case-insensitive token patterns to catch "EBITDA", "Ebitda", "ebitda"
+    - Multi-word phrases use case-sensitive string patterns (natural capitalization)
+    - Ambiguous short patterns removed to reduce false positives:
+      * "CD" removed - conflicts with CD-ROM, music CDs (use "certificate of deposit")
+      * "EV" removed - conflicts with electric vehicles (use "enterprise value")
 
 Usage with spaCy:
     import spacy
     from spacy.pipeline import EntityRuler
 
-    nlp = spacy.load("en_core_web_lg")
+    nlp = spacy.load("en_core_web_sm")
     ruler = nlp.add_pipe("entity_ruler", before="ner")
     ruler.add_patterns(FINANCIAL_PATTERNS)
 
