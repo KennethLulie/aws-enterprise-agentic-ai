@@ -151,9 +151,9 @@ SPACY_TO_ENTITY_TYPE: dict[str, EntityType] = {
 """
 Mapping from spaCy NER labels to our EntityType enum.
 
-This dictionary maps the built-in spaCy NER labels (from the en_core_web_lg
-model) to our domain-specific EntityType values. Labels not in this mapping
-should be handled with a default type or filtered out.
+This dictionary maps the built-in spaCy NER labels (from the en_core_web_sm
+model or any larger variant) to our domain-specific EntityType values. Labels
+not in this mapping should be handled with a default type or filtered out.
 
 spaCy Label Reference:
     - ORG: Companies, agencies, institutions
