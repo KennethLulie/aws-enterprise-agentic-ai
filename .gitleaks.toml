@@ -27,6 +27,8 @@ paths = [
     '''package-lock\.json$''',
     '''yarn\.lock$''',
     '''\.git/''',
+    # Generated extraction artifacts - contain file hashes, not secrets
+    '''documents/extracted/''',
 ]
 regexes = [
     # Example/placeholder values in documentation
