@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-18 (Phase 2a: Section boundary detection, company extraction, 256-token chunks)
+**Last Updated:** 2026-01-18 (Phase 2a: Parent/child chunking module added)
 
 ---
 
@@ -88,6 +88,7 @@
 | backend/src/ingestion/vlm_extractor.py | VLM-based PDF extraction using Claude Sonnet 4.5 Vision (Bedrock) with automatic fallback to deprecated Claude 3.5 Sonnet V2 |
 | backend/src/ingestion/document_processor.py | High-level document processor with manifest tracking, consolidation, batch processing, and company name extraction from cover page |
 | backend/src/ingestion/semantic_chunking.py | spaCy-based semantic text chunking with section boundary detection for 10-K documents |
+| backend/src/ingestion/parent_child_chunking.py | Hierarchical parent/child chunking (1024-token parents, 256-token children) for RAG |
 | backend/src/utils/__init__.py | Utility helpers package |
 | backend/src/utils/embeddings.py | Bedrock Titan embeddings utility for RAG vectorization |
 | backend/tests/__init__.py | Tests package |

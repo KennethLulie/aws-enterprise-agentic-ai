@@ -10,9 +10,13 @@ document types for the RAG pipeline:
   tracking, consolidation, and batch processing.
 - semantic_chunking: spaCy-based semantic text chunking that respects
   sentence and paragraph boundaries.
+- parent_child_chunking: Hierarchical chunking strategy that creates
+  large parent chunks (1024 tokens) for context and small child chunks
+  (256 tokens) for precise embedding search.
 
 Usage:
     from src.ingestion import VLMExtractor, DocumentProcessor, SemanticChunker
+    from src.ingestion import ParentChildChunker
     from pathlib import Path
 
     # Low-level extraction
@@ -32,6 +36,10 @@ Usage:
     # Semantic chunking for RAG indexing
     chunker = SemanticChunker(max_tokens=512, overlap_tokens=50)
     chunks = chunker.chunk_document(result["pages"])
+
+    # Parent/child chunking for hierarchical RAG
+    pc_chunker = ParentChildChunker(parent_tokens=1024, child_tokens=256)
+    parents, children = pc_chunker.chunk_document("DOC_ID", result["pages"])
 """
 
 from src.ingestion.vlm_extractor import (
@@ -54,6 +62,11 @@ from src.ingestion.semantic_chunking import (
     SpaCyLoadError,
 )
 
+from src.ingestion.parent_child_chunking import (
+    ParentChildChunker,
+    ParentChildChunkingError,
+)
+
 __all__ = [
     # VLM Extractor
     "VLMExtractor",
@@ -69,4 +82,7 @@ __all__ = [
     "SemanticChunker",
     "ChunkingError",
     "SpaCyLoadError",
+    # Parent/Child Chunking
+    "ParentChildChunker",
+    "ParentChildChunkingError",
 ]
