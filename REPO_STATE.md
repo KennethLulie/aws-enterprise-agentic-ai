@@ -94,6 +94,7 @@
 | backend/src/utils/embeddings.py | Bedrock Titan v2 embeddings utility for RAG vectorization (1024 dimensions) |
 | backend/src/utils/pinecone_client.py | Pinecone vector store client wrapper for RAG operations (dotproduct metric, 1024 dims) |
 | backend/src/knowledge_graph/__init__.py | Knowledge graph package for entity extraction (spaCy) and graph queries (Neo4j) |
+| backend/src/knowledge_graph/ontology.py | Financial domain ontology: EntityType, RelationType enums, spaCy mappings, EntityRuler patterns |
 | backend/tests/__init__.py | Tests package |
 | backend/tests/test_agent.py | Agent and graph tests |
 | backend/tests/test_api.py | API endpoint tests |
@@ -194,7 +195,6 @@
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
 | backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
 | backend/src/knowledge_graph/queries.py | Graph traversal queries |
-| backend/src/knowledge_graph/ontology.py | Financial domain ontology |
 | backend/src/utils/reranker.py | Cross-encoder reranking (Phase 2 RAG) |
 | lambda/document-ingestion/handler.py | S3-triggered document processing |
 | terraform/modules/lambda/main.tf | Lambda infrastructure |
@@ -207,7 +207,6 @@
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
 | backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
 | backend/src/knowledge_graph/queries.py | Graph traversal queries |
-| backend/src/knowledge_graph/ontology.py | Financial domain ontology |
 | backend/src/utils/reranker.py | Cross-encoder reranking |
 
 **Lambda & Infrastructure:**

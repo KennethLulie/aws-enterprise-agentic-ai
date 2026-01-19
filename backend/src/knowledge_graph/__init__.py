@@ -89,12 +89,16 @@ from __future__ import annotations
 # =============================================================================
 
 # Phase 2b Section 2.3: Ontology definitions
-# from src.knowledge_graph.ontology import (
-#     EntityType,
-#     RelationType,
-#     SPACY_TO_ENTITY_TYPE,
-#     FINANCIAL_PATTERNS,
-# )
+from src.knowledge_graph.ontology import (
+    EntityType,
+    RelationType,
+    SPACY_TO_ENTITY_TYPE,
+    FINANCIAL_PATTERNS,
+    PATTERN_LABEL_TO_ENTITY_TYPE,
+    get_entity_type,
+    is_valid_entity_type,
+    is_valid_relation_type,
+)
 
 # Phase 2b Section 3.3: Entity extraction
 # from src.knowledge_graph.extractor import EntityExtractor, Entity
@@ -118,10 +122,14 @@ __version__ = "0.1.0"
 __all__: list[str] = [
     "__version__",
     # Ontology (Phase 2b Section 2.3)
-    # "EntityType",
-    # "RelationType",
-    # "SPACY_TO_ENTITY_TYPE",
-    # "FINANCIAL_PATTERNS",
+    "EntityType",
+    "RelationType",
+    "SPACY_TO_ENTITY_TYPE",
+    "FINANCIAL_PATTERNS",
+    "PATTERN_LABEL_TO_ENTITY_TYPE",
+    "get_entity_type",
+    "is_valid_entity_type",
+    "is_valid_relation_type",
     # Entity Extraction (Phase 2b Section 3.3)
     # "EntityExtractor",
     # "Entity",
