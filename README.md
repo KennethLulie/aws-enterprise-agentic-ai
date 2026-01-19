@@ -69,14 +69,22 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 ## 📋 Project Status
 
-**Current Phase:** Phase 2 🚧 In Progress (Core Agent Tools) - How-to guides complete, ready for implementation
+**Current Phase:** Phase 2b 🚧 In Progress (Intelligence Layer) - Adding Knowledge Graph and hybrid search
 
 > 🚀 **Demo link and password available on request**
 
-**Phase 2 (in progress)** adds core agent tools with comprehensive how-to guides:
-- 📖 Phase 2a: Data Foundation - VLM extraction, SQL tool with 10-K financial data, basic RAG
-- 📖 Phase 2b: Intelligence Layer - Knowledge Graph (Neo4j), hybrid retrieval, multi-tool orchestration
-- See [Current Phase Guides](#current-phase-guides) below for implementation details
+**Phase 2a (completed January 19, 2026)** delivered data foundation and core tools:
+- ✅ SQL Query Tool - Real implementation with Neon PostgreSQL
+- ✅ RAG Retrieval Tool - Real implementation with Pinecone
+- ✅ Document processing pipeline with VLM extraction
+- ✅ Parent/child chunking with contextual enrichment
+- ✅ Agent integration with graceful fallback
+
+**Phase 2b (in progress)** adds intelligence layer:
+- 📖 Knowledge Graph - Neo4j with spaCy entity extraction
+- 📖 Hybrid Search - BM25 + dense embeddings with RRF fusion
+- 📖 Cross-encoder Reranking - LLM-based relevance scoring
+- See [docs/PHASE_2B_HOW_TO_GUIDE.md](docs/PHASE_2B_HOW_TO_GUIDE.md) for implementation details
 
 **Phase 1b (completed January 13, 2026)** added production hardening:
 - ✅ Neon PostgreSQL integration for persistent state (free tier)
@@ -100,7 +108,7 @@ This system goes beyond a simple demo by implementing production-ready features:
 - LangGraph agent with Bedrock (Nova Pro) and streaming responses
 - ✅ Tavily search tool (Phase 2a completed early) - live when `TAVILY_API_KEY` is set, mock fallback otherwise
 - ✅ FMP market data tool (Phase 2d completed early) - live when `FMP_API_KEY` is set, mock fallback otherwise
-- SQL and RAG tools stubbed (real implementations in Phase 2b/2c)
+- SQL and RAG tools stubbed (real implementations completed in Phase 2a)
 - Docker Compose for all services with hot reload
 - Password-protected web interface
 

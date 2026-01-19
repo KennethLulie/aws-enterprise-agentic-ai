@@ -2,7 +2,7 @@
 
 > ✅ **PHASE 2a COMPLETED** (January 19, 2026)
 >
-> This guide has been completed and archived. For the next phase, see [PHASE_2B_HOW_TO_GUIDE.md](PHASE_2B_HOW_TO_GUIDE.md).
+> This guide has been completed and archived. For the next phase, see [docs/PHASE_2B_HOW_TO_GUIDE.md](docs/PHASE_2B_HOW_TO_GUIDE.md).
 
 **Purpose:** This guide implements the data foundation for the agent: VLM document extraction, SQL tool for 10-K financial queries, and basic RAG retrieval with dense vector search. By the end, the agent can answer questions using real financial data from SEC filings.
 
@@ -18,7 +18,7 @@
 - Health check with Pinecone status and vector count
 - Graceful fallback when RAG has no documents
 
-**Next Phase:** [Phase 2b - Intelligence Layer](PHASE_2B_HOW_TO_GUIDE.md)
+**Next Phase:** [Phase 2b - Intelligence Layer](docs/PHASE_2B_HOW_TO_GUIDE.md)
 
 **Estimated Time:** 8-12 hours depending on familiarity with document processing and vector databases
 
@@ -2229,6 +2229,86 @@ Verify: docker-compose exec backend python -c "from src.ingestion.semantic_chunk
 > - **Child chunks (256 tokens):** Small, precise chunks used for embedding and retrieval
 > - **Parent chunks (1024 tokens):** Larger context chunks returned in search results
 
+**Agent Prompt:**
+```
+Create `backend/src/ingestion/parent_child_chunking.py`
+
+Requirements:
+1. Module docstring explaining parent/child chunking strategy
+2. Custom exceptions: ParentChildChunkingError
+3. Constants section with defaults
+
+4. ParentChildChunker class with:
+   - __init__(self, parent_tokens: int = 1024, child_tokens: int = 256, overlap_tokens: int = 50)
+   - chunk_document(self, document_id: str, pages: list[dict]) -> tuple[list[dict], list[dict]]
+   - _create_parent_chunks(self, document_id: str, pages: list[dict]) -> list[dict]
+   - _create_children_from_parent(self, parent: dict) -> list[dict]
+   - _count_tokens(self, text: str) -> int  # Use same formula as semantic_chunking: words * 1.3
+
+5. Parent chunk format:
+   {
+     "parent_id": "AAPL_10K_2024_parent_0",
+     "document_id": "AAPL_10K_2024",
+     "text": "The full 1024-token parent text...",
+     "token_count": 1024,
+     "start_page": 15,
+     "end_page": 16,
+     "section": "Item 1A: Risk Factors",
+     "parent_index": 0
+   }
+
+6. Child chunk format:
+   {
+     "child_id": "AAPL_10K_2024_parent_0_child_0",
+     "parent_id": "AAPL_10K_2024_parent_0",
+     "document_id": "AAPL_10K_2024",
+     "text": "The 256-token child text...",
+     "token_count": 256,
+     "start_page": 15,
+     "end_page": 15,
+     "section": "Item 1A: Risk Factors",
+     "child_index": 0,
+     "child_index_in_document": 5  # Global index across all children
+   }
+
+7. Use SemanticChunker internally for sentence boundary detection
+8. Never split parent chunks across section boundaries (delegate to semantic_chunking.py)
+9. Children inherit section from parent
+10. Children do NOT have overlap across parent boundaries (only within same parent)
+
+Key Features:
+- Synchronous methods (no I/O, pure computation)
+- Parents are non-overlapping (no redundant storage)
+- Children have 50-token overlap WITHIN same parent only
+- Parent text stored for retrieval (not re-embedded)
+- Section-aware parent boundaries (see semantic_chunking.py section boundary logic)
+- Use structlog for logging
+- Include __all__ exports: ["ParentChildChunker", "ParentChildChunkingError"]
+
+Token Counting (IMPORTANT - must match semantic_chunking.py):
+def _count_tokens(self, text: str) -> int:
+    """Use same formula as SemanticChunker: words * 1.3"""
+    if not text:
+        return 0
+    words = len(text.split())
+    return max(1, int(words * 1.3))
+
+Upstream Dependencies:
+- Requires semantic_chunking.py for sentence boundary detection
+- Requires section information from VLM extraction
+
+Downstream Dependencies:
+- extract_and_index.py must call this instead of raw semantic chunking
+- pinecone_client.py must store parent_text in metadata
+- rag.py must return parent_text instead of child text
+
+Reference:
+- [backend.mdc] for Python patterns
+- semantic_chunking.py for sentence boundary logic and token counting
+- LangChain ParentDocumentRetriever concept
+- RAG_IMPROVEMENTS_DELTA.md for full architecture details
+
+Verify: docker-compose exec backend python -c "from src.ingestion.parent_child_chunking import ParentChildChunker; print('OK')"
 ```
 
 8.2 Delta Addition #2
@@ -3498,6 +3578,57 @@ Phase 2a establishes the data foundation with:
 - Hybrid search (dense embeddings + BM25 keyword search)
 - Query expansion and cross-encoder reranking
 - Multi-tool query orchestration (SQL + RAG combined)
+
+---
+
+## Phase 2b Delta Improvements (Carry Forward)
+
+The following improvements were identified during Phase 2a implementation and should be addressed in Phase 2b:
+
+### Delta 1: Graceful Tool Degradation
+
+**Problem:** If BedrockEmbeddings or PineconeClient fail to initialize (e.g., missing credentials, service outage), the tool raises an exception on first use. This can cause the agent to get stuck in retry loops or confuse users.
+
+**Recommended Implementation:**
+
+Add try/except around client initialization with graceful fallback:
+
+```python
+# In rag.py - update _get_embeddings_client()
+def _get_embeddings_client() -> "BedrockEmbeddings | None":
+    """Get or create cached BedrockEmbeddings client with graceful degradation."""
+    global _embeddings_client
+    if _embeddings_client is None:
+        try:
+            from src.utils.embeddings import BedrockEmbeddings
+            _embeddings_client = BedrockEmbeddings()
+            logger.debug("embeddings_client_created", cached=True)
+        except Exception as e:
+            logger.error("embeddings_client_init_failed", error=str(e))
+            return None
+    return _embeddings_client
+
+# Then in rag_retrieval tool:
+embeddings = _get_embeddings_client()
+if embeddings is None:
+    return "Document search is temporarily unavailable. Please try again later or ask a different question."
+```
+
+**Apply same pattern to:**
+- `_get_pinecone_client()` in rag.py
+- SQL tool database connection in sql.py
+
+**Benefits:**
+- User-friendly error messages instead of stack traces
+- Prevents agent from getting stuck
+- Consistent with existing error handling patterns
+
+**Considerations:**
+- Should log errors for monitoring/alerting
+- Health check should reflect tool availability status
+- Consider adding a "tool_status" field to health endpoint
+
+---
 
 **Estimated Time for Phase 2a:** 8-12 hours
 

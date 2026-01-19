@@ -2,7 +2,7 @@
 
 **Purpose:** This document serves as the authoritative reference for implementation details, technology specifications, and development order throughout all phases. Consult this document before implementing any feature to ensure consistency, completeness, and proper integration.  Make sure this document is updated as needed as the project proceeds.
 
-**Last Updated:** 2026-01-18 (Phase 2a delta improvements) - Semantic chunking enhanced with section boundary detection, 256-token chunks, and company extraction. Implementation guides: `docs/PHASE_2A_HOW_TO_GUIDE.md` (Data Foundation) and `docs/PHASE_2B_HOW_TO_GUIDE.md` (Intelligence Layer). See `docs/RAG_README.md` for architecture.
+**Last Updated:** 2026-01-19 (Phase 2a complete) - SQL and RAG tools implemented with real backends (Neon PostgreSQL, Pinecone). Phase 2b active (Knowledge Graph, hybrid search). Implementation guide: `docs/PHASE_2B_HOW_TO_GUIDE.md`.
 
 ---
 
@@ -85,8 +85,8 @@ Fully working agent locally before any AWS deployment.
 - **Checkpointing:** MemorySaver (in-memory, no DB)
 - **Web Search:** Real Tavily API (with mock fallback when API key not set) - **Phase 2a completed early**
 - **Market Data:** Real FMP API (with mock fallback when API key not set) - **Phase 2d completed early**
-- **Database:** Stub-only in Phase 0 (SQL tool returns mock data); real DB in Phase 2b
-- **Vector Store:** Stub-only in Phase 0 (RAG tool returns mock data); real retrieval in Phase 2c
+- **Database:** Stub-only in Phase 0 (SQL tool returns mock data); real DB added in Phase 2a
+- **Vector Store:** Stub-only in Phase 0 (RAG tool returns mock data); real retrieval added in Phase 2a
 - **Logging:** Basic Python logging (upgrade to structlog in Phase 1b)
 
 #### Frontend Stack
@@ -570,7 +570,7 @@ Add production-grade features: persistent state, CI/CD, observability, security 
 ### Goal
 Agent can search the web, query SQL databases, and retrieve from documents.
 
-**Note:** Tools 2a (Tavily Search) and 2d (Market Data) were completed ahead of schedule in Phase 0. Phase 2 focuses on implementing 2b (SQL Query) and 2c (RAG Retrieval).
+**Note:** Tools 2a (Tavily Search) and 2d (Market Data) were completed ahead of schedule in Phase 0. Tools 2b (SQL Query) and 2c (RAG Retrieval) were completed in Phase 2a. Phase 2b focuses on Knowledge Graph and hybrid search enhancements.
 
 ### Data Flow Overview
 

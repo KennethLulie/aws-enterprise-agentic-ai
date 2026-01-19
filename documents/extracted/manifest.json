@@ -10,7 +10,7 @@
       "extraction_cost_usd": 0.425,
       "doc_type": "reference",
       "indexed_to_pinecone": true,
-      "indexed_at": "2026-01-19T02:43:15.372538+00:00",
+      "indexed_at": "2026-01-19T04:19:20.336643+00:00",
       "chunk_count": 14,
       "error_count": 0,
       "index_schema_version": "v2_parent_child",
@@ -26,7 +26,7 @@
       "extraction_cost_usd": 0.15,
       "doc_type": "reference",
       "indexed_to_pinecone": true,
-      "indexed_at": "2026-01-19T02:43:18.249117+00:00",
+      "indexed_at": "2026-01-19T04:19:23.192329+00:00",
       "chunk_count": 14,
       "error_count": 0,
       "index_schema_version": "v2_parent_child",
@@ -42,7 +42,7 @@
       "extraction_cost_usd": 4.76,
       "doc_type": "10k",
       "indexed_to_pinecone": true,
-      "indexed_at": "2026-01-19T02:44:16.917165+00:00",
+      "indexed_at": "2026-01-19T04:20:21.262794+00:00",
       "chunk_count": 324,
       "error_count": 0,
       "index_schema_version": "v2_parent_child",
@@ -53,6 +53,6 @@
     "documents_extracted": 3,
     "documents_indexed": 3,
     "total_extraction_cost_usd": 5.335,
-    "last_updated": "2026-01-19T02:44:16.917181+00:00"
+    "last_updated": "2026-01-19T04:20:21.262816+00:00"
   }
 }

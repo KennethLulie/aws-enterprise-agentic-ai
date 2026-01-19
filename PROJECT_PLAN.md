@@ -1705,6 +1705,31 @@ Production-ready infrastructure with:
 - Database migrations ready (Alembic configured)
 - Comprehensive health checks with dependency validation
 
+### ✅ Phase 2a: Data Foundation & Basic Tools - COMPLETED (January 19, 2026)
+
+Data foundation and core agent tools implemented:
+- ✅ SQL Query Tool with real Neon PostgreSQL integration
+  - Natural language to SQL conversion using Bedrock Claude
+  - SQL injection prevention with query validation and table whitelisting
+  - 10-K financial data loaded (7 companies, ~150 rows)
+- ✅ RAG Retrieval Tool with real Pinecone integration
+  - VLM document extraction using Claude Vision
+  - Parent/child chunking (1024/256 tokens)
+  - Contextual enrichment prepending metadata
+  - Semantic search with deduplication
+  - ~352 vectors indexed (NVIDIA 10-K + 2 reference docs)
+- ✅ Document Processing Pipeline
+  - VLM extraction with `extract_and_index.py` batch script
+  - Semantic chunking with spaCy (section-aware)
+  - BedrockEmbeddings with Titan (1536d)
+  - Pinecone indexing with parent/child architecture
+- ✅ Agent Integration
+  - All 4 tools registered (tavily_search, sql_query, rag_retrieval, market_data)
+  - Improved tool descriptions for better tool selection
+  - Graceful fallback to Tavily when RAG has no documents
+- ✅ Health Check Enhancement
+  - Pinecone status with vector count included
+
 ---
 
 ## Next Steps
@@ -1735,13 +1760,13 @@ Implementation guides are ready:
 - 📖 `docs/PHASE_2B_HOW_TO_GUIDE.md` - Intelligence Layer (Knowledge Graph, hybrid retrieval, multi-tool orchestration)
 
 Phase 2 component status:
-- ✅ **2a. Tavily Search Tool** - Completed in Phase 0 with mock fallback
-- 🚧 **2b. SQL Query Tool** - How-to guide ready (PHASE_2A Section 6-7)
-- 🚧 **2c. RAG Document Tool** - How-to guide ready (PHASE_2A Section 8-10, PHASE_2B Section 7-11)
-- ✅ **2d. Market Data Tool** - Completed in Phase 0 with mock fallback
-- 🚧 **VLM extraction scripts** - How-to guide ready (PHASE_2A Section 5)
-- 🚧 **Knowledge Graph** - How-to guide ready (PHASE_2B Section 2-6)
-- 🚧 **Cross-document analysis** - How-to guide ready (PHASE_2B Section 12b)
+- ✅ **2a. Tavily Search Tool** - Completed in Phase 0
+- ✅ **2b. SQL Query Tool** - Completed in Phase 2a (January 19, 2026)
+- ✅ **2c. RAG Document Tool** - Completed in Phase 2a (January 19, 2026)
+- ✅ **2d. Market Data Tool** - Completed in Phase 0
+- 🚧 **Knowledge Graph** - Phase 2b active (Neo4j with spaCy entity extraction)
+- 🚧 **Hybrid Search** - Phase 2b active (BM25 + dense embeddings + RRF fusion)
+- 🚧 **Cross-encoder Reranking** - Phase 2b planned
 
 **Pre-Phase 0 Checklist (Completed):**
 - [x] Docker Desktop installed and running

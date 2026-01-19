@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-19 (Phase 2a: Agent integration complete - health check with Pinecone, distinct tool descriptions)
+**Last Updated:** 2026-01-19 (Phase 2a complete: SQL and RAG tools with real backends, Phase 2b active)
 
 ---
 
@@ -77,9 +77,9 @@
 | backend/src/agent/nodes/error_recovery.py | Error recovery node |
 | backend/src/agent/tools/__init__.py | Tools package exports |
 | backend/src/agent/tools/market_data.py | FMP market data tool (mock-friendly) |
-| backend/src/agent/tools/rag.py | RAG retrieval tool - Pinecone semantic search with parent deduplication, filtering, citations |
+| backend/src/agent/tools/rag.py | RAG retrieval tool - Real Pinecone semantic search with parent/child deduplication, contextual enrichment, metadata filtering, source citations, graceful fallback to Tavily |
 | backend/src/agent/tools/search.py | Tavily search tool |
-| backend/src/agent/tools/sql.py | SQL query tool with NL-to-SQL conversion via Bedrock, query validation, and formatted results |
+| backend/src/agent/tools/sql.py | SQL query tool - Real NL-to-SQL conversion via Bedrock, query validation, table whitelisting, formatted results from Neon PostgreSQL |
 | backend/src/agent/tools/sql_safety.py | SQL safety module with query validation, table/column whitelists, and sanitization |
 | backend/src/cache/__init__.py | Cache package (Phase 4+ placeholders) |
 | backend/src/db/__init__.py | Database package exports (SQLAlchemy session management) |
@@ -134,11 +134,11 @@
 | docs/SECURITY.md | Security and secrets management guide |
 | docs/integration-test-checklist.md | Phase 0 end-to-end test checklist |
 | docs/RAG_README.md | RAG system architecture, design decisions, and alternatives |
-| docs/PHASE_2A_HOW_TO_GUIDE.md | Phase 2a step-by-step guide (data foundation) |
 | docs/PHASE_2B_HOW_TO_GUIDE.md | Phase 2b step-by-step guide (intelligence layer) |
 | docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md | Completed Phase 0 guide (archived) |
 | docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md | Completed Phase 1a guide (archived) |
 | docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md | Completed Phase 1b guide (archived) |
+| docs/completed-phases/PHASE_2A_HOW_TO_GUIDE.md | Completed Phase 2a guide (archived) |
 | docs/completed-phases/PHASE_2_REQUIREMENTS.md | Phase 2 requirements planning document (archived) |
 | docs/completed-phases/RAG_IMPROVEMENTS_DELTA.md | RAG chunking improvements delta (section boundaries, 256-token chunks, company extraction) |
 
@@ -150,6 +150,7 @@
 | scripts/dev.sh | Dev helper script (start/stop/logs/test/shell/clean) |
 | scripts/validate_setup.py | Prerequisites validation script |
 | scripts/extract_and_index.py | VLM document extraction and Pinecone indexing batch script (--status, --dry-run, --force, --doc, --index-only, --reindex, --index-doc) |
+| scripts/rag_diagnostic.py | RAG diagnostic tool for Pinecone inspection and query testing (--stats, --inspect, --query, --all) |
 | scripts/load_10k_to_sql.py | SQL data loading script for 10-K financial data (--validate-only, --dry-run, --ticker, --force) |
 
 ### Terraform Directory

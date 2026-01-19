@@ -1,15 +1,24 @@
 # Phase 2a: Data Foundation & Basic Tools - Complete How-To Guide
 
-> 🚧 **PHASE 2a IN PROGRESS**
+> ✅ **PHASE 2a COMPLETED** (January 19, 2026)
 >
-> | Component | URL |
-> |-----------|-----|
-> | **Frontend (CloudFront)** | `https://d2bhnqevtvjc7f.cloudfront.net` |
-> | **Backend (App Runner)** | `https://yhvmf3inyx.us-east-1.awsapprunner.com` |
->
-> Building on Phase 1b with core data tools.
+> This guide has been completed and archived. For the next phase, see [docs/PHASE_2B_HOW_TO_GUIDE.md](docs/PHASE_2B_HOW_TO_GUIDE.md).
 
 **Purpose:** This guide implements the data foundation for the agent: VLM document extraction, SQL tool for 10-K financial queries, and basic RAG retrieval with dense vector search. By the end, the agent can answer questions using real financial data from SEC filings.
+
+**Status:** ✅ COMPLETED (January 19, 2026)
+
+**What Was Delivered:**
+- SQL Query Tool with Neon PostgreSQL integration
+- RAG Retrieval Tool with Pinecone and parent/child chunking
+- VLM document extraction pipeline (Claude Vision)
+- Semantic chunking with section boundary detection
+- Contextual enrichment with metadata prepending
+- Agent integration with all 4 tools working
+- Health check with Pinecone status and vector count
+- Graceful fallback when RAG has no documents
+
+**Next Phase:** [Phase 2b - Intelligence Layer](docs/PHASE_2B_HOW_TO_GUIDE.md)
 
 **Estimated Time:** 8-12 hours depending on familiarity with document processing and vector databases
 
@@ -3618,6 +3627,132 @@ if embeddings is None:
 - Should log errors for monitoring/alerting
 - Health check should reflect tool availability status
 - Consider adding a "tool_status" field to health endpoint
+
+---
+
+## Delta Addendum: Reference Document Metadata Fix (January 2026)
+
+### Issue Description
+
+After Phase 2a completion, RAG retrieval was not returning indexed news/reference documents when queried. Documents were confirmed indexed in Pinecone (manifest showed `indexed_to_pinecone: true`), but semantic search failed to find them with good relevance scores.
+
+**Symptoms:**
+- Queries like "NVIDIA VRAM unbundling" returned no relevant results from indexed news articles
+- Source citations showed "Unknown Source" instead of actual publication names
+- Contextual enrichment used fallback values instead of actual metadata
+
+### Root Cause
+
+The `build_document_metadata()` function in `scripts/extract_and_index.py` incorrectly extracted metadata for reference documents:
+
+1. **Nested metadata not accessed**: The function looked for fields at `doc.get("source_name")` but the extraction pipeline stores them under `doc["metadata"]["source"]`
+
+2. **Key name mismatch**: The extraction uses `"source"` but indexing expected `"source_name"`
+
+**Broken code:**
+```python
+# Reference document metadata
+else:
+    metadata["source_type"] = doc.get("source_type", "document")
+    metadata["source_name"] = doc.get("source_name")  # Returns None!
+    metadata["publication_date"] = doc.get("publication_date")  # Returns None!
+    metadata["headline"] = doc.get("headline")  # Returns None!
+```
+
+**Extracted JSON structure:**
+```json
+{
+  "document_id": "...",
+  "document_type": "reference",
+  "metadata": {
+    "headline": "...",
+    "publication_date": "2026-01-16",
+    "source": "Tom's Hardware",
+    "source_type": "news"
+  }
+}
+```
+
+### Fix Applied
+
+Updated `build_document_metadata()` to correctly read from the nested metadata field:
+
+```python
+# Reference document metadata
+else:
+    # Get metadata from nested "metadata" field (populated by document_processor)
+    # Note: extraction uses "source" key, but downstream expects "source_name"
+    doc_meta = doc.get("metadata", {})
+    metadata["source_type"] = doc_meta.get("source_type", "document")
+    metadata["source_name"] = doc_meta.get("source")  # Key is "source" not "source_name"
+    metadata["publication_date"] = doc_meta.get("publication_date")
+    metadata["headline"] = doc_meta.get("headline")
+```
+
+After fixing, re-index documents with: `python scripts/extract_and_index.py --reindex`
+
+### Prevention: Agent Prompt for Data Flow Verification
+
+The following prompt pattern would have caught this issue during implementation:
+
+---
+
+**Agent Prompt: End-to-End Data Flow Verification**
+
+```
+When implementing a data pipeline that spans multiple modules (extraction -> transformation -> storage -> retrieval), verify the complete data flow by:
+
+1. **Trace the schema at each stage:**
+   - Document the exact JSON/dict structure OUTPUT by each module
+   - Document the exact structure EXPECTED as INPUT by the next module
+   - Flag any key name differences (e.g., "source" vs "source_name")
+
+2. **Verify nested vs flat structure handling:**
+   - If extraction produces nested metadata (`doc["metadata"]["field"]`)
+   - Confirm downstream code accesses the nested path, not `doc["field"]`
+
+3. **Create a minimal integration test:**
+   - Index ONE document
+   - Query for it immediately
+   - Assert the query returns it with expected metadata
+   - If retrieval fails, inspect the actual stored metadata
+
+4. **Log intermediate values during development:**
+   - Before indexing: print the metadata dict being stored
+   - Verify it contains actual values, not None/fallbacks
+
+Example verification for RAG indexing:
+- After `build_document_metadata()`: print metadata to confirm all fields populated
+- After Pinecone upsert: query one vector and inspect its metadata
+- After RAG query: check if results include the expected document
+```
+
+---
+
+### Diagnostic Tool Created
+
+A new diagnostic script `scripts/rag_diagnostic.py` was created to help debug RAG retrieval issues:
+
+```bash
+# Show index stats
+python scripts/rag_diagnostic.py --stats
+
+# Inspect vectors for a document
+python scripts/rag_diagnostic.py --inspect "NVIDIA"
+
+# Test retrieval with a query
+python scripts/rag_diagnostic.py --query "memory shortage"
+
+# Run all diagnostic tests
+python scripts/rag_diagnostic.py --all
+```
+
+### Lessons Learned
+
+1. **Test retrieval immediately after indexing** - Don't assume indexed documents are retrievable
+2. **Verify metadata at storage time** - Log what's actually being stored, not just that upsert succeeded
+3. **Match key names across module boundaries** - Different modules may use different conventions (`source` vs `source_name`)
+4. **Integration tests > unit tests for pipelines** - The bug was in the interface between modules, not within any single module
 
 ---
 

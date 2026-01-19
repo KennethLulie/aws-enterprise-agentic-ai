@@ -12,15 +12,15 @@ Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestratio
 
 | Setting | Value |
 |---------|-------|
-| **Phase** | 2 (Core Agent Tools) |
-| **Guide** | PHASE_2_HOW_TO_GUIDE.md (to be created) |
+| **Phase** | 2b (Intelligence Layer) |
+| **Guide** | PHASE_2B_HOW_TO_GUIDE.md |
 | **Cost Target** | $20-50/month for demo |
 | **AWS Region** | us-east-1 (always) |
 
 **Phase 2 Scope:**
 - ✅ 2a. Tavily Search Tool - *Completed in Phase 0*
-- 🚧 2b. SQL Query Tool - *To implement with Neon PostgreSQL*
-- 🚧 2c. RAG Document Tool - *To implement with Pinecone*
+- ✅ 2b. SQL Query Tool - *Completed in Phase 2a with Neon PostgreSQL*
+- ✅ 2c. RAG Document Tool - *Completed in Phase 2a with Pinecone*
 - ✅ 2d. Market Data Tool - *Completed in Phase 0*
 
 ## Sources of Truth
@@ -43,8 +43,8 @@ Enterprise-grade agentic AI on AWS: LangGraph + Bedrock, multi-tool orchestratio
 | 0 | None | MemorySaver | `/api/chat` | Search ✅, Market ✅, SQL stub, RAG stub |
 | 1a | None | MemorySaver | `/api/chat` | Search ✅, Market ✅, SQL stub, RAG stub |
 | 1b | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Search ✅, Market ✅, SQL stub, RAG stub |
-| 2 | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Search ✅, Market ✅, SQL ✅, RAG ✅ |
-| 4+ | Neon PostgreSQL | PostgresSaver | `/api/v1/` | All Real + Cached |
+| 2a | Neon PostgreSQL | PostgresSaver | `/api/v1/` | Search ✅, Market ✅, SQL ✅, RAG ✅ |
+| 2b+ | Neon PostgreSQL | PostgresSaver | `/api/v1/` | All Real + Cached |
 
 ## Technology Stack
 

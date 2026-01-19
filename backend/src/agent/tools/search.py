@@ -142,10 +142,21 @@ async def _call_tavily_api(
 @tool("tavily_search", args_schema=SearchInput)
 async def tavily_search(query: str) -> Dict[str, Any]:
     """
-    Search the web for current information using Tavily API (with mock fallback).
+    Search the internet for current information, news, and real-time data.
 
-    Uses real Tavily when `TAVILY_API_KEY` is set; otherwise returns
-    deterministic mock data to keep Phase 0 runnable without external calls.
+    USE THIS TOOL when users ask to:
+    - "Google" or "search the web" for something
+    - Find current news or recent events
+    - Look up real-time information not in the database
+    - Verify or update information from documents with current data
+
+    This is your web search capability - equivalent to a Google search.
+
+    Args:
+        query: The search query to look up on the web.
+
+    Returns:
+        Search results with titles, snippets, and URLs from relevant web pages.
     """
 
     settings = get_settings()

@@ -671,10 +671,13 @@ def build_document_metadata(doc: dict[str, Any]) -> dict[str, Any]:
 
     # Reference document metadata
     else:
-        metadata["source_type"] = doc.get("source_type", "document")
-        metadata["source_name"] = doc.get("source_name")
-        metadata["publication_date"] = doc.get("publication_date")
-        metadata["headline"] = doc.get("headline")
+        # Get metadata from nested "metadata" field (populated by document_processor)
+        # Note: extraction uses "source" key, but downstream expects "source_name"
+        doc_meta = doc.get("metadata", {})
+        metadata["source_type"] = doc_meta.get("source_type", "document")
+        metadata["source_name"] = doc_meta.get("source")  # Key is "source" not "source_name"
+        metadata["publication_date"] = doc_meta.get("publication_date")
+        metadata["headline"] = doc_meta.get("headline")
 
     return metadata
 
