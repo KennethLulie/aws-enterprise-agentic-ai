@@ -247,6 +247,40 @@ ls documents/extracted/*.json | wc -l
 - [ ] Basic RAG tool returns relevant passages
 - [ ] Extracted JSON files exist in documents/extracted/
 
+### 1.7 Verify Pinecone Supports Hybrid Search
+
+**⚠️ Important:** Pinecone hybrid search (dense + sparse) requires specific index configuration. Most Phase 2a indexes should already support this, but verify.
+
+**Command:**
+```bash
+docker-compose exec backend python -c "
+from pinecone import Pinecone
+from src.config.settings import get_settings
+
+settings = get_settings()
+pc = Pinecone(api_key=settings.pinecone_api_key)
+
+# Get index info
+index_list = pc.list_indexes()
+for idx in index_list:
+    if idx.name == settings.pinecone_index_name:
+        print(f'Index: {idx.name}')
+        print(f'Metric: {idx.metric}')
+        print(f'Dimension: {idx.dimension}')
+        print(f'Status: {idx.status}')
+        
+        # dotproduct metric is required for hybrid search
+        if idx.metric == 'dotproduct':
+            print('\\n✓ Index supports hybrid search (dotproduct metric)')
+        elif idx.metric == 'cosine':
+            print('\\n⚠️ Index uses cosine metric - hybrid search will work but dotproduct is recommended')
+        else:
+            print(f'\\n⚠️ Metric {idx.metric} may not support hybrid search optimally')
+"
+```
+
+**If hybrid search is not supported**, you'll need to create a new index with `metric='dotproduct'` and re-index documents. See Common Issues section for details.
+
 ---
 
 ## 2. Knowledge Graph Ontology
@@ -657,7 +691,35 @@ Reference:
 Verify: docker-compose exec backend python -c "from src.knowledge_graph import Neo4jStore; print('OK')"
 ```
 
-### 4.5 Neo4j Graph Store Checklist
+### 4.5 Create Neo4j Indexes for Query Performance
+
+**⚠️ Important:** Create indexes BEFORE bulk entity indexing for much better performance.
+
+**Command:**
+```bash
+# Create indexes for frequently queried fields
+docker-compose exec neo4j cypher-shell -u neo4j -p localdevpassword "
+CREATE INDEX entity_text IF NOT EXISTS FOR (n:Entity) ON (n.text);
+CREATE INDEX document_id IF NOT EXISTS FOR (n:Document) ON (n.document_id);
+CREATE INDEX entity_mention_count IF NOT EXISTS FOR (n:Entity) ON (n.mention_count);
+"
+
+# Verify indexes created
+docker-compose exec neo4j cypher-shell -u neo4j -p localdevpassword "SHOW INDEXES"
+```
+
+**Expected Output:**
+```
++------------------+-------+----------+
+| name             | state | type     |
++------------------+-------+----------+
+| entity_text      | ONLINE| BTREE    |
+| document_id      | ONLINE| BTREE    |
+| entity_mention_count | ONLINE| BTREE |
++------------------+-------+----------+
+```
+
+### 4.6 Neo4j Graph Store Checklist
 
 - [ ] store.py created with Neo4jStore class
 - [ ] Connection to local Neo4j works
@@ -666,6 +728,7 @@ Verify: docker-compose exec backend python -c "from src.knowledge_graph import N
 - [ ] batch_create_entities for bulk loading
 - [ ] create_document_node for document hubs
 - [ ] Package __init__.py exports Neo4jStore
+- [ ] **Neo4j indexes created for entity_text, document_id**
 
 ---
 
@@ -1361,6 +1424,40 @@ Key Features:
 - Parse Nova Lite response to extract variants
 - Handle edge cases: short queries, junk output
 - Limit query length to prevent abuse
+- **Deduplicate variants** (Nova Lite sometimes returns similar/identical variants)
+- **Timeout handling** (30s default, fail gracefully to original query only)
+
+**Reliability Requirements (Important):**
+
+```python
+from functools import lru_cache
+import asyncio
+
+class QueryExpander:
+    def __init__(self, model_id: str = "amazon.nova-lite-v1:0", timeout: float = 30.0):
+        self.model_id = model_id
+        self.timeout = timeout
+    
+    @lru_cache(maxsize=100)  # Cache for repeated queries
+    def expand(self, query: str, num_variants: int = 3) -> tuple[str, ...]:
+        """Expand query with caching and timeout handling."""
+        try:
+            variants = self._expand_with_timeout(query, num_variants)
+            # Deduplicate
+            seen = {query.lower().strip()}
+            unique = [query]
+            for v in variants:
+                if v.lower().strip() not in seen:
+                    seen.add(v.lower().strip())
+                    unique.append(v)
+            return tuple(unique[:num_variants + 1])
+        except asyncio.TimeoutError:
+            logger.warning("query_expansion_timeout", query=query[:50])
+            return (query,)  # Fall back to original only
+        except Exception as e:
+            logger.error("query_expansion_failed", error=str(e))
+            return (query,)  # Graceful degradation
+```
 
 Cost Note:
 - Nova Lite: ~$0.0003/1K input tokens, $0.0012/1K output tokens
@@ -1746,6 +1843,36 @@ Key Features:
 - Filter out passages that return "NOT_RELEVANT"
 - Handle edge cases: very short passages, no relevant content
 
+**Parent/Child Integration (Important):**
+- Compress the `parent_text` field (1024 tokens) - this is the full context sent to the LLM
+- Do NOT modify `child_text_raw` - preserve this for citation match preview
+- Store compressed result in new `compressed_text` field
+- Short passages (<100 tokens in parent_text) can skip compression
+
+compress_results() should handle parent/child structure:
+```python
+def compress_results(self, query: str, results: list[dict]) -> list[dict]:
+    """Compress parent_text while preserving child_text_raw for citations."""
+    compressed_results = []
+    for result in results:
+        metadata = result.get("metadata", {})
+        parent_text = metadata.get("parent_text", metadata.get("text", ""))
+        
+        # Skip compression for short passages
+        if len(parent_text) < 400:  # ~100 tokens
+            result["compressed_text"] = parent_text
+            compressed_results.append(result)
+            continue
+        
+        compressed = self.compress(query, parent_text)
+        if compressed != "NOT_RELEVANT":
+            result["compressed_text"] = compressed
+            # Preserve child_text_raw for citation preview
+            compressed_results.append(result)
+    
+    return compressed_results
+```
+
 Example:
 Input passage: "Apple Inc. reported revenue of $394B in fiscal 2024. 
                The company's new titanium design was well-received.
@@ -1825,7 +1952,10 @@ Verify: docker-compose exec backend python -c "from src.utils import ContextualC
 
 - [ ] compressor.py created with ContextualCompressor class
 - [ ] compress() extracts relevant sentences
-- [ ] compress_results() handles batch processing
+- [ ] compress_results() handles batch processing with parent/child structure
+- [ ] Compresses `parent_text` field (1024 tokens)
+- [ ] Preserves `child_text_raw` for citation preview
+- [ ] Stores result in `compressed_text` field
 - [ ] NOT_RELEVANT passages filtered out
 - [ ] Source metadata preserved
 - [ ] Utils __init__.py exports ContextualCompressor
@@ -1842,6 +1972,20 @@ Integrating all retrieval components (dense, BM25, KG, query expansion, RRF, rer
 - **Full Pipeline:** Combines all Phase 2b improvements
 - **Quality Improvement:** Each component adds retrieval quality
 - **Unified Interface:** Single function for all retrieval needs
+
+> **⚠️ Phase 2a Parent/Child Architecture Dependency**
+> 
+> Phase 2a implemented parent/child chunking where:
+> - **Child chunks (256 tokens)** are embedded and stored in Pinecone
+> - **Parent text (1024 tokens)** is stored in metadata for full LLM context
+> - Key fields: `parent_id`, `parent_text`, `child_text`, `child_text_raw`
+> 
+> The HybridRetriever MUST preserve this structure:
+> 1. Results are deduplicated by `parent_id` (not just chunk ID)
+> 2. `parent_text` is used for LLM context and compression
+> 3. `child_text_raw` is preserved for citation "Matched:" previews
+> 
+> See Phase 2a Section 8.2 (Parent/Child Chunking) and Section 10 (RAG Tool) for full details.
 
 ### 11.1 Create Hybrid Retriever Module
 
@@ -1880,28 +2024,77 @@ Pipeline Parameters:
 - rerank_candidates: 15
 - final_top_k: 5 (configurable)
 
-Output Format:
+Output Format (Parent/Child Compatible):
 [
   {
-    "id": "AAPL_10K_2024_chunk_42",
-    "text": "The Company faces significant...",
+    "id": "AAPL_10K_2024_child_42",
+    "parent_id": "AAPL_10K_2024_parent_5",
+    "parent_text": "The full 1024-token parent context for LLM...",
+    "child_text_raw": "The 256-token matched child text for citation preview...",
+    "compressed_text": "Relevant sentences extracted by compressor (if enabled)...",
     "relevance_score": 9,
+    "rrf_score": 0.032,
     "sources": ["dense", "bm25", "kg"],
     "metadata": {
       "document_id": "AAPL_10K_2024",
       "ticker": "AAPL",
       "section": "Item 1A: Risk Factors",
-      "page": 15
+      "page": 15,
+      "fiscal_year": 2024
     }
   },
   ...
 ]
 
+**Field Descriptions (Parent/Child Architecture from Phase 2a):**
+- `id`: Child chunk ID (what was embedded and matched)
+- `parent_id`: Parent chunk ID (groups related children)
+- `parent_text`: Full 1024-token context (used for LLM synthesis)
+- `child_text_raw`: Original 256-token text without enrichment (used for citation preview)
+- `compressed_text`: Query-relevant sentences from parent_text (if compression enabled)
+- `relevance_score`: Cross-encoder reranking score (1-10)
+- `rrf_score`: RRF fusion score before reranking
+- `sources`: Which retrieval methods found this result
+
 Key Features:
 - Parallel queries for dense and BM25 (use asyncio if possible)
 - Entity extraction from query for KG lookup
-- Deduplication before RRF (same chunk from multiple sources)
+- Deduplication by chunk ID before RRF (same chunk from multiple sources)
+- **Parent deduplication after RRF** (multiple children from same parent → keep highest scoring)
 - Include retrieval stats in response (optional)
+
+**Parent/Child Deduplication (Critical):**
+
+Multiple child chunks from the same parent may rank highly after RRF fusion.
+Deduplicate by `parent_id` BEFORE reranking to avoid sending duplicate context:
+
+```python
+def _deduplicate_by_parent(self, results: list[dict]) -> list[dict]:
+    """
+    Keep only the highest-scoring child per parent.
+    This prevents duplicate parent context in final results.
+    """
+    parent_best: dict[str, dict] = {}
+    
+    for result in results:
+        metadata = result.get("metadata", {})
+        parent_id = metadata.get("parent_id", result.get("id", "unknown"))
+        score = result.get("rrf_score", 0.0)
+        
+        if parent_id not in parent_best or score > parent_best[parent_id]["rrf_score"]:
+            parent_best[parent_id] = result
+    
+    # Sort by RRF score descending
+    return sorted(parent_best.values(), key=lambda x: x.get("rrf_score", 0), reverse=True)
+```
+
+**Integration with Phase 2a RAG Tool:**
+
+The existing `rag.py` from Phase 2a has helper functions for parent/child handling.
+HybridRetriever should use compatible output format so `rag.py` functions work seamlessly:
+- `_deduplicate_by_parent()` - works with `parent_id` in metadata
+- `_get_result_text()` - prefers `parent_text`, falls back to `text`/`child_text`
+- `_format_citation()` - uses `child_text_raw` for match preview
 
 **Graceful Degradation (Important):**
 
@@ -1984,15 +2177,31 @@ Requirements:
 3. Add option to disable hybrid features for simpler queries
 4. Update tool description for better agent selection
 5. Format response with retrieval stats and citations
+6. **PRESERVE existing parent/child handling functions from Phase 2a**
 
 Updated Function Signature:
 - retrieve_documents(query: str, top_k: int = 5, hybrid: bool = True) -> str
+
+**Parent/Child Functions to PRESERVE (from Phase 2a):**
+
+The existing rag.py has critical parent/child handling that MUST be preserved:
+
+1. `_deduplicate_by_parent(results)` - Deduplicates by parent_id, keeps highest score
+2. `_get_result_text(metadata, warn_missing)` - Gets parent_text with fallback
+3. `_format_citation(metadata)` - Formats citation with child_text_raw preview
+
+These functions work with both:
+- Phase 2a dense-only results (has parent_text, child_text_raw in metadata)
+- Phase 2b hybrid results (same structure from HybridRetriever)
 
 Key Features:
 - If hybrid=True: Use full pipeline (expansion, dense+BM25+KG, RRF, reranking)
 - If hybrid=False: Use basic dense search only (Phase 2a behavior, fallback)
 - Include relevance scores in citations
 - Track which retrieval sources contributed
+- **Use parent_text for LLM context (1024 tokens)**
+- **Use child_text_raw for "Matched:" citation preview (256 tokens)**
+- **Use compressed_text if available (after contextual compression)**
 
 Updated Tool Description:
 "Search 10-K document text for information. Use for:
@@ -2001,19 +2210,41 @@ Updated Tool Description:
  - Qualitative questions about company operations
  - Context around numbers from SQL queries"
 
-Response Format:
+Response Format (uses parent/child structure):
 "Found 5 relevant passages (hybrid retrieval: dense+BM25+KG, reranked):
 
 [1] Source: Apple 10-K 2024, Item 1A, Page 15 (Relevance: 9/10)
-<passage text>
+{parent_text or compressed_text - full context for LLM}
+Matched: {first 100 chars of child_text_raw}...
 
 [2] Source: NVIDIA 10-K 2024, Item 1A, Page 22 (Relevance: 8/10)
-<passage text>
+{parent_text or compressed_text - full context for LLM}
+Matched: {first 100 chars of child_text_raw}...
 ..."
+
+**Integration Pattern:**
+
+```python
+async def _retrieve_hybrid(query: str, top_k: int, filters: dict | None) -> str:
+    """Use HybridRetriever with parent/child compatible output."""
+    retriever = _get_hybrid_retriever()
+    
+    # HybridRetriever returns results with parent_text, child_text_raw
+    results = await retriever.retrieve(
+        query=query,
+        top_k=top_k * 3,  # Request more for parent deduplication
+        use_kg=True,
+        compress=True
+    )
+    
+    # Results already deduplicated by parent_id in HybridRetriever
+    # Use existing _format_results() which handles parent/child structure
+    return _format_results(results[:top_k], query)
+```
 
 Reference:
 - HybridRetriever from Section 11.1
-- Existing rag.py structure from Phase 2a
+- Existing rag.py structure from Phase 2a (preserve parent/child functions)
 - [agent.mdc] for tool patterns
 - [backend.mdc] for Python patterns
 
@@ -2058,8 +2289,17 @@ Our supply chain and manufacturing operations are global and complex...
   - [ ] RRF fusion (Section 9)
   - [ ] Cross-encoder reranking (Section 10)
   - [ ] Contextual compression (Section 10b)
+- [ ] **Parent/Child Architecture (Phase 2a compatibility):**
+  - [ ] Output includes `parent_id`, `parent_text`, `child_text_raw` fields
+  - [ ] `_deduplicate_by_parent()` deduplicates by parent_id after RRF
+  - [ ] Compression operates on `parent_text` (1024 tokens)
+  - [ ] `child_text_raw` preserved for citation "Matched:" preview
 - [ ] Ingestion __init__.py exports HybridRetriever
 - [ ] rag.py updated to use HybridRetriever
+- [ ] **Existing rag.py parent/child functions preserved:**
+  - [ ] `_deduplicate_by_parent()` still works
+  - [ ] `_get_result_text()` prefers parent_text
+  - [ ] `_format_citation()` uses child_text_raw for match preview
 - [ ] Tool description updated for better agent selection
 - [ ] hybrid=True uses full pipeline
 - [ ] hybrid=False falls back to basic dense search
@@ -2586,13 +2826,75 @@ curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
   -d '{"message": "Compare gross margins across tech companies and explain what affects margins."}'
 ```
 
-### 13.5 End-to-End Verification Checklist
+### 13.5 Verify Parent/Child Structure in Hybrid Pipeline
+
+**Command (verify parent/child fields preserved through hybrid pipeline):**
+```bash
+docker-compose exec backend python -c "
+from src.ingestion.hybrid_retriever import HybridRetriever
+from src.config.settings import get_settings
+
+# Initialize retriever (uses cached clients)
+retriever = HybridRetriever()
+
+# Test query
+results = retriever.retrieve('What are supply chain risks?', top_k=3)
+
+print('Verifying parent/child structure in hybrid results:')
+for i, r in enumerate(results):
+    metadata = r.get('metadata', {})
+    print(f'\\nResult {i+1}:')
+    print(f'  id: {r.get(\"id\", \"N/A\")}')
+    print(f'  parent_id: {metadata.get(\"parent_id\", \"MISSING\")}')
+    print(f'  parent_text: {len(metadata.get(\"parent_text\", \"\"))} chars')
+    print(f'  child_text_raw: {len(metadata.get(\"child_text_raw\", \"\"))} chars')
+    print(f'  compressed_text: {len(r.get(\"compressed_text\", \"\"))} chars')
+    print(f'  relevance_score: {r.get(\"relevance_score\", \"N/A\")}')
+    print(f'  sources: {r.get(\"sources\", [])}')
+
+# Verify all required fields present
+required_fields = ['parent_id', 'parent_text', 'child_text_raw']
+missing = []
+for r in results:
+    m = r.get('metadata', {})
+    for field in required_fields:
+        if not m.get(field):
+            missing.append(f'{r.get(\"id\")}: {field}')
+
+if missing:
+    print(f'\\n⚠️ Missing parent/child fields: {missing}')
+else:
+    print(f'\\n✓ All {len(results)} results have parent/child structure')
+"
+```
+
+**Expected Output:**
+```
+Verifying parent/child structure in hybrid results:
+
+Result 1:
+  id: AAPL_10K_2024_child_42
+  parent_id: AAPL_10K_2024_parent_5
+  parent_text: 1024 chars
+  child_text_raw: 256 chars
+  compressed_text: 312 chars
+  relevance_score: 9
+  sources: ['dense', 'bm25']
+
+...
+
+✓ All 3 results have parent/child structure
+```
+
+### 13.6 End-to-End Verification Checklist
 
 - [ ] Knowledge Graph has 1000+ entities
 - [ ] Entity queries return relevant documents
 - [ ] Hybrid search returns better results than dense-only
 - [ ] Query expansion generates meaningful variants
 - [ ] Reranking improves result ordering
+- [ ] **Parent/child structure preserved through hybrid pipeline**
+- [ ] **Compression operates on parent_text, preserves child_text_raw**
 - [ ] Multi-tool queries work (SQL + RAG)
 - [ ] AWS deployment successful with new features
 
@@ -2617,8 +2919,20 @@ curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
 - [ ] Utils __init__.py exports: BM25Encoder, rrf_fusion, CrossEncoderReranker, ContextualCompressor
 - [ ] Ingestion __init__.py exports: QueryExpander, HybridRetriever
 
+### Parent/Child Architecture Compatibility (Phase 2a Integration)
+- [ ] HybridRetriever output includes: `parent_id`, `parent_text`, `child_text_raw`
+- [ ] Parent deduplication (`_deduplicate_by_parent`) works after RRF fusion
+- [ ] Compression operates on `parent_text` (1024 tokens), stores in `compressed_text`
+- [ ] `child_text_raw` preserved unchanged for citation "Matched:" preview
+- [ ] Existing `rag.py` helper functions work with hybrid results:
+  - [ ] `_deduplicate_by_parent()` - deduplicates by parent_id
+  - [ ] `_get_result_text()` - prefers parent_text, falls back gracefully
+  - [ ] `_format_citation()` - uses child_text_raw for match preview
+- [ ] Backwards compatible with Phase 2a dense-only results
+
 ### Integration
 - [ ] RAG tool uses hybrid retrieval by default
+- [ ] RAG tool preserves parent/child handling from Phase 2a
 - [ ] SQL tool description updated with USE/DO NOT USE sections
 - [ ] RAG tool description updated with USE/DO NOT USE sections
 - [ ] Tavily tool description updated with USE/DO NOT USE sections
@@ -2729,6 +3043,220 @@ print(f'Score: {score}')
 - Check agent prompt includes tool selection guidance
 - Test with explicit "use SQL for numbers, RAG for context" in query
 
+### Issue: Bedrock rate limiting (ThrottlingException)
+
+**Symptoms:**
+- "ThrottlingException" errors during query expansion or reranking
+- Intermittent failures on high-traffic queries
+
+**Root Cause:**
+Nova Lite has per-second rate limits. Full hybrid pipeline makes 4+ LLM calls per query (expansion + reranking + compression).
+
+**Solution:**
+Use the same exponential backoff pattern from Phase 2A VLM extraction. See `backend/src/ingestion/vlm_extractor.py` and `backend/src/utils/embeddings.py` for the retry implementation.
+
+Also consider:
+- Add LRU caching for query expansion (same queries return same variants)
+- Reduce reranking candidates from 15 to 10
+- Request quota increase via AWS Support if needed
+
+### Issue: Pinecone hybrid search returns no results
+
+**Symptoms:**
+- Dense-only search works, hybrid returns nothing
+- "sparse_values" errors
+
+**Root Cause:**
+Pinecone index must be configured for hybrid search at creation time.
+
+**Solution:**
+```bash
+# Check index configuration
+docker-compose exec backend python -c "
+from pinecone import Pinecone
+from src.config.settings import get_settings
+
+settings = get_settings()
+pc = Pinecone(api_key=settings.pinecone_api_key)
+index = pc.Index(settings.pinecone_index_name)
+print(index.describe_index_stats())
+"
+
+# If index doesn't support sparse, you need to:
+# 1. Create new index with metric='dotproduct' and sparse_values enabled
+# 2. Re-index all documents with both dense and sparse vectors
+```
+
+### Issue: Query expansion returns duplicate variants
+
+**Symptoms:**
+- Nova Lite returns same text for multiple variants
+- Redundant searches waste time
+
+**Solution:**
+```python
+def expand(self, query: str, num_variants: int = 3) -> list[str]:
+    variants = [query]  # Always include original
+    raw_variants = self._call_nova_lite(prompt)
+    
+    # Deduplicate and filter
+    seen = {query.lower().strip()}
+    for v in raw_variants:
+        normalized = v.lower().strip()
+        if normalized not in seen and len(v) > 10:
+            seen.add(normalized)
+            variants.append(v)
+    
+    # If not enough unique variants, return what we have
+    return variants[:num_variants + 1]
+```
+
+### Issue: Neo4j memory exhaustion during entity indexing
+
+**Symptoms:**
+- Neo4j crashes during large document indexing
+- "Java heap space" errors
+
+**Solution:**
+```yaml
+# docker-compose.yml - increase Neo4j memory
+neo4j:
+  environment:
+    - NEO4J_dbms_memory_heap_initial__size=512m
+    - NEO4J_dbms_memory_heap_max__size=1G
+    - NEO4J_dbms_memory_pagecache_size=512m
+```
+
+Also batch entity creation:
+```python
+# Process documents in batches of 100 entities
+BATCH_SIZE = 100
+for i in range(0, len(entities), BATCH_SIZE):
+    batch = entities[i:i+BATCH_SIZE]
+    store.batch_create_entities(batch)
+```
+
+### Issue: BM25 token hash collisions
+
+**Symptoms:**
+- Unrelated terms match unexpectedly
+- Sparse search returns irrelevant results
+
+**Root Cause:**
+Python hash() can produce collisions when modded to 2^31.
+
+**Solution:**
+Use a better hash function:
+```python
+import hashlib
+
+def hash_token(token: str) -> int:
+    """Use SHA256 for collision-resistant hashing."""
+    h = hashlib.sha256(token.encode()).hexdigest()
+    return int(h[:8], 16)  # First 8 hex chars = 32 bits
+```
+
+---
+
+## Best Practices & Performance Optimization
+
+### 1. Async Patterns for Parallel Retrieval
+
+The hybrid pipeline should run dense and BM25 searches in parallel:
+
+```python
+import asyncio
+
+async def _parallel_search(self, query_variants: list[str]) -> dict:
+    """Run dense and BM25 searches in parallel for all variants."""
+    tasks = []
+    
+    for variant in query_variants:
+        tasks.append(self._dense_search(variant, top_k=15))
+        tasks.append(self._bm25_search(variant, top_k=15))
+    
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Handle any exceptions gracefully
+    valid_results = [r for r in results if not isinstance(r, Exception)]
+    return valid_results
+```
+
+### 2. Caching for Repeated Queries
+
+Add LRU caching for expensive operations:
+
+```python
+from functools import lru_cache
+
+class QueryExpander:
+    @lru_cache(maxsize=100)
+    def expand(self, query: str) -> tuple[str, ...]:
+        """Cache query expansions (return tuple for hashability)."""
+        variants = self._generate_variants(query)
+        return tuple(variants)
+```
+
+### 3. Timeout Configuration
+
+All external service calls should have configurable timeouts:
+
+```python
+# config/settings.py
+class Settings(BaseSettings):
+    # Timeouts (seconds)
+    pinecone_timeout: float = 10.0
+    neo4j_timeout: float = 5.0
+    bedrock_timeout: float = 30.0
+    
+    # Retry configuration
+    max_retries: int = 3
+    retry_backoff_base: float = 2.0
+```
+
+### 4. Memory-Efficient Entity Extraction
+
+For large documents, process pages in batches:
+
+```python
+def extract_from_document(self, extraction_json: dict, batch_size: int = 10) -> list[Entity]:
+    """Extract entities with memory-efficient batching."""
+    all_entities = []
+    pages = extraction_json.get("pages", [])
+    
+    for i in range(0, len(pages), batch_size):
+        batch = pages[i:i+batch_size]
+        for page in batch:
+            entities = self.extract_entities(
+                page.get("text", ""),
+                document_id=extraction_json.get("document_id"),
+                page=page.get("page_number")
+            )
+            all_entities.extend(entities)
+        
+        # Allow garbage collection between batches
+        import gc
+        gc.collect()
+    
+    return all_entities
+```
+
+### 5. Graceful Fallback Chain
+
+Implement fallback at each pipeline stage:
+
+```
+Full Pipeline → Dense+BM25 → Dense Only → Cached Results → Error Response
+
+Priority order:
+1. Try full hybrid (dense + BM25 + KG + reranking + compression)
+2. If KG fails → continue with dense + BM25
+3. If BM25 fails → continue with dense only
+4. If reranking fails → use RRF scores directly
+5. If compression fails → return full passages
+6. If dense fails → return error (core requirement)
+```
+
 ---
 
 ## Files Created/Modified in Phase 2b
@@ -2807,7 +3335,6 @@ git push origin v0.5.0-phase2b
 **Commands:**
 ```bash
 # Move completed guides to archive
-mv docs/PHASE_2A_HOW_TO_GUIDE.md docs/completed-phases/
 mv docs/PHASE_2B_HOW_TO_GUIDE.md docs/completed-phases/
 
 git add docs/

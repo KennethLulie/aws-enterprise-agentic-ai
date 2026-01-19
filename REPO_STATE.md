@@ -138,7 +138,7 @@
 | docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md | Completed Phase 0 guide (archived) |
 | docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md | Completed Phase 1a guide (archived) |
 | docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md | Completed Phase 1b guide (archived) |
-| docs/completed-phases/PHASE_2A_HOW_TO_GUIDE.md | Completed Phase 2a guide (archived) |
+| docs/PHASE_2A_HOW_TO_GUIDE.md | Completed Phase 2a guide |
 | docs/completed-phases/PHASE_2_REQUIREMENTS.md | Phase 2 requirements planning document (archived) |
 | docs/completed-phases/RAG_IMPROVEMENTS_DELTA.md | RAG chunking improvements delta (section boundaries, 256-token chunks, company extraction) |
 
