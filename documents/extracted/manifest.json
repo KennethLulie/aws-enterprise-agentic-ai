@@ -9,13 +9,15 @@
       "pages_processed": 17,
       "extraction_cost_usd": 0.425,
       "doc_type": "reference",
-      "indexed_to_pinecone": false,
-      "indexed_at": null,
-      "chunk_count": null,
-      "error_count": 0
+      "indexed_to_pinecone": true,
+      "indexed_at": "2026-01-19T02:43:15.372538+00:00",
+      "chunk_count": 14,
+      "error_count": 0,
+      "index_schema_version": "v2_parent_child",
+      "parent_count": 3
     },
     "IDC_-_Global_Memory_Shortage_Crisis__Market_Analysis_and_the_Potential_Impact_on_the_Smartphone_and_PC_Markets_in_2026": {
-      "source_file": "IDC - Global Memory Shortage Crisis_ Market Analysis and the Potential Impact on the Smartphone and PC Markets in 2026.pdf",
+      "source_file": "IDC - Global\u00a0Memory\u00a0Shortage\u00a0Crisis_\u00a0Market\u00a0Analysis and\u00a0the\u00a0Potential\u00a0Impact on the\u00a0Smartphone and PC\u00a0Markets in 2026.pdf",
       "file_hash": "22b101031c165467f2ce922ea04bf76e",
       "file_size_bytes": 1491467,
       "extracted_at": "2026-01-17T02:32:54.235110+00:00",
@@ -23,10 +25,12 @@
       "pages_processed": 6,
       "extraction_cost_usd": 0.15,
       "doc_type": "reference",
-      "indexed_to_pinecone": false,
-      "indexed_at": null,
-      "chunk_count": null,
-      "error_count": 0
+      "indexed_to_pinecone": true,
+      "indexed_at": "2026-01-19T02:43:18.249117+00:00",
+      "chunk_count": 14,
+      "error_count": 0,
+      "index_schema_version": "v2_parent_child",
+      "parent_count": 3
     },
     "NVDA_10K_2025": {
       "source_file": "NVDA_10K_2025.pdf",
@@ -37,16 +41,18 @@
       "pages_processed": 119,
       "extraction_cost_usd": 4.76,
       "doc_type": "10k",
-      "indexed_to_pinecone": false,
-      "indexed_at": null,
-      "chunk_count": null,
-      "error_count": 0
+      "indexed_to_pinecone": true,
+      "indexed_at": "2026-01-19T02:44:16.917165+00:00",
+      "chunk_count": 324,
+      "error_count": 0,
+      "index_schema_version": "v2_parent_child",
+      "parent_count": 89
     }
   },
   "totals": {
     "documents_extracted": 3,
-    "documents_indexed": 0,
+    "documents_indexed": 3,
     "total_extraction_cost_usd": 5.335,
-    "last_updated": "2026-01-17T03:11:15.290753+00:00"
+    "last_updated": "2026-01-19T02:44:16.917181+00:00"
   }
 }

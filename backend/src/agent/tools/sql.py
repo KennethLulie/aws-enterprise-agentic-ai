@@ -477,22 +477,32 @@ def _build_mock_result(query: str) -> str:
 @tool("sql_query", args_schema=SQLQueryInput)
 async def sql_query(query: str) -> str:
     """
-    Query the 10-K financial database using natural language.
+    Query structured financial metrics and numbers from 10-K SEC filings.
 
-    This tool converts your question to SQL, validates it for safety,
-    executes it against the PostgreSQL database, and returns formatted results.
+    Use this tool for questions about QUANTITATIVE financial data:
+    - Revenue, profit, margins, EPS, and other numeric metrics
+    - Company comparisons by financial performance
+    - Segment and geographic revenue breakdowns
+    - Year-over-year financial changes
+    - Risk factor CATEGORIES and counts (not detailed descriptions)
+
+    DO NOT use this tool for:
+    - Detailed explanations of WHY something happened
+    - Full text descriptions or narratives from filings
+    - Specific quotes or passages from documents
+    - Understanding context or reasoning behind numbers
 
     Examples:
         - "What was NVIDIA's revenue in 2024?"
         - "Which company has the highest net margin?"
         - "Show segment revenue breakdown for tech companies"
-        - "List all risk factors related to supply chain"
+        - "Compare gross margins across all companies"
 
     Args:
-        query: Natural language question about financial data.
+        query: Natural language question about financial metrics and numbers.
 
     Returns:
-        Formatted response with data and the SQL query used.
+        Formatted table/response with data and the SQL query used.
     """
     settings = get_settings()
 

@@ -1,17 +1,29 @@
 #!/usr/bin/env python3
 """
-Document extraction batch script for VLM-based PDF processing.
+Document extraction and indexing batch script for VLM-based PDF processing.
 
 This standalone script extracts structured data from PDF documents using
-Claude Vision (via AWS Bedrock). It's designed to run locally and process
-documents in batch with progress tracking, cost estimation, and graceful
-interruption handling.
+Claude Vision (via AWS Bedrock) and indexes them to Pinecone for RAG retrieval.
+It's designed to run locally and process documents in batch with progress
+tracking, cost estimation, and graceful interruption handling.
+
+Extraction Pipeline:
+    1. Convert PDF pages to images
+    2. Extract text and structure using Claude Vision (VLM)
+    3. Save structured JSON to documents/extracted/
+
+Indexing Pipeline:
+    1. Load extracted JSON
+    2. Create parent/child chunks (1024/256 tokens)
+    3. Enrich child chunks with contextual metadata
+    4. Generate embeddings for child chunks
+    5. Upsert to Pinecone with parent_text in metadata
 
 Usage:
     # Show help
     python scripts/extract_and_index.py --help
 
-    # Check extraction status (no API calls)
+    # Check extraction/indexing status (no API calls)
     python scripts/extract_and_index.py --status
 
     # Dry run - list what would be processed
@@ -26,8 +38,18 @@ Usage:
     # Force re-extraction of a single document
     python scripts/extract_and_index.py --doc AAPL_10K_2024 --force
 
+    # Index only (skip extraction, just index extracted JSONs)
+    python scripts/extract_and_index.py --index-only
+
+    # Re-index all documents (delete existing vectors first)
+    python scripts/extract_and_index.py --reindex
+
+    # Index a single document
+    python scripts/extract_and_index.py --index-doc NVDA_10K_2025
+
 Reference:
-    - PHASE_2A_HOW_TO_GUIDE.md Section 5.3 for requirements
+    - PHASE_2A_HOW_TO_GUIDE.md Section 5.3 for extraction requirements
+    - PHASE_2A_HOW_TO_GUIDE.md Section 9.3 for indexing requirements
     - backend.mdc for Python patterns
 """
 
@@ -39,13 +61,20 @@ import json
 import os
 import signal
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Add backend/src to path for imports when running locally
+# Add backend/src to path for imports when running locally or in Docker
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_SRC = PROJECT_ROOT / "backend"
+
+# Check if we're running in Docker (scripts mounted at /app/scripts)
+if Path("/app/src").exists():
+    # Running in Docker - /app is the backend root
+    BACKEND_SRC = Path("/app")
+    PROJECT_ROOT = Path("/app")  # Documents are at /app/documents
+
 if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
 
@@ -132,6 +161,10 @@ from src.ingestion.document_processor import (
     ESTIMATED_COST_PER_PAGE_10K,
     ESTIMATED_COST_PER_PAGE_REFERENCE,
 )
+from src.ingestion.parent_child_chunking import ParentChildChunker
+from src.ingestion.contextual_chunking import ContextualEnricher
+from src.utils.embeddings import BedrockEmbeddings, EmbeddingError
+from src.utils.pinecone_client import PineconeClient, PineconeClientError
 
 # =============================================================================
 # Constants
@@ -153,6 +186,10 @@ DEFAULT_EXTRACTED_DIR = PROJECT_ROOT / "documents" / "extracted"
 # Estimated pages per document for cost calculation
 ESTIMATED_PAGES_10K = 100
 ESTIMATED_PAGES_REFERENCE = 10
+
+# Index schema version - increment when changing vector format
+# This triggers re-indexing when schema changes
+CURRENT_INDEX_SCHEMA_VERSION = "v2_parent_child"
 
 
 # =============================================================================
@@ -534,6 +571,467 @@ def print_summary(
 
 
 # =============================================================================
+# Indexing Functions
+# =============================================================================
+
+
+def needs_reindexing(manifest: dict[str, Any], doc_id: str, force: bool = False) -> bool:
+    """
+    Check if a document needs re-indexing.
+
+    A document needs re-indexing if:
+    - It's not in the manifest
+    - It hasn't been indexed to Pinecone
+    - The index schema version has changed
+    - Force flag is set
+
+    Args:
+        manifest: The manifest dictionary.
+        doc_id: Document ID to check.
+        force: If True, always re-index.
+
+    Returns:
+        True if document needs re-indexing.
+    """
+    if force:
+        return True
+
+    documents = manifest.get("documents", {})
+    if doc_id not in documents:
+        return True
+
+    doc = documents[doc_id]
+    if not doc.get("indexed_to_pinecone"):
+        return True
+
+    # Re-index if schema version changed
+    if doc.get("index_schema_version") != CURRENT_INDEX_SCHEMA_VERSION:
+        return True
+
+    return False
+
+
+def load_extracted_json(json_path: Path) -> dict[str, Any] | None:
+    """
+    Load an extracted JSON document.
+
+    Args:
+        json_path: Path to the JSON file.
+
+    Returns:
+        Document dictionary or None if loading fails.
+    """
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"{RED}  Failed to load {json_path.name}: {e}{RESET}")
+        return None
+
+
+def build_document_metadata(doc: dict[str, Any]) -> dict[str, Any]:
+    """
+    Build document-level metadata for indexing.
+
+    Extracts metadata from the document JSON for use in chunking
+    and Pinecone vector metadata.
+
+    Args:
+        doc: The extracted document dictionary.
+
+    Returns:
+        Document metadata dictionary.
+    """
+    doc_type = doc.get("document_type", "reference")
+
+    # Base metadata
+    metadata = {
+        "document_id": doc.get("document_id"),
+        "document_type": doc_type,
+        "total_pages": doc.get("total_pages", 0),
+    }
+
+    # 10-K specific metadata
+    if doc_type == "10k":
+        # Try to extract company info from first page or document
+        metadata["ticker"] = doc.get("ticker")
+        metadata["company"] = doc.get("company")
+        metadata["fiscal_year"] = doc.get("fiscal_year")
+
+        # If not at top level, try to extract from filename
+        if not metadata["ticker"]:
+            doc_id = doc.get("document_id", "")
+            parts = doc_id.split("_")
+            if len(parts) >= 3 and parts[1].upper() == "10K":
+                metadata["ticker"] = parts[0]
+                try:
+                    metadata["fiscal_year"] = int(parts[2])
+                except ValueError:
+                    pass
+
+    # Reference document metadata
+    else:
+        metadata["source_type"] = doc.get("source_type", "document")
+        metadata["source_name"] = doc.get("source_name")
+        metadata["publication_date"] = doc.get("publication_date")
+        metadata["headline"] = doc.get("headline")
+
+    return metadata
+
+
+def extract_pages_for_chunking(doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Extract page data in the format expected by ParentChildChunker.
+
+    Args:
+        doc: The extracted document dictionary.
+
+    Returns:
+        List of page dictionaries with page_number, text, and section.
+    """
+    pages = []
+    for page in doc.get("pages", []):
+        page_data = {
+            "page_number": page.get("page_number", 0),
+            "text": page.get("text", ""),
+            "section": page.get("section", ""),
+        }
+        # Only include pages with actual text content
+        if page_data["text"].strip():
+            pages.append(page_data)
+    return pages
+
+
+def sanitize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    """
+    Sanitize metadata for Pinecone by removing None values.
+
+    Pinecone rejects metadata fields with null values - they must be
+    string, number, boolean, or list of strings only.
+
+    Args:
+        metadata: The metadata dictionary to sanitize.
+
+    Returns:
+        Sanitized metadata with None values removed.
+    """
+    return {k: v for k, v in metadata.items() if v is not None}
+
+
+async def index_document(
+    json_path: Path,
+    pinecone_client: PineconeClient,
+    embeddings_client: BedrockEmbeddings,
+    chunker: ParentChildChunker,
+    enricher: ContextualEnricher,
+    manifest: dict[str, Any],
+    force: bool = False,
+) -> dict[str, Any]:
+    """
+    Index a single document to Pinecone.
+
+    Pipeline:
+    1. Load extracted JSON
+    2. Create parent/child chunks
+    3. Enrich children with contextual metadata
+    4. Generate embeddings for children
+    5. Build Pinecone vectors with parent_text in metadata
+    6. Upsert to Pinecone (delete-before-upsert pattern)
+    7. Update manifest
+
+    Args:
+        json_path: Path to the extracted JSON file.
+        pinecone_client: Initialized PineconeClient.
+        embeddings_client: Initialized BedrockEmbeddings.
+        chunker: Initialized ParentChildChunker.
+        enricher: Initialized ContextualEnricher.
+        manifest: The manifest dictionary (will be modified).
+        force: If True, re-index even if already indexed.
+
+    Returns:
+        Result dictionary with indexing stats.
+    """
+    doc_id = json_path.stem
+
+    # Check if needs indexing
+    if not needs_reindexing(manifest, doc_id, force=force):
+        return {
+            "document_id": doc_id,
+            "skipped": True,
+            "reason": "already indexed with current schema",
+        }
+
+    # Load document
+    doc = load_extracted_json(json_path)
+    if not doc:
+        return {
+            "document_id": doc_id,
+            "error": "failed to load JSON",
+        }
+
+    # Build metadata
+    doc_metadata = build_document_metadata(doc)
+
+    # Extract pages for chunking
+    pages = extract_pages_for_chunking(doc)
+    if not pages:
+        return {
+            "document_id": doc_id,
+            "error": "no text content found",
+        }
+
+    print(f"  Chunking {len(pages)} pages...")
+
+    # Step 1: Create parent/child chunks
+    parents, children = chunker.chunk_document(doc_id, pages)
+
+    if not children:
+        return {
+            "document_id": doc_id,
+            "error": "no chunks created",
+        }
+
+    print(f"  Created {len(parents)} parents, {len(children)} children")
+
+    # Step 2: Enrich children with contextual metadata
+    enriched_children = enricher.enrich_children(children, doc_metadata)
+
+    # Step 3: Generate embeddings for enriched children
+    print(f"  Generating {len(enriched_children)} embeddings...")
+    child_texts = [child["text"] for child in enriched_children]
+
+    try:
+        embeddings = await embeddings_client.embed_batch(child_texts)
+    except EmbeddingError as e:
+        return {
+            "document_id": doc_id,
+            "error": f"Embedding generation failed: {e}",
+        }
+
+    if len(embeddings) != len(enriched_children):
+        return {
+            "document_id": doc_id,
+            "error": f"Embedding count mismatch: got {len(embeddings)}, expected {len(enriched_children)}",
+        }
+
+    # Step 4: Build Pinecone vectors
+    # Create lookup for parents by ID
+    parents_by_id = {p["parent_id"]: p for p in parents}
+
+    vectors = []
+    for i, child in enumerate(enriched_children):
+        parent = parents_by_id[child["parent_id"]]
+
+        # Build metadata dict (may contain None values)
+        raw_metadata = {
+            # Core identifiers
+            "document_id": child["document_id"],
+            "document_type": doc_metadata["document_type"],
+            "parent_id": child["parent_id"],
+            "parent_index": parent["parent_index"],
+            "child_index": child["child_index"],
+            # Text content
+            "parent_text": parent["text"],  # Full 1024-token context
+            "child_text": child["text"],  # Enriched (what was embedded)
+            "child_text_raw": child.get("text_raw", child["text"]),  # For citations
+            # Location info
+            "section": child.get("section", ""),
+            "page_number": child.get("start_page", 0),
+            "total_pages": doc_metadata.get("total_pages", 0),
+            # 10-K specific fields
+            "ticker": doc_metadata.get("ticker"),
+            "company": doc_metadata.get("company"),
+            "fiscal_year": doc_metadata.get("fiscal_year"),
+            # Reference doc fields
+            "source_type": doc_metadata.get("source_type"),
+            "source_name": doc_metadata.get("source_name"),
+            "publication_date": doc_metadata.get("publication_date"),
+            "headline": doc_metadata.get("headline"),
+        }
+
+        # Sanitize metadata by removing None values (Pinecone rejects null)
+        vector = {
+            "id": child["child_id"],
+            "values": embeddings[i],
+            "metadata": sanitize_metadata(raw_metadata),
+        }
+        vectors.append(vector)
+
+    # Step 5: Upsert to Pinecone (delete-before-upsert)
+    print(f"  Upserting to Pinecone...")
+    try:
+        upsert_result = pinecone_client.upsert_document(doc_id, vectors)
+    except PineconeClientError as e:
+        return {
+            "document_id": doc_id,
+            "error": f"Pinecone upsert failed: {e}",
+        }
+
+    # Step 6: Update manifest
+    if "documents" not in manifest:
+        manifest["documents"] = {}
+
+    if doc_id not in manifest["documents"]:
+        manifest["documents"][doc_id] = {}
+
+    manifest["documents"][doc_id].update({
+        "indexed_to_pinecone": True,
+        "indexed_at": datetime.now(timezone.utc).isoformat(),
+        "index_schema_version": CURRENT_INDEX_SCHEMA_VERSION,
+        "chunk_count": len(children),
+        "parent_count": len(parents),
+    })
+
+    # Update totals
+    if "totals" not in manifest:
+        manifest["totals"] = {}
+    manifest["totals"]["documents_indexed"] = sum(
+        1 for d in manifest["documents"].values() if d.get("indexed_to_pinecone")
+    )
+    manifest["totals"]["last_updated"] = datetime.now(timezone.utc).isoformat()
+
+    print(f"  Done: {len(vectors)} vectors indexed ({len(parents)} unique parents)")
+
+    return {
+        "document_id": doc_id,
+        "parent_count": len(parents),
+        "child_count": len(children),
+        "vector_count": upsert_result.get("upserted_count", len(vectors)),
+        "skipped_count": upsert_result.get("skipped_count", 0),
+    }
+
+
+async def index_all_documents(
+    extracted_dir: Path,
+    manifest: dict[str, Any],
+    force: bool = False,
+    doc_id_filter: str | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """
+    Index all extracted documents to Pinecone.
+
+    Args:
+        extracted_dir: Directory containing extracted JSON files.
+        manifest: The manifest dictionary (will be modified).
+        force: If True, re-index all documents.
+        doc_id_filter: If provided, only index this document.
+
+    Returns:
+        Tuple of (results, errors).
+    """
+    global _interrupted
+
+    # Initialize clients
+    print(f"{CYAN}Initializing indexing clients...{RESET}")
+
+    try:
+        pinecone_client = PineconeClient()
+        print(f"  {GREEN}✓ Pinecone client initialized{RESET}")
+    except PineconeClientError as e:
+        print(f"  {RED}✗ Pinecone client failed: {e}{RESET}")
+        return [], [{"error": str(e)}]
+
+    try:
+        embeddings_client = BedrockEmbeddings()
+        print(f"  {GREEN}✓ Embeddings client initialized{RESET}")
+    except Exception as e:
+        print(f"  {RED}✗ Embeddings client failed: {e}{RESET}")
+        return [], [{"error": str(e)}]
+
+    chunker = ParentChildChunker()
+    enricher = ContextualEnricher()
+    print(f"  {GREEN}✓ Chunker and enricher initialized{RESET}")
+
+    # Find JSON files to index
+    if doc_id_filter:
+        json_files = [extracted_dir / f"{doc_id_filter}.json"]
+        if not json_files[0].exists():
+            print(f"{RED}Document not found: {doc_id_filter}{RESET}")
+            return [], [{"document_id": doc_id_filter, "error": "not found"}]
+    else:
+        json_files = sorted(extracted_dir.glob("*.json"))
+        # Exclude manifest.json
+        json_files = [f for f in json_files if f.name != "manifest.json"]
+
+    if not json_files:
+        print(f"{YELLOW}No extracted documents found in {extracted_dir}{RESET}")
+        return [], []
+
+    # Count what needs indexing
+    to_index = [f for f in json_files if needs_reindexing(manifest, f.stem, force)]
+    to_skip = len(json_files) - len(to_index)
+
+    if not to_index:
+        print(f"\n{GREEN}All {len(json_files)} documents already indexed with current schema.{RESET}")
+        print(f"Use --reindex to force re-indexing.")
+        return [], []
+
+    print(f"\n{BOLD}Indexing {len(to_index)} documents ({to_skip} already indexed)...{RESET}\n")
+
+    results: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+
+    for i, json_path in enumerate(to_index, 1):
+        if _interrupted:
+            print(f"\n{YELLOW}Stopping after {i - 1} documents (interrupted){RESET}")
+            break
+
+        doc_id = json_path.stem
+        print(f"Indexing {doc_id}...")
+
+        try:
+            result = await index_document(
+                json_path=json_path,
+                pinecone_client=pinecone_client,
+                embeddings_client=embeddings_client,
+                chunker=chunker,
+                enricher=enricher,
+                manifest=manifest,
+                force=force,
+            )
+
+            if result.get("error"):
+                print(f"  {RED}Error: {result['error']}{RESET}")
+                errors.append(result)
+            elif result.get("skipped"):
+                print(f"  {BLUE}Skipped: {result.get('reason', 'already indexed')}{RESET}")
+            else:
+                results.append(result)
+
+        except Exception as e:
+            print(f"  {RED}Failed: {e}{RESET}")
+            errors.append({"document_id": doc_id, "error": str(e)})
+
+    return results, errors
+
+
+def print_indexing_summary(
+    results: list[dict[str, Any]],
+    errors: list[dict[str, Any]],
+    extracted_dir: Path,
+) -> None:
+    """Print indexing summary."""
+    print_header("Indexing Summary")
+
+    total_parents = sum(r.get("parent_count", 0) for r in results)
+    total_children = sum(r.get("child_count", 0) for r in results)
+    total_vectors = sum(r.get("vector_count", 0) for r in results)
+
+    print(f"  Documents indexed: {len(results)}")
+    print(f"  Total parents: {total_parents}")
+    print(f"  Total children (vectors): {total_children}")
+
+    if errors:
+        print(f"\n{RED}  Failed documents: {len(errors)}{RESET}")
+        for err in errors:
+            doc_id = err.get("document_id", "unknown")
+            error_msg = err.get("error", "unknown error")
+            print(f"    - {doc_id}: {error_msg[:50]}...")
+
+    print()
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -541,20 +1039,27 @@ def print_summary(
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Extract structured data from PDF documents using VLM (Claude Vision).",
+        description="Extract and index PDF documents using VLM (Claude Vision) and Pinecone.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --status              Show extraction status (no API calls)
+  # Extraction
+  %(prog)s --status              Show extraction/indexing status (no API calls)
   %(prog)s --dry-run             List what would be processed
   %(prog)s                       Extract all pending documents
   %(prog)s --doc-types 10k       Extract only 10-K documents
   %(prog)s --doc AAPL_10K_2024   Extract a single document
   %(prog)s --force               Re-extract all documents
   %(prog)s --if-changed          Re-extract only if file content changed
+
+  # Indexing
+  %(prog)s --index-only          Index all extracted documents to Pinecone
+  %(prog)s --reindex             Re-index all documents (delete existing vectors)
+  %(prog)s --index-doc NVDA_10K_2025  Index a single document
         """,
     )
 
+    # Directory options
     parser.add_argument(
         "--raw-dir",
         type=Path,
@@ -567,6 +1072,8 @@ Examples:
         default=DEFAULT_EXTRACTED_DIR,
         help=f"Path for extracted JSON output (default: {DEFAULT_EXTRACTED_DIR})",
     )
+
+    # Extraction options
     parser.add_argument(
         "--doc-types",
         nargs="+",
@@ -597,15 +1104,88 @@ Examples:
         "--doc",
         type=str,
         metavar="DOC_ID",
-        help="Process single document by ID (e.g., AAPL_10K_2024)",
+        help="Extract single document by ID (e.g., AAPL_10K_2024)",
+    )
+
+    # Indexing options
+    parser.add_argument(
+        "--index-only",
+        action="store_true",
+        help="Skip extraction, just index existing JSON files to Pinecone",
+    )
+    parser.add_argument(
+        "--reindex",
+        action="store_true",
+        help="Re-index all documents (delete existing vectors first)",
+    )
+    parser.add_argument(
+        "--index-doc",
+        type=str,
+        metavar="DOC_ID",
+        help="Index single document by ID (e.g., NVDA_10K_2025)",
     )
 
     return parser.parse_args()
 
 
+def load_manifest(extracted_dir: Path) -> dict[str, Any]:
+    """Load manifest from extracted directory."""
+    manifest_path = extracted_dir / "manifest.json"
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"documents": {}, "totals": {}}
+
+
+def save_manifest(manifest: dict[str, Any], extracted_dir: Path) -> None:
+    """Save manifest to extracted directory."""
+    manifest_path = extracted_dir / "manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+
 async def async_main(args: argparse.Namespace) -> int:
     """Async main function."""
-    # Initialize processor
+
+    # Handle --index-only or --index-doc commands (indexing mode)
+    if args.index_only or args.index_doc or args.reindex:
+        print(f"{CYAN}Running in indexing mode...{RESET}")
+        print(f"  Extracted directory: {args.extracted_dir}")
+
+        # Load manifest
+        manifest = load_manifest(args.extracted_dir)
+
+        # Run indexing
+        results, errors = await index_all_documents(
+            extracted_dir=args.extracted_dir,
+            manifest=manifest,
+            force=args.reindex,
+            doc_id_filter=args.index_doc,
+        )
+
+        # Save updated manifest
+        if results:
+            save_manifest(manifest, args.extracted_dir)
+            print(f"{GREEN}Manifest updated.{RESET}")
+
+        # Print summary
+        print_indexing_summary(results, errors, args.extracted_dir)
+
+        # Verify Pinecone stats
+        if results:
+            try:
+                client = PineconeClient()
+                stats = client.get_stats()
+                print(f"{CYAN}Pinecone index stats: {stats['total_vector_count']} vectors{RESET}")
+            except Exception as e:
+                print(f"{YELLOW}Could not get Pinecone stats: {e}{RESET}")
+
+        return 1 if errors else 0
+
+    # Initialize processor for extraction mode
     print(f"{CYAN}Initializing DocumentProcessor...{RESET}")
     print(f"  Raw directory: {args.raw_dir}")
     print(f"  Extracted directory: {args.extracted_dir}")
@@ -622,6 +1202,33 @@ async def async_main(args: argparse.Namespace) -> int:
     # Handle --status command
     if args.status:
         show_status(processor)
+
+        # Also show indexing status
+        manifest = load_manifest(args.extracted_dir)
+        documents = manifest.get("documents", {})
+        indexed = [d for d in documents.values() if d.get("indexed_to_pinecone")]
+        not_indexed = [d for d in documents.values() if not d.get("indexed_to_pinecone")]
+
+        print(f"\n{BOLD}Indexing Status{RESET}")
+        print("=" * 15)
+        if indexed:
+            print(f"\n{GREEN}Indexed: {len(indexed)} documents{RESET}")
+            for doc_id, doc in documents.items():
+                if doc.get("indexed_to_pinecone"):
+                    chunks = doc.get("chunk_count", "?")
+                    version = doc.get("index_schema_version", "?")
+                    date = format_date(doc.get("indexed_at"))
+                    print(f"  - {doc_id} ({chunks} chunks, {version}, {date})")
+        else:
+            print(f"\n{YELLOW}Indexed: 0 documents{RESET}")
+
+        if not_indexed:
+            print(f"\n{YELLOW}Not indexed: {len(not_indexed)} documents{RESET}")
+            for doc_id, doc in documents.items():
+                if not doc.get("indexed_to_pinecone"):
+                    print(f"  - {doc_id}")
+
+        print()
         return 0
 
     # Handle --dry-run command

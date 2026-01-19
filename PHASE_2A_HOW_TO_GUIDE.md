@@ -3570,6 +3570,57 @@ Phase 2a establishes the data foundation with:
 - Query expansion and cross-encoder reranking
 - Multi-tool query orchestration (SQL + RAG combined)
 
+---
+
+## Phase 2b Delta Improvements (Carry Forward)
+
+The following improvements were identified during Phase 2a implementation and should be addressed in Phase 2b:
+
+### Delta 1: Graceful Tool Degradation
+
+**Problem:** If BedrockEmbeddings or PineconeClient fail to initialize (e.g., missing credentials, service outage), the tool raises an exception on first use. This can cause the agent to get stuck in retry loops or confuse users.
+
+**Recommended Implementation:**
+
+Add try/except around client initialization with graceful fallback:
+
+```python
+# In rag.py - update _get_embeddings_client()
+def _get_embeddings_client() -> "BedrockEmbeddings | None":
+    """Get or create cached BedrockEmbeddings client with graceful degradation."""
+    global _embeddings_client
+    if _embeddings_client is None:
+        try:
+            from src.utils.embeddings import BedrockEmbeddings
+            _embeddings_client = BedrockEmbeddings()
+            logger.debug("embeddings_client_created", cached=True)
+        except Exception as e:
+            logger.error("embeddings_client_init_failed", error=str(e))
+            return None
+    return _embeddings_client
+
+# Then in rag_retrieval tool:
+embeddings = _get_embeddings_client()
+if embeddings is None:
+    return "Document search is temporarily unavailable. Please try again later or ask a different question."
+```
+
+**Apply same pattern to:**
+- `_get_pinecone_client()` in rag.py
+- SQL tool database connection in sql.py
+
+**Benefits:**
+- User-friendly error messages instead of stack traces
+- Prevents agent from getting stuck
+- Consistent with existing error handling patterns
+
+**Considerations:**
+- Should log errors for monitoring/alerting
+- Health check should reflect tool availability status
+- Consider adding a "tool_status" field to health endpoint
+
+---
+
 **Estimated Time for Phase 2a:** 8-12 hours
 
 **Success Criteria:** ✅ SQL tool answers financial queries correctly, RAG tool returns relevant passages with citations, agent selects appropriate tool automatically.

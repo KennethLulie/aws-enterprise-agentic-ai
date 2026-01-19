@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-18 (Phase 2a: Parent/child chunking module added)
+**Last Updated:** 2026-01-19 (Phase 2a: Agent integration complete - health check with Pinecone, distinct tool descriptions)
 
 ---
 
@@ -65,7 +65,7 @@
 | backend/src/api/routes/__init__.py | API routes package |
 | backend/src/api/routes/auth.py | Demo password login route |
 | backend/src/api/routes/chat.py | Chat API endpoints with streaming, rate limiting (10 req/min) |
-| backend/src/api/routes/health.py | Health check with dependency checks (database, Bedrock) |
+| backend/src/api/routes/health.py | Health check with dependency checks (database, Bedrock, Pinecone) |
 | backend/src/api/routes/v1/__init__.py | V1 router aggregation, includes chat router |
 | backend/src/api/routes/v1/chat.py | Versioned chat endpoints (/api/v1/chat) with rate limiting |
 | backend/src/agent/__init__.py | Agent package with get_agent(), checkpointer exports, tool utilities |
@@ -77,7 +77,7 @@
 | backend/src/agent/nodes/error_recovery.py | Error recovery node |
 | backend/src/agent/tools/__init__.py | Tools package exports |
 | backend/src/agent/tools/market_data.py | FMP market data tool (mock-friendly) |
-| backend/src/agent/tools/rag.py | RAG retrieval tool stub |
+| backend/src/agent/tools/rag.py | RAG retrieval tool - Pinecone semantic search with parent deduplication, filtering, citations |
 | backend/src/agent/tools/search.py | Tavily search tool |
 | backend/src/agent/tools/sql.py | SQL query tool with NL-to-SQL conversion via Bedrock, query validation, and formatted results |
 | backend/src/agent/tools/sql_safety.py | SQL safety module with query validation, table/column whitelists, and sanitization |
@@ -89,8 +89,10 @@
 | backend/src/ingestion/document_processor.py | High-level document processor with manifest tracking, consolidation, batch processing, and company name extraction from cover page |
 | backend/src/ingestion/semantic_chunking.py | spaCy-based semantic text chunking with section boundary detection for 10-K documents |
 | backend/src/ingestion/parent_child_chunking.py | Hierarchical parent/child chunking (1024-token parents, 256-token children) for RAG |
+| backend/src/ingestion/contextual_chunking.py | Contextual enrichment for RAG chunks (Anthropic approach - prepends document context) |
 | backend/src/utils/__init__.py | Utility helpers package |
 | backend/src/utils/embeddings.py | Bedrock Titan embeddings utility for RAG vectorization |
+| backend/src/utils/pinecone_client.py | Pinecone vector store client wrapper for RAG operations |
 | backend/tests/__init__.py | Tests package |
 | backend/tests/test_agent.py | Agent and graph tests |
 | backend/tests/test_api.py | API endpoint tests |
@@ -147,7 +149,7 @@
 | scripts/setup.sh | One-time setup script |
 | scripts/dev.sh | Dev helper script (start/stop/logs/test/shell/clean) |
 | scripts/validate_setup.py | Prerequisites validation script |
-| scripts/extract_and_index.py | VLM document extraction batch script with CLI (--status, --dry-run, --force, --doc) |
+| scripts/extract_and_index.py | VLM document extraction and Pinecone indexing batch script (--status, --dry-run, --force, --doc, --index-only, --reindex, --index-doc) |
 | scripts/load_10k_to_sql.py | SQL data loading script for 10-K financial data (--validate-only, --dry-run, --ticker, --force) |
 
 ### Terraform Directory
@@ -187,7 +189,6 @@
 ### Phase 2+ - Advanced Features
 | File | Purpose |
 |------|---------|
-| backend/src/ingestion/contextual_chunking.py | Context-preserving chunking |
 | backend/src/knowledge_graph/__init__.py | Knowledge graph package (Neo4j) |
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
 | backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
@@ -202,7 +203,6 @@
 **Knowledge Graph & 2025 SOTA RAG:**
 | File | Purpose |
 |------|---------|
-| backend/src/ingestion/contextual_chunking.py | Context prepending for chunks |
 | backend/src/knowledge_graph/__init__.py | KG package (Neo4j) |
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
 | backend/src/knowledge_graph/store.py | Neo4j graph store adapter |

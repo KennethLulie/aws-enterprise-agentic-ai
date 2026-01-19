@@ -13,10 +13,13 @@ document types for the RAG pipeline:
 - parent_child_chunking: Hierarchical chunking strategy that creates
   large parent chunks (1024 tokens) for context and small child chunks
   (256 tokens) for precise embedding search.
+- contextual_chunking: Contextual enrichment for RAG chunks using
+  Anthropic's approach - prepends document-level context to improve
+  retrieval accuracy.
 
 Usage:
     from src.ingestion import VLMExtractor, DocumentProcessor, SemanticChunker
-    from src.ingestion import ParentChildChunker
+    from src.ingestion import ParentChildChunker, ContextualEnricher
     from pathlib import Path
 
     # Low-level extraction
@@ -40,6 +43,11 @@ Usage:
     # Parent/child chunking for hierarchical RAG
     pc_chunker = ParentChildChunker(parent_tokens=1024, child_tokens=256)
     parents, children = pc_chunker.chunk_document("DOC_ID", result["pages"])
+
+    # Contextual enrichment for improved retrieval
+    enricher = ContextualEnricher()
+    metadata = {"document_type": "10k", "company": "Apple Inc.", "ticker": "AAPL"}
+    enriched_children = enricher.enrich_children(children, metadata)
 """
 
 from src.ingestion.vlm_extractor import (
@@ -67,6 +75,11 @@ from src.ingestion.parent_child_chunking import (
     ParentChildChunkingError,
 )
 
+from src.ingestion.contextual_chunking import (
+    ContextualEnricher,
+    ContextualEnrichmentError,
+)
+
 __all__ = [
     # VLM Extractor
     "VLMExtractor",
@@ -85,4 +98,7 @@ __all__ = [
     # Parent/Child Chunking
     "ParentChildChunker",
     "ParentChildChunkingError",
+    # Contextual Enrichment
+    "ContextualEnricher",
+    "ContextualEnrichmentError",
 ]

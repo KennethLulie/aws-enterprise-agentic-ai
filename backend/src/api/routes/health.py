@@ -10,6 +10,7 @@ Features:
     - Dependency checks with graceful degradation:
         - Database connectivity with latency tracking
         - Bedrock availability check
+        - Pinecone vector store connectivity with vector count
     - Non-blocking checks with configurable timeouts
     - No authentication required
 
@@ -34,7 +35,8 @@ Example Response:
         "api_version": "v1",
         "checks": {
             "database": {"status": "ok", "latency_ms": 50},
-            "bedrock": {"status": "ok"}
+            "bedrock": {"status": "ok"},
+            "pinecone": {"status": "ok", "vector_count": 1423}
         }
     }
 """
@@ -86,6 +88,26 @@ class DependencyCheckResult(BaseModel):
     )
 
 
+class PineconeCheckResult(BaseModel):
+    """Result of Pinecone vector store health check."""
+
+    status: str = Field(
+        ...,
+        description="Check status: ok, error, or skipped",
+        examples=["ok"],
+    )
+    vector_count: int | None = Field(
+        default=None,
+        description="Total number of vectors indexed in Pinecone",
+        examples=[1423],
+    )
+    error: str | None = Field(
+        default=None,
+        description="Error message if check failed",
+        examples=[None],
+    )
+
+
 class DependencyChecks(BaseModel):
     """Container for all dependency check results."""
 
@@ -96,6 +118,10 @@ class DependencyChecks(BaseModel):
     bedrock: DependencyCheckResult = Field(
         ...,
         description="AWS Bedrock availability check result",
+    )
+    pinecone: PineconeCheckResult = Field(
+        ...,
+        description="Pinecone vector store check result with vector count",
     )
 
 
@@ -252,7 +278,9 @@ async def check_bedrock() -> DependencyCheckResult:
             # Add explicit credentials for local development
             if not settings.is_aws():
                 if settings.aws_access_key_id:
-                    client_kwargs["aws_access_key_id"] = settings.aws_access_key_id
+                    client_kwargs["aws_access_key_id"] = (
+                        settings.aws_access_key_id.get_secret_value()
+                    )
                 if settings.aws_secret_access_key:
                     client_kwargs["aws_secret_access_key"] = (
                         settings.aws_secret_access_key.get_secret_value()
@@ -299,6 +327,103 @@ async def check_bedrock() -> DependencyCheckResult:
         )
 
 
+async def check_pinecone() -> PineconeCheckResult:
+    """
+    Check Pinecone vector store connectivity and get vector count.
+
+    Attempts to connect to Pinecone and retrieve index statistics including
+    the total number of vectors indexed. This is a lightweight check that
+    verifies the RAG system's vector store is operational.
+
+    Returns:
+        PineconeCheckResult with status="ok" and vector_count if successful,
+        status="error" with error message if failed,
+        or status="skipped" if Pinecone is not configured.
+
+    Note:
+        In local development without PINECONE_API_KEY, this check returns
+        "skipped" rather than failing, allowing graceful degradation.
+    """
+    try:
+        settings = get_settings()
+
+        # Check if Pinecone is configured
+        pinecone_api_key = settings.pinecone_api_key
+        pinecone_index_name = settings.pinecone_index_name
+
+        if not pinecone_api_key:
+            return PineconeCheckResult(
+                status="skipped",
+                error="Pinecone API key not configured",
+            )
+
+        if not pinecone_index_name:
+            return PineconeCheckResult(
+                status="skipped",
+                error="Pinecone index name not configured",
+            )
+
+        # Import pinecone here to avoid import errors if not installed
+        from pinecone import Pinecone  # type: ignore[import-untyped]
+
+        def _check_pinecone() -> int:
+            """Connect to Pinecone and get vector count."""
+            # Get API key value (handle SecretStr)
+            api_key_value = (
+                pinecone_api_key.get_secret_value()
+                if hasattr(pinecone_api_key, "get_secret_value")
+                else str(pinecone_api_key)
+            )
+
+            # Initialize Pinecone client
+            pc = Pinecone(api_key=api_key_value)
+
+            # Get the index
+            index = pc.Index(pinecone_index_name)
+
+            # Get index stats (lightweight operation)
+            stats = index.describe_index_stats()
+
+            # Total vector count across all namespaces
+            return stats.total_vector_count
+
+        # Execute with timeout
+        loop = asyncio.get_event_loop()
+        vector_count = await asyncio.wait_for(
+            loop.run_in_executor(None, _check_pinecone),
+            timeout=CHECK_TIMEOUT_SECONDS,
+        )
+
+        return PineconeCheckResult(
+            status="ok",
+            vector_count=vector_count,
+        )
+
+    except asyncio.TimeoutError:
+        logger.warning("pinecone_check_timeout", timeout_seconds=CHECK_TIMEOUT_SECONDS)
+        return PineconeCheckResult(
+            status="error",
+            error=f"Pinecone check timed out after {CHECK_TIMEOUT_SECONDS}s",
+        )
+
+    except ImportError:
+        return PineconeCheckResult(
+            status="skipped",
+            error="pinecone package not available",
+        )
+
+    except Exception as exc:
+        logger.warning(
+            "pinecone_check_failed",
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        return PineconeCheckResult(
+            status="error",
+            error=str(exc),
+        )
+
+
 def determine_overall_status(checks: DependencyChecks) -> str:
     """
     Determine overall health status based on dependency check results.
@@ -314,10 +439,15 @@ def determine_overall_status(checks: DependencyChecks) -> str:
     Returns:
         Overall status string: "ok", "degraded", or "error".
     """
-    all_checks = [checks.database, checks.bedrock]
-    error_checks = [c for c in all_checks if c.status == "error"]
+    # Collect all check statuses (database, bedrock, pinecone)
+    all_statuses = [
+        checks.database.status,
+        checks.bedrock.status,
+        checks.pinecone.status,
+    ]
+    error_count = sum(1 for s in all_statuses if s == "error")
 
-    if not error_checks:
+    if error_count == 0:
         return "ok"
 
     # Currently all checks are optional, so errors result in "degraded"
@@ -354,7 +484,7 @@ async def health_check() -> HealthResponse:
     Health check endpoint with dependency status.
 
     Returns the current status of the API along with environment information
-    and results of dependency checks (database, Bedrock).
+    and results of dependency checks (database, Bedrock, Pinecone).
 
     This endpoint is accessible without authentication and is used by:
     - Load balancers for health monitoring
@@ -379,7 +509,8 @@ async def health_check() -> HealthResponse:
             "api_version": "v1",
             "checks": {
                 "database": {"status": "ok", "latency_ms": 50},
-                "bedrock": {"status": "ok"}
+                "bedrock": {"status": "ok"},
+                "pinecone": {"status": "ok", "vector_count": 1423}
             }
         }
         ```
@@ -387,14 +518,16 @@ async def health_check() -> HealthResponse:
     settings = get_settings()
 
     # Run dependency checks concurrently
-    db_result, bedrock_result = await asyncio.gather(
+    db_result, bedrock_result, pinecone_result = await asyncio.gather(
         check_database(),
         check_bedrock(),
+        check_pinecone(),
     )
 
     checks = DependencyChecks(
         database=db_result,
         bedrock=bedrock_result,
+        pinecone=pinecone_result,
     )
 
     overall_status = determine_overall_status(checks)
@@ -405,6 +538,8 @@ async def health_check() -> HealthResponse:
         status=overall_status,
         database_status=db_result.status,
         bedrock_status=bedrock_result.status,
+        pinecone_status=pinecone_result.status,
+        pinecone_vector_count=pinecone_result.vector_count,
     )
 
     return HealthResponse(
@@ -425,6 +560,8 @@ __all__ = [
     "HealthResponse",
     "DependencyChecks",
     "DependencyCheckResult",
+    "PineconeCheckResult",
     "check_database",
     "check_bedrock",
+    "check_pinecone",
 ]

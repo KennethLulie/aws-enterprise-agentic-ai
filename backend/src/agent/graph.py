@@ -57,6 +57,8 @@ except ImportError:
 # Tool Registry
 # =============================================================================
 
+# IMPORTANT: Keep this in sync with __all__ in src/agent/tools/__init__.py.
+# When adding or removing tools, update both locations.
 REGISTERED_TOOLS: tuple[BaseTool, ...] = (
     tavily_search,
     sql_query,
