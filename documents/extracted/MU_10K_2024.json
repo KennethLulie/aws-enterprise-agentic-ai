@@ -1,0 +1,79 @@
+{
+  "document_id": "MU_10K_2024",
+  "document_type": "10k",
+  "filename": "MU_10K_2024.pdf",
+  "extraction_date": "2026-01-19T22:07:11.397846+00:00",
+  "total_pages": 1,
+  "pages_processed": 1,
+  "pages": [
+    {
+      "page_number": 1,
+      "section": "Cover Page",
+      "content_type": "mixed",
+      "text": "UNITED STATES SECURITIES AND EXCHANGE COMMISSION\nWashington, D.C. 20549\n\nFORM 10-K\n\n(Mark One)\n\n☒ ANNUAL REPORT PURSUANT TO SECTION 13 OR 15(d) OF THE SECURITIES EXCHANGE ACT OF 1934.\n\nFor the fiscal year ended December 28, 2024\n\nOR\n\n☐ TRANSITION REPORT PURSUANT TO SECTION 13 OR 15(d) OF THE SECURITIES EXCHANGE ACT OF 1934.\n\nFor the transition period from _____ to _____\n\nCommission File Number 001-07882\n\nADVANCED MICRO DEVICES, INC.\n\n(Exact name of registrant as specified in its charter)\n\nDelaware                                                94-1692300\n(State or other jurisdiction of incorporation or organization)    (I.R.S. Employer Identification No.)\n\n2485 Augustine Drive\nSanta Clara, California 95054\n(Address of principal executive offices)(Zip Code)\n\n(408) 749-4000\n(Registrant's telephone number, including area code)\n\nSecurities registered pursuant to Section 12(b) of the Act:\n\nCommon Stock, $0.01 par value per share    AMD    The NASDAQ Global Select Market\n(Title of each class)    (Trading symbol)    (Name of each exchange on which registered)\n\nSecurities registered pursuant to Section 12(g) of the Act:\nNone\n\nIndicate by check mark if the registrant is a well-known seasoned issuer, as defined in Rule 405 of the Securities Act. Yes ☑ No ☐\n\nIndicate by check mark if the registrant is not required to file reports pursuant to Section 13 or Section 15(d) of the Exchange Act. Yes ☐ No ☑\n\nIndicate by check mark whether the registrant (1) has filed all reports required to be filed by Section 13 or 15(d) of the Securities Exchange Act of 1934 during the preceding 12 months (or for such shorter period that the registrant was required to file such reports), and (2) has been subject to such filing requirements for the past 90 days. Yes ☑ No ☐\n\nIndicate by check mark whether the registrant has submitted electronically every Interactive Data File required to be submitted pursuant to Rule 405 of Regulation S-T during the preceding 12 months (or for such shorter period that the registrant was required to submit such files): Yes ☑ No ☐\n\nIndicate by check mark whether the registrant is a large accelerated filer, an accelerated filer, a non-accelerated filer, a smaller reporting company, or an emerging growth company. See the definitions of \"large accelerated filer,\" \"accelerated filer,\" \"smaller reporting company,\" and \"emerging\"",
+      "tables": [
+        {
+          "table_name": "Registered Securities",
+          "table_type": "other",
+          "headers": [
+            "Title of each class",
+            "Trading symbol",
+            "Name of each exchange on which registered"
+          ],
+          "rows": [
+            {
+              "label": "Common Stock, $0.01 par value per share",
+              "values": {
+                "Trading symbol": "AMD",
+                "Exchange": "The NASDAQ Global Select Market"
+              }
+            }
+          ]
+        }
+      ],
+      "financial_metrics": {
+        "fiscal_year": 2024,
+        "revenue": null,
+        "cost_of_revenue": null,
+        "gross_profit": null,
+        "operating_expenses": null,
+        "operating_income": null,
+        "net_income": null,
+        "total_assets": null,
+        "total_liabilities": null,
+        "total_equity": null,
+        "cash_and_equivalents": null,
+        "long_term_debt": null,
+        "gross_margin": null,
+        "operating_margin": null,
+        "net_margin": null,
+        "earnings_per_share": null,
+        "diluted_eps": null,
+        "currency": "USD"
+      },
+      "segment_data": [],
+      "geographic_data": [],
+      "risk_factors": [],
+      "cross_references": []
+    }
+  ],
+  "metadata": {
+    "ticker": "MU",
+    "fiscal_year": 2024,
+    "company": "Advanced Micro Devices, Inc.",
+    "document_type": "SEC 10-K Filing"
+  },
+  "consolidated": {
+    "financial_metrics_by_year": {
+      "2024": {
+        "fiscal_year": 2024,
+        "currency": "USD"
+      }
+    },
+    "segment_revenue": [],
+    "geographic_revenue": [],
+    "risk_factors": []
+  },
+  "errors": [],
+  "estimated_cost_usd": 0.04
+}

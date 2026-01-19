@@ -91,8 +91,9 @@
 | backend/src/ingestion/parent_child_chunking.py | Hierarchical parent/child chunking (1024-token parents, 256-token children) for RAG |
 | backend/src/ingestion/contextual_chunking.py | Contextual enrichment for RAG chunks (Anthropic approach - prepends document context) |
 | backend/src/utils/__init__.py | Utility helpers package |
-| backend/src/utils/embeddings.py | Bedrock Titan embeddings utility for RAG vectorization |
-| backend/src/utils/pinecone_client.py | Pinecone vector store client wrapper for RAG operations |
+| backend/src/utils/embeddings.py | Bedrock Titan v2 embeddings utility for RAG vectorization (1024 dimensions) |
+| backend/src/utils/pinecone_client.py | Pinecone vector store client wrapper for RAG operations (dotproduct metric, 1024 dims) |
+| backend/src/knowledge_graph/__init__.py | Knowledge graph package for entity extraction (spaCy) and graph queries (Neo4j) |
 | backend/tests/__init__.py | Tests package |
 | backend/tests/test_agent.py | Agent and graph tests |
 | backend/tests/test_api.py | API endpoint tests |
@@ -190,7 +191,6 @@
 ### Phase 2+ - Advanced Features
 | File | Purpose |
 |------|---------|
-| backend/src/knowledge_graph/__init__.py | Knowledge graph package (Neo4j) |
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
 | backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
 | backend/src/knowledge_graph/queries.py | Graph traversal queries |
@@ -204,7 +204,6 @@
 **Knowledge Graph & 2025 SOTA RAG:**
 | File | Purpose |
 |------|---------|
-| backend/src/knowledge_graph/__init__.py | KG package (Neo4j) |
 | backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
 | backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
 | backend/src/knowledge_graph/queries.py | Graph traversal queries |

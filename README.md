@@ -452,7 +452,7 @@ GitHub Actions automates the entire development lifecycle:
 
 ### Document Processing & RAG
 - **VLM Extraction:** Claude Vision (via Bedrock) - Extracts clean text from complex PDFs including tables, handles all document types
-- **Embeddings:** AWS Bedrock Titan Embeddings - 1536-dimensional vectors for semantic search (~$0.0001/1K tokens)
+- **Embeddings:** AWS Bedrock Titan Embeddings v2 - 1024-dimensional vectors for semantic search (~$0.0001/1K tokens)
 - **Entity Extraction:** spaCy NER - Cost-efficient entity extraction for Knowledge Graph population (20-50x cheaper than LLM)
 - **Chunking:** Semantic chunking with spaCy sentence boundaries + contextual enrichment
 

@@ -355,9 +355,10 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 1. **Pinecone (free tier):**
    - Create account at https://pinecone.io
-   - Create index: name=`demo-index`, dimensions=1536, metric=cosine
+   - Create index: name=`demo-index`, dimensions=1024, metric=dotproduct
    - Region: **AWS us-east-1** (same as rest of stack). If us-east-1 temporarily unavailable, use us-west-2 and expect +20‑30 ms latency plus minimal data-transfer charges.
    - Copy API key to your `.env` file (see `.env.example` for the variable name)
+   - Note: Uses Titan v2 embeddings (1024 dims) with dotproduct metric for optimal hybrid search
 
 2. **Tavily (free tier):**
    - Create account at https://tavily.com
@@ -774,7 +775,7 @@ PDF → Claude VLM → Clean Text → ┬→ Semantic Chunking → Titan Embed �
 
 **Core Features:**
 - Pinecone serverless index with hybrid search (dense + sparse via BM25)
-- Document embedding pipeline (Bedrock Titan Embeddings, 1536 dimensions)
+- Document embedding pipeline (Bedrock Titan Embeddings v2, 1024 dimensions)
 - **VLM extraction** (Claude Vision) for all documents via batch script
 - Query expansion (3 alternative phrasings via Nova Lite, +20-30% recall)
 - RRF (Reciprocal Rank Fusion) for combining semantic + keyword + graph results
@@ -1721,7 +1722,7 @@ Data foundation and core agent tools implemented:
 - ✅ Document Processing Pipeline
   - VLM extraction with `extract_and_index.py` batch script
   - Semantic chunking with spaCy (section-aware)
-  - BedrockEmbeddings with Titan (1536d)
+  - BedrockEmbeddings with Titan v2 (1024d)
   - Pinecone indexing with parent/child architecture
 - ✅ Agent Integration
   - All 4 tools registered (tavily_search, sql_query, rag_retrieval, market_data)

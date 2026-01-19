@@ -279,7 +279,187 @@ for idx in index_list:
 "
 ```
 
-**If hybrid search is not supported**, you'll need to create a new index with `metric='dotproduct'` and re-index documents. See Common Issues section for details.
+**If hybrid search is not supported**, you'll need to create a new index with `metric='dotproduct'` and re-index documents. Follow Section 1.8 below.
+
+### 1.8 Upgrade Pinecone Index and Embeddings Model
+
+**⚠️ Required if:** Your index uses `cosine` metric (from Phase 0/2a) OR you want to upgrade to Titan v2 embeddings.
+
+Since we're recreating the index anyway, we'll make two improvements at once:
+
+1. **Metric:** `cosine` → `dotproduct` (optimal for hybrid search)
+2. **Embeddings:** Titan v1 (1536 dim) → Titan v2 (1024 dim, better benchmarks)
+
+**Why These Changes?**
+
+| Change | Reason |
+|--------|--------|
+| `dotproduct` metric | Hybrid search combines dense + sparse vectors; dotproduct doesn't distort sparse scores like cosine does |
+| Titan v2 embeddings | Better performance on benchmarks, variable dimensions, L2 normalization support |
+| 1024 dimensions | Titan v2 default; smaller vectors = faster search, lower storage, comparable quality |
+
+**What Changes Are Needed:**
+
+| Component | Changes Required |
+|-----------|------------------|
+| `backend/src/config/settings.py` | ✅ Update default embedding model to v2 |
+| `backend/src/utils/embeddings.py` | ✅ Update default constant to v2 |
+| Pinecone Console | ✅ Delete old index, create new with dotproduct + 1024 dims |
+| Secrets | ❌ None - keep same API key |
+| Environment Variables | ❌ None - keep same index name |
+| Data | ✅ Re-run indexing script to repopulate vectors |
+
+---
+
+**Step 1: Update Embedding Model in Code**
+
+**File: `backend/src/config/settings.py`**
+
+Find and change:
+```python
+bedrock_embedding_model_id: str = Field(
+    default="amazon.titan-embed-text-v1",
+```
+
+To:
+```python
+bedrock_embedding_model_id: str = Field(
+    default="amazon.titan-embed-text-v2:0",
+```
+
+**File: `backend/src/utils/embeddings.py`**
+
+Find and change:
+```python
+DEFAULT_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"
+```
+
+To:
+```python
+DEFAULT_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
+```
+
+**Verify the code change:**
+```bash
+docker-compose exec backend python -c "
+from src.config.settings import get_settings
+from src.utils.embeddings import BedrockEmbeddings
+
+settings = get_settings()
+embeddings = BedrockEmbeddings()
+
+print(f'Settings model: {settings.bedrock_embedding_model_id}')
+print(f'Embeddings model: {embeddings.model_id}')
+print(f'Dimension: {embeddings.get_dimension()}')
+"
+```
+
+**Expected Output:**
+```
+Settings model: amazon.titan-embed-text-v2:0
+Embeddings model: amazon.titan-embed-text-v2:0
+Dimension: 1024
+```
+
+---
+
+**Step 2: Note Your Current Index Name**
+
+```bash
+docker-compose exec backend python -c "
+from src.config.settings import get_settings
+settings = get_settings()
+print(f'Current index name: {settings.pinecone_index_name}')
+"
+```
+
+---
+
+**Step 3: Delete Old Index in Pinecone Console**
+
+1. Go to https://app.pinecone.io
+2. Navigate to your index (e.g., `dense-local-demo`)
+3. Click **Delete Index**
+4. Confirm deletion
+
+---
+
+**Step 4: Create New Index with Dotproduct + 1024 Dimensions**
+
+1. In Pinecone console, click **Create Index**
+2. Configure with these settings:
+   - **Name:** Same as before (e.g., `dense-local-demo`) - keeps env vars unchanged
+   - **Setup Mode:** Manual
+   - **Vector Type:** Dense
+   - **Dimensions:** `1024` ← **Changed from 1536 for Titan v2**
+   - **Metric:** `dotproduct` ← **Changed from cosine for hybrid search**
+   - **Cloud:** AWS
+   - **Region:** `us-east-1`
+3. Click **Create Index**
+4. Wait for status to show "Ready"
+
+---
+
+**Step 5: Re-index Documents**
+
+```bash
+# Re-run indexing (uses existing extracted JSON, re-embeds with Titan v2)
+python scripts/extract_and_index.py --index-only
+
+# This will:
+# - Skip PDF extraction (already done)
+# - Re-embed all chunks using Titan v2 (1024 dimensions)
+# - Upload vectors to the new index
+```
+
+---
+
+**Step 6: Verify New Index**
+
+```bash
+docker-compose exec backend python -c "
+from pinecone import Pinecone
+from src.config.settings import get_settings
+
+settings = get_settings()
+api_key = settings.pinecone_api_key.get_secret_value() if hasattr(settings.pinecone_api_key, 'get_secret_value') else settings.pinecone_api_key
+pc = Pinecone(api_key=api_key)
+
+index_list = pc.list_indexes()
+for idx in index_list:
+    if idx.name == settings.pinecone_index_name:
+        print(f'Index: {idx.name}')
+        print(f'Metric: {idx.metric}')
+        print(f'Dimension: {idx.dimension}')
+        
+        index = pc.Index(idx.name)
+        stats = index.describe_index_stats()
+        print(f'Vector count: {stats.total_vector_count}')
+        
+        if idx.metric == 'dotproduct' and idx.dimension == 1024:
+            print('\\n✓ Index upgraded: dotproduct metric + Titan v2 (1024 dims)')
+"
+```
+
+**Expected Output:**
+```
+Index: dense-local-demo
+Metric: dotproduct
+Dimension: 1024
+Vector count: 352
+
+✓ Index upgraded: dotproduct metric + Titan v2 (1024 dims)
+```
+
+---
+
+**Step 7: Update Documentation References**
+
+After completing the upgrade, update these files to reflect 1024 dimensions:
+- `DEVELOPMENT_REFERENCE.md` - embedding dimensions reference
+- `docs/RAG_README.md` - component summary table
+
+**Estimated Time:** ~20-25 minutes (code changes + Pinecone + re-indexing)
 
 ---
 

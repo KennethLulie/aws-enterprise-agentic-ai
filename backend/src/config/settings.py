@@ -19,6 +19,7 @@ When ENVIRONMENT=aws, secrets are loaded from AWS Secrets Manager:
 - enterprise-agentic-ai/auth-token-secret (key: "secret")
 - enterprise-agentic-ai/tavily-api-key (key: "api_key")
 - enterprise-agentic-ai/fmp-api-key (key: "api_key")
+- enterprise-agentic-ai/neo4j (keys: "uri", "user", "password") [Phase 2+]
 
 Secrets are cached in memory to avoid repeated API calls.
 
@@ -125,6 +126,10 @@ def load_secrets_from_aws() -> dict[str, str]:
         "auth_token_secret": ("enterprise-agentic-ai/auth-token-secret", "secret"),
         "tavily_api_key": ("enterprise-agentic-ai/tavily-api-key", "api_key"),
         "fmp_api_key": ("enterprise-agentic-ai/fmp-api-key", "api_key"),
+        # Phase 2: Knowledge Graph (Neo4j AuraDB)
+        "neo4j_uri": ("enterprise-agentic-ai/neo4j", "uri"),
+        "neo4j_user": ("enterprise-agentic-ai/neo4j", "user"),
+        "neo4j_password": ("enterprise-agentic-ai/neo4j", "password"),
     }
 
     for setting_name, (secret_name, key) in secret_mappings.items():
@@ -248,8 +253,8 @@ class Settings(BaseSettings):
     )
 
     bedrock_embedding_model_id: str = Field(
-        default="amazon.titan-embed-text-v1",
-        description="Bedrock model ID for generating text embeddings.",
+        default="amazon.titan-embed-text-v2:0",
+        description="Bedrock model ID for generating text embeddings (v2 = 1024 dims).",
     )
 
     bedrock_verification_model_id: str = Field(
@@ -535,8 +540,8 @@ class Settings(BaseSettings):
     )
 
     neo4j_password: SecretStr = Field(
-        default=SecretStr("demo_password"),
-        description="Neo4j password.",
+        default=SecretStr("localdevpassword"),
+        description="Neo4j password. Matches docker-compose.yml for local dev.",
     )
 
     # =========================================================================

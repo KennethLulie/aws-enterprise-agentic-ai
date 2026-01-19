@@ -650,7 +650,7 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 
 **Vector Store & Search:**
 - **Vector Store:** Pinecone Serverless (free tier, 100K vectors)
-- **Embeddings:** Bedrock Titan Embeddings (1536 dimensions)
+- **Embeddings:** Bedrock Titan Embeddings v2 (1024 dimensions)
 - **Hybrid Search:** Dense + sparse vectors with RRF fusion
 
 **Ingestion Pipeline:**
@@ -945,7 +945,7 @@ class SendMessageRequest(BaseModel):
     - Impact: +20-30% recall
 
 13. **Embeddings** (`backend/src/utils/embeddings.py`)
-    - Bedrock Titan integration (1536 dimensions)
+    - Bedrock Titan v2 integration (1024 dimensions)
     - Batch embedding generation
     - Caching
 
@@ -1615,8 +1615,8 @@ terraform {
 
 ### Pinecone
 - **Index Name:** `demo-index`
-- **Dimensions:** 1536 (Bedrock Titan)
-- **Metric:** cosine
+- **Dimensions:** 1024 (Bedrock Titan v2)
+- **Metric:** dotproduct (optimal for hybrid search)
 - **Region:** us-east-1 (AWS region)
 - **Tier:** Serverless (free tier: 100K vectors)
 
@@ -1635,7 +1635,7 @@ terraform {
 - **Models:**
   - Nova Pro: `amazon.nova-pro-v1:0`
   - Nova Lite: `amazon.nova-lite-v1:0`
-  - Titan Embeddings: `amazon.titan-embed-text-v1`
+  - Titan Embeddings v2: `amazon.titan-embed-text-v2:0` (1024 dimensions)
   - Claude Sonnet 4.5 (Primary VLM): `us.anthropic.claude-sonnet-4-5-20250929-v1:0` (released Sep 2025, current recommended)
   - Claude Fallback (Deprecated): `anthropic.claude-3-5-sonnet-20241022-v2:0` (retired Oct 2025, shutdown Feb 2026)
 

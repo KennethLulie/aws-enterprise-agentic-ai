@@ -114,7 +114,7 @@ This RAG system enables natural language querying over complex financial documen
 |-----------|------------|---------|
 | Document Extraction | Claude Sonnet 4.5 Vision (VLM) via Bedrock | Convert ALL PDF pages to structured text |
 | Entity Extraction | spaCy NER | Extract entities for Knowledge Graph (cost-efficient) |
-| Embeddings | AWS Bedrock Titan | Convert text to 1536-dim semantic vectors |
+| Embeddings | AWS Bedrock Titan v2 | Convert text to 1024-dim semantic vectors |
 | Vector Store | Pinecone Serverless | Semantic (dense) and keyword (BM25) search |
 | Knowledge Graph | Neo4j AuraDB Free | Entity relationships and graph traversal |
 | SQL Database | Neon PostgreSQL | Structured 10-K financial metrics |
@@ -293,7 +293,7 @@ Our system combines all four approaches.
 
 **How it works:**
 
-Text is converted to a 1536-dimensional vector that captures meaning. Similar meanings produce similar vectors, even with different words.
+Text is converted to a 1024-dimensional vector (Titan v2) that captures meaning. Similar meanings produce similar vectors, even with different words.
 
 ```
 "supply chain disruption"  →  [0.023, -0.145, 0.089, ...]
@@ -549,7 +549,7 @@ When a user asks a question, the system executes this pipeline:
 ### Pinecone (Vector Store)
 
 **What's stored:**
-- Dense vectors (1536 dimensions) for semantic search
+- Dense vectors (1024 dimensions, Titan v2) for semantic search
 - Sparse vectors (BM25) for keyword search
 - Metadata for filtering and retrieval
 
@@ -572,7 +572,8 @@ When a user asks a question, the system executes this pipeline:
 
 **Index configuration:**
 - Name: `enterprise-agentic-ai`
-- Metric: Cosine similarity
+- Metric: Dotproduct (optimal for hybrid search)
+- Dimensions: 1024 (Titan v2)
 - Cloud: AWS us-east-1
 - Tier: Free (100K vectors)
 

@@ -1,0 +1,85 @@
+{
+  "document_id": "GOOG_10K_2025",
+  "document_type": "10k",
+  "filename": "GOOG_10K_2025.pdf",
+  "extraction_date": "2026-01-19T22:07:03.085273+00:00",
+  "total_pages": 1,
+  "pages_processed": 1,
+  "pages": [
+    {
+      "page_number": 1,
+      "section": "Cover Page",
+      "content_type": "mixed",
+      "text": "UNITED STATES SECURITIES AND EXCHANGE COMMISSION Washington, D.C. 20549 FORM 10-K (Mark One) ☒ ANNUAL REPORT PURSUANT TO SECTION 13 OR 15(d) OF THE SECURITIES EXCHANGE ACT OF 1934 For the fiscal year ended December 31, 2024 OR ☐ TRANSITION REPORT PURSUANT TO SECTION 13 OR 15(d) OF THE SECURITIES EXCHANGE ACT OF 1934 For the transition period from ______ to ______. Commission file number: 001-37580 Alphabet Inc. (Exact name of registrant as specified in its charter) Delaware 61-1767919 (State or other jurisdiction of incorporation or organization) (I.R.S. Employer Identification No.) 1600 Amphitheatre Parkway Mountain View, CA 94043 (Address of principal executive offices, including zip code) (650) 253-0000 (Registrant's telephone number, including area code) Securities registered pursuant to Section 12(b) of the Act:",
+      "tables": [
+        {
+          "table_name": "Securities Registered Under Section 12(b)",
+          "table_type": "other",
+          "headers": [
+            "Title of each class",
+            "Trading Symbol(s)",
+            "Name of each exchange on which registered"
+          ],
+          "rows": [
+            {
+              "label": "Class A Common Stock, $0.001 par value",
+              "values": {
+                "Trading Symbol(s)": "GOOGL",
+                "Name of each exchange on which registered": "Nasdaq Stock Market LLC (Nasdaq Global Select Market)"
+              }
+            },
+            {
+              "label": "Class C Capital Stock, $0.001 par value",
+              "values": {
+                "Trading Symbol(s)": "GOOG",
+                "Name of each exchange on which registered": "Nasdaq Stock Market LLC (Nasdaq Global Select Market)"
+              }
+            }
+          ]
+        }
+      ],
+      "financial_metrics": {
+        "fiscal_year": 2024,
+        "revenue": null,
+        "cost_of_revenue": null,
+        "gross_profit": null,
+        "operating_expenses": null,
+        "operating_income": null,
+        "net_income": null,
+        "total_assets": null,
+        "total_liabilities": null,
+        "total_equity": null,
+        "cash_and_equivalents": null,
+        "long_term_debt": null,
+        "gross_margin": null,
+        "operating_margin": null,
+        "net_margin": null,
+        "earnings_per_share": null,
+        "diluted_eps": null,
+        "currency": "USD"
+      },
+      "segment_data": [],
+      "geographic_data": [],
+      "risk_factors": [],
+      "cross_references": []
+    }
+  ],
+  "metadata": {
+    "ticker": "GOOG",
+    "fiscal_year": 2024,
+    "document_type": "SEC 10-K Filing"
+  },
+  "consolidated": {
+    "financial_metrics_by_year": {
+      "2024": {
+        "fiscal_year": 2024,
+        "currency": "USD"
+      }
+    },
+    "segment_revenue": [],
+    "geographic_revenue": [],
+    "risk_factors": []
+  },
+  "errors": [],
+  "estimated_cost_usd": 0.04
+}

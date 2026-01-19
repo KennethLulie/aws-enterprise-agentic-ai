@@ -16,7 +16,7 @@ The client is designed for the parent/child chunking architecture where:
 Vector Format (10-K Documents):
     {
         "id": "AAPL_10K_2024_parent_5_child_2",
-        "values": [0.1, 0.2, ...],  # 1536 floats
+        "values": [0.1, 0.2, ...],  # 1024 floats (Titan v2)
         "metadata": {
             "document_id": "AAPL_10K_2024",
             "document_type": "10k",
@@ -148,8 +148,8 @@ MAX_RETRY_WAIT = 10  # seconds
 # Rate limiting - delay between batch operations to avoid throttling
 BATCH_DELAY_SECONDS = 0.1  # 100ms between batches
 
-# Expected embedding dimension (Titan v1)
-EXPECTED_DIMENSION = 1536
+# Expected embedding dimension (Titan v2 default)
+EXPECTED_DIMENSION = 1024
 
 # Metadata size limit (Pinecone limit is 40KB, we use 38KB for safety margin)
 MAX_METADATA_BYTES = 38 * 1024  # 38KB
@@ -478,7 +478,7 @@ class PineconeClient:
         avoid throttling.
 
         Validation (unless skip_validation=True):
-        - Checks vector dimension matches EXPECTED_DIMENSION (1536)
+        - Checks vector dimension matches EXPECTED_DIMENSION (1024 for Titan v2)
         - Checks metadata size < 40KB (Pinecone limit)
         - Vectors failing validation are skipped with warnings
 
@@ -611,7 +611,7 @@ class PineconeClient:
         in the metadata of each result.
 
         Args:
-            vector: Query embedding vector (1536 floats for Titan).
+            vector: Query embedding vector (1024 floats for Titan v2).
             top_k: Number of results to return. Defaults to 10.
             filter: Optional metadata filter dict. Uses Pinecone filter syntax.
             include_metadata: Include metadata in results. Defaults to True.

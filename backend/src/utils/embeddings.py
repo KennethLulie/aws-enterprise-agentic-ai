@@ -62,8 +62,8 @@ logger = structlog.get_logger(__name__)
 # Constants
 # =============================================================================
 
-# Default Titan embedding model
-DEFAULT_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"
+# Default Titan embedding model (v2 has better benchmarks, 1024 dimensions)
+DEFAULT_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
 
 # Embedding dimensions by model
 MODEL_DIMENSIONS = {
@@ -139,7 +139,7 @@ class BedrockEmbeddings:
 
         # Single embedding
         vector = await embeddings.embed_text("Hello world")
-        print(f"Dimension: {len(vector)}")  # 1536
+        print(f"Dimension: {len(vector)}")  # 1024 (Titan v2)
 
         # Batch embedding
         texts = ["Text 1", "Text 2", "Text 3"]
@@ -157,7 +157,7 @@ class BedrockEmbeddings:
 
         Args:
             model_id: Bedrock model ID for embeddings. Defaults to
-                amazon.titan-embed-text-v1 from settings or constant.
+                amazon.titan-embed-text-v2:0 from settings or constant.
             cache_size: Maximum number of embeddings to cache in memory.
                 Set to 0 to disable caching. Defaults to 1000.
         """
@@ -222,7 +222,7 @@ class BedrockEmbeddings:
                 - 1536 for amazon.titan-embed-text-v1
                 - 1024 for amazon.titan-embed-text-v2 (default)
         """
-        return MODEL_DIMENSIONS.get(self.model_id, 1536)
+        return MODEL_DIMENSIONS.get(self.model_id, 1024)
 
     def _get_cache_key(self, text: str) -> str:
         """
@@ -424,8 +424,8 @@ class BedrockEmbeddings:
             text: The text to embed.
 
         Returns:
-            List of floats representing the embedding vector (1536 dimensions
-            for Titan v1, 1024 for Titan v2).
+            List of floats representing the embedding vector (1024 dimensions
+            for Titan v2, 1536 for Titan v1).
 
         Raises:
             EmbeddingInputError: If the input text is invalid.

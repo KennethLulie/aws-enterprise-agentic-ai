@@ -306,6 +306,8 @@ aws bedrock list-foundation-models --region us-east-1 --query 'modelSummaries[?m
    - **Cloud:** AWS
    - **Region:** `us-east-1` (must match AWS region; use the serverless region, e.g., `PINECONE_ENVIRONMENT=us-east-1`)
 
+   > **⚠️ UPDATE (Phase 2b):** The project now uses **Titan v2 (1024 dimensions)** with **dotproduct metric** for optimal hybrid search. If following this guide, you'll need to recreate the index later per Phase 2b Section 1.8, or create it correctly now with: dimensions=1024, metric=dotproduct.
+
 **Get API Key:**
 - Go to API Keys in Pinecone dashboard
 - Copy your API key
