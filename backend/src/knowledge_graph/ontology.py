@@ -186,6 +186,74 @@ Reference:
 
 FINANCIAL_PATTERNS: list[dict[str, Any]] = [
     # =========================================================================
+    # ORGANIZATION Patterns - Major tech companies and their tickers
+    # Added to help spaCy recognize company names in short queries
+    # =========================================================================
+    # NVIDIA and variations
+    {"label": "ORG", "pattern": [{"LOWER": "nvidia"}]},
+    {"label": "ORG", "pattern": "NVIDIA"},
+    {"label": "ORG", "pattern": [{"LOWER": "nvda"}]},
+    {"label": "ORG", "pattern": "NVDA"},
+    # AMD and variations
+    {"label": "ORG", "pattern": [{"LOWER": "amd"}]},
+    {"label": "ORG", "pattern": "AMD"},
+    {"label": "ORG", "pattern": "Advanced Micro Devices"},
+    # Intel
+    {"label": "ORG", "pattern": [{"LOWER": "intel"}]},
+    {"label": "ORG", "pattern": "Intel"},
+    {"label": "ORG", "pattern": [{"LOWER": "intc"}]},
+    # Google/Alphabet
+    {"label": "ORG", "pattern": [{"LOWER": "google"}]},
+    {"label": "ORG", "pattern": "Google"},
+    {"label": "ORG", "pattern": [{"LOWER": "alphabet"}]},
+    {"label": "ORG", "pattern": "Alphabet"},
+    {"label": "ORG", "pattern": [{"LOWER": "goog"}]},
+    {"label": "ORG", "pattern": [{"LOWER": "googl"}]},
+    # Micron
+    {"label": "ORG", "pattern": [{"LOWER": "micron"}]},
+    {"label": "ORG", "pattern": "Micron"},
+    {"label": "ORG", "pattern": "Micron Technology"},
+    {"label": "ORG", "pattern": [{"LOWER": "mu"}]},
+    # Apple
+    {"label": "ORG", "pattern": [{"LOWER": "apple"}]},
+    {"label": "ORG", "pattern": "Apple"},
+    {"label": "ORG", "pattern": [{"LOWER": "aapl"}]},
+    # Microsoft
+    {"label": "ORG", "pattern": [{"LOWER": "microsoft"}]},
+    {"label": "ORG", "pattern": "Microsoft"},
+    {"label": "ORG", "pattern": [{"LOWER": "msft"}]},
+    # Amazon
+    {"label": "ORG", "pattern": [{"LOWER": "amazon"}]},
+    {"label": "ORG", "pattern": "Amazon"},
+    {"label": "ORG", "pattern": [{"LOWER": "amzn"}]},
+    # Meta/Facebook
+    {"label": "ORG", "pattern": [{"LOWER": "meta"}]},
+    {"label": "ORG", "pattern": "Meta"},
+    {"label": "ORG", "pattern": [{"LOWER": "facebook"}]},
+    {"label": "ORG", "pattern": "Facebook"},
+    # Tesla
+    {"label": "ORG", "pattern": [{"LOWER": "tesla"}]},
+    {"label": "ORG", "pattern": "Tesla"},
+    {"label": "ORG", "pattern": [{"LOWER": "tsla"}]},
+    # Samsung
+    {"label": "ORG", "pattern": [{"LOWER": "samsung"}]},
+    {"label": "ORG", "pattern": "Samsung"},
+    # TSMC
+    {"label": "ORG", "pattern": [{"LOWER": "tsmc"}]},
+    {"label": "ORG", "pattern": "TSMC"},
+    {"label": "ORG", "pattern": "Taiwan Semiconductor"},
+    # SK Hynix
+    {"label": "ORG", "pattern": "SK Hynix"},
+    {"label": "ORG", "pattern": [{"LOWER": "hynix"}]},
+    # Qualcomm
+    {"label": "ORG", "pattern": [{"LOWER": "qualcomm"}]},
+    {"label": "ORG", "pattern": "Qualcomm"},
+    {"label": "ORG", "pattern": [{"LOWER": "qcom"}]},
+    # Broadcom
+    {"label": "ORG", "pattern": [{"LOWER": "broadcom"}]},
+    {"label": "ORG", "pattern": "Broadcom"},
+    {"label": "ORG", "pattern": [{"LOWER": "avgo"}]},
+    # =========================================================================
     # REGULATION Patterns - Regulatory bodies and frameworks
     # =========================================================================
     # U.S. Financial Regulators (case-insensitive for acronyms)
