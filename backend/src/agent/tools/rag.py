@@ -262,9 +262,19 @@ def _format_citation(metadata: dict[str, Any]) -> str:
     doc_type = metadata.get("document_type", "document").upper()
     section = metadata.get("section", "Unknown Section")
 
-    # Format fiscal_year and page_number safely (handles floats, strings, malformed)
+    # Format fiscal_year and page safely (handles floats, strings, malformed)
+    # Chunks use start_page/end_page from semantic_chunking.py
     fiscal_year = _safe_int(metadata.get("fiscal_year"), default=None)
-    page = _safe_int(metadata.get("page_number"), default="?")
+    start_page = _safe_int(metadata.get("start_page"), default=None)
+    end_page = _safe_int(metadata.get("end_page"), default=None)
+    
+    # Format page reference (show range if chunk spans multiple pages)
+    if start_page is not None and end_page is not None and start_page != end_page:
+        page = f"{start_page}-{end_page}"
+    elif start_page is not None:
+        page = str(start_page)
+    else:
+        page = "?"
 
     # Build citation based on document type
     if doc_type == "10K":

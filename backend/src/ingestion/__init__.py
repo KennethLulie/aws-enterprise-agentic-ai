@@ -16,10 +16,13 @@ document types for the RAG pipeline:
 - contextual_chunking: Contextual enrichment for RAG chunks using
   Anthropic's approach - prepends document-level context to improve
   retrieval accuracy.
+- query_expansion: Query analysis and expansion using Nova Lite -
+  generates query variants and classifies KG complexity.
 
 Usage:
     from src.ingestion import VLMExtractor, DocumentProcessor, SemanticChunker
     from src.ingestion import ParentChildChunker, ContextualEnricher
+    from src.ingestion import QueryExpander, QueryAnalysis
     from pathlib import Path
 
     # Low-level extraction
@@ -48,6 +51,12 @@ Usage:
     enricher = ContextualEnricher()
     metadata = {"document_type": "10k", "company": "Apple Inc.", "ticker": "AAPL"}
     enriched_children = enricher.enrich_children(children, metadata)
+
+    # Query expansion and KG complexity analysis
+    expander = QueryExpander()
+    analysis = await expander.analyze("Apple's Taiwan suppliers")
+    print(analysis.variants)      # Alternative phrasings
+    print(analysis.use_2hop)      # True for complex queries
 """
 
 from src.ingestion.vlm_extractor import (
@@ -80,6 +89,13 @@ from src.ingestion.contextual_chunking import (
     ContextualEnrichmentError,
 )
 
+from src.ingestion.query_expansion import (
+    QueryExpander,
+    QueryAnalysis,
+    QueryExpansionError,
+    QueryAnalysisTimeoutError,
+)
+
 __all__ = [
     # VLM Extractor
     "VLMExtractor",
@@ -101,4 +117,9 @@ __all__ = [
     # Contextual Enrichment
     "ContextualEnricher",
     "ContextualEnrichmentError",
+    # Query Expansion
+    "QueryExpander",
+    "QueryAnalysis",
+    "QueryExpansionError",
+    "QueryAnalysisTimeoutError",
 ]

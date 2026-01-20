@@ -603,10 +603,12 @@ class PineconeClient:
         filter: dict[str, Any] | None = None,
         include_metadata: bool = True,
         include_values: bool = False,
+        sparse_vector: dict[str, list] | None = None,
     ) -> list[dict[str, Any]]:
         """
-        Query Pinecone for similar vectors.
+        Query Pinecone for similar vectors with optional hybrid search.
 
+        Supports both dense-only and hybrid (dense + sparse) queries.
         Returns parent_text for LLM context and child_text_raw for citations
         in the metadata of each result.
 
@@ -616,6 +618,9 @@ class PineconeClient:
             filter: Optional metadata filter dict. Uses Pinecone filter syntax.
             include_metadata: Include metadata in results. Defaults to True.
             include_values: Include vector values in results. Defaults to False.
+            sparse_vector: Optional BM25 sparse vector for hybrid search.
+                Format: {"indices": [int, ...], "values": [float, ...]}
+                When provided, combines dense semantic search with keyword matching.
 
         Returns:
             List of match dictionaries:
@@ -634,11 +639,22 @@ class PineconeClient:
         Raises:
             PineconeQueryError: If query fails.
 
-        Example:
+        Example (dense-only):
             results = client.query(
                 embedding,
                 top_k=5,
                 filter={"ticker": "AAPL", "fiscal_year": 2024}
+            )
+
+        Example (hybrid with BM25):
+            from src.utils.bm25_encoder import BM25Encoder
+            bm25 = BM25Encoder()
+            sparse = bm25.encode("NVIDIA earnings per share")
+
+            results = client.query(
+                embedding,
+                sparse_vector=sparse,
+                top_k=5
             )
         """
         index = self._get_index()
@@ -650,16 +666,27 @@ class PineconeClient:
             "query_started",
             top_k=top_k,
             has_filter=sanitized_filter is not None,
+            has_sparse=sparse_vector is not None,
         )
 
         try:
-            response = index.query(
-                vector=vector,
-                top_k=top_k,
-                filter=sanitized_filter,
-                include_metadata=include_metadata,
-                include_values=include_values,
-            )
+            # Build query kwargs
+            query_kwargs = {
+                "vector": vector,
+                "top_k": top_k,
+                "include_metadata": include_metadata,
+                "include_values": include_values,
+            }
+
+            # Add filter if provided
+            if sanitized_filter:
+                query_kwargs["filter"] = sanitized_filter
+
+            # Add sparse vector for hybrid search if provided
+            if sparse_vector and sparse_vector.get("indices"):
+                query_kwargs["sparse_vector"] = sparse_vector
+
+            response = index.query(**query_kwargs)
 
             # Convert response to list of dicts
             results = []
@@ -678,12 +705,13 @@ class PineconeClient:
                 "query_completed",
                 num_results=len(results),
                 top_score=results[0]["score"] if results else None,
+                hybrid=sparse_vector is not None,
             )
 
             return results
 
         except Exception as e:
-            self._log.error("query_failed", error=str(e))
+            self._log.error("query_failed", error=str(e), hybrid=sparse_vector is not None)
             raise PineconeQueryError(f"Failed to query vectors: {e}") from e
 
     @retry(

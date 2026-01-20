@@ -116,7 +116,7 @@ This RAG system enables natural language querying over complex financial documen
 | Entity Extraction | spaCy NER | Extract entities for Knowledge Graph (cost-efficient) |
 | Embeddings | AWS Bedrock Titan v2 | Convert text to 1024-dim semantic vectors |
 | Vector Store | Pinecone Serverless | Semantic (dense) and keyword (BM25) search |
-| Knowledge Graph | Neo4j AuraDB Free | Entity relationships, graph traversal, chunk boosting + LLM evidence |
+| Knowledge Graph | Neo4j AuraDB Free | Entity relationships, graph traversal, page-level chunk boosting + LLM evidence |
 | SQL Database | Neon PostgreSQL | Structured 10-K financial metrics |
 | Orchestration | LangGraph | Coordinate retrieval and synthesis |
 | LLM | AWS Bedrock Nova Pro | Query expansion, reranking, synthesis |
@@ -378,40 +378,54 @@ A chunk ranked #1 in semantic and #3 in BM25:
 Score = 1/(60+1) + 1/(60+3) = 0.0164 + 0.0159 = 0.0323
 ```
 
-**Note:** Knowledge Graph results are NOT included in RRF directly because they return document IDs (document-level) while dense/BM25 return chunks. Instead, KG results are applied as a boost step after RRF.
+**Note:** Knowledge Graph results are NOT included in RRF directly because KG queries return document-level information while dense/BM25 return chunks. Instead, KG results are applied as a **page-level boost** after RRF.
 
 RRF naturally balances semantic and keyword sources without manual weighting.
 
-### KG Boost (After RRF)
+### KG Boost (After RRF) - Page-Level Precision
 
-After RRF fusion, chunks from KG-matched documents receive a score boost:
+After RRF fusion, chunks from KG-matched **pages** receive a score boost. This is page-level boosting,
+not document-level - only chunks from pages where the entity was mentioned get boosted.
 
 ```
 Flow:
 Dense (chunks) + BM25 (chunks) → RRF Fusion → KG Boost → Reranking
                                                  ↑
-                        KG search → doc IDs + entity evidence
+                        KG search → doc IDs + pages + entity evidence
 ```
 
 **Boost mechanism:**
-- Chunks whose `document_id` appears in KG results get +0.1 to RRF score
+- KG returns document IDs AND specific page numbers where entities appear
+- Only chunks whose `start_page` is in KG results get +0.1 to RRF score
 - KG entity evidence is attached to these chunks for LLM explainability
 - Results are re-sorted after boosting
+
+**Why Page-Level (with Document-Level Fallback)?**
+
+| Document Type | Boost Strategy | Behavior |
+|--------------|----------------|----------|
+| 10-K PDFs | Page-level | Only relevant pages boosted |
+| News articles | Document-level fallback | All chunks boosted (articles are typically small) |
+
+| Query | Old Approach | New Page-Level Approach |
+|-------|--------------|------------------------|
+| "NVIDIA risks" on 10-K | Boosts ALL 500 chunks | Boosts only pages 15-25 (Risk Factors) |
+| "NVIDIA news" on article | Boosts all chunks | Same - falls back to doc-level |
 
 **Example:**
 ```
 Before KG boost:
-  NVDA_chunk_42: rrf_score=0.032
-  AAPL_chunk_15: rrf_score=0.031
+  NVDA_chunk_42 (page 67): rrf_score=0.032
+  AAPL_chunk_15 (page 22): rrf_score=0.031
 
-KG found: AAPL_10K_2024 (matched entity: "Apple", type: "Organization")
+KG found: AAPL_10K_2024, pages [15, 22, 45] (matched entity: "Apple")
 
 After KG boost:
-  AAPL_chunk_15: rrf_score=0.131, kg_evidence={entity: "Apple", type: "Organization"}
-  NVDA_chunk_42: rrf_score=0.032
+  AAPL_chunk_15 (page 22): rrf_score=0.131, kg_evidence={entity: "Apple", pages: [15,22,45]}
+  NVDA_chunk_42 (page 67): rrf_score=0.032  (NOT boosted - page not in KG results)
 ```
 
-This bridges document-level KG intelligence to chunk-level ranking.
+This provides precise page-level KG intelligence for chunk-level ranking.
 
 ---
 
@@ -497,15 +511,15 @@ The VLM already produces clean text - spaCy can reliably extract entities from t
 
 The Knowledge Graph integrates with the retrieval pipeline in three ways:
 
-**1. Entity Evidence for Explainability**
+**1. Entity Evidence for Explainability (with Page Numbers)**
 
-KG queries return not just document IDs, but entity evidence explaining WHY each document matched:
+KG queries return document IDs, page numbers, and entity evidence explaining WHY each document matched:
 
 ```python
 # Instead of just returning document IDs:
 [{"id": "AAPL_10K_2024"}, {"id": "NVDA_10K_2024"}]
 
-# Return entity evidence (from HybridRetriever._kg_search):
+# Return entity evidence with pages (from HybridRetriever._kg_search):
 [
   {
     "id": "AAPL_10K_2024",
@@ -513,7 +527,8 @@ KG queries return not just document IDs, but entity evidence explaining WHY each
     "kg_evidence": {
       "matched_entity": "Apple",
       "entity_type": "Organization",
-      "match_type": "direct_mention"
+      "match_type": "direct_mention",
+      "pages": [15, 22, 45]  # Specific pages for page-level boosting
     }
   },
   {
@@ -523,6 +538,7 @@ KG queries return not just document IDs, but entity evidence explaining WHY each
       "matched_entity": "supply chain",
       "entity_type": "Concept",
       "match_type": "related_via",
+      "pages": [12, 18, 67],  # Pages where related entity appears
       "related_to": "Apple",
       "shared_docs": 3
     }
@@ -530,17 +546,19 @@ KG queries return not just document IDs, but entity evidence explaining WHY each
 ]
 ```
 
-**2. Chunk-Level Boosting**
+**2. Page-Level Boosting**
 
-KG operates at document-level, but retrieval needs chunk-level ranking:
+KG provides page-level precision for chunk-level ranking:
 
 ```
-KG: "AAPL_10K_2024 mentions Apple"
+KG: "AAPL_10K_2024 mentions Apple on pages [15, 22, 45]"
     ↓
-Boost all chunks from AAPL_10K_2024 by +0.1
+Boost only chunks from pages 15, 22, 45 by +0.1
     ↓
-Attach kg_evidence to those chunks for LLM context
+Attach kg_evidence (including pages) to those chunks for LLM context
 ```
+
+This is more precise than document-level boosting - only relevant pages are boosted.
 
 **3. Multi-Hop for Complex Queries**
 
@@ -613,10 +631,11 @@ When a user asks a question, the system executes this pipeline:
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ STEP 3b: KG BOOST                                                            │
+│ STEP 3b: KG BOOST (Page-Level)                                               │
 │                                                                              │
-│ Apply +0.1 boost to chunks from KG-matched documents                        │
-│ Attach kg_evidence to boosted chunks for LLM explainability                 │
+│ Apply +0.1 boost to chunks from KG-matched PAGES (not entire documents)     │
+│ KG returns doc_id + pages where entity appears → boost only those pages     │
+│ Attach kg_evidence (incl. pages) to boosted chunks for LLM explainability   │
 │ Re-sort by boosted RRF score                                                 │
 │ See "KG Boost (After RRF)" section for details                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -698,7 +717,8 @@ When a user asks a question, the system executes this pipeline:
 | `publication_date` | - | ✓ | Document date (YYYY-MM-DD) |
 | `source` | - | ✓ | Publication name (Reuters, FT) |
 | `section` | ✓ | - | 10-K section (Item 1A, etc.) |
-| `page_number` | ✓ | ✓ | Page reference |
+| `start_page` | ✓ | ✓ | First page of chunk |
+| `end_page` | ✓ | ✓ | Last page of chunk |
 | `chunk_index` | ✓ | ✓ | Position in document |
 | `text` | ✓ | ✓ | Chunk content for retrieval |
 

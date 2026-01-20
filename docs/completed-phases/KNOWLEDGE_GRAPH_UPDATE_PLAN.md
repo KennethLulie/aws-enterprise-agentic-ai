@@ -621,27 +621,60 @@ backend/src/
 
 ---
 
+### Decision 5: Page-Level vs Document-Level KG Boosting
+
+**Question:** When KG finds an entity in a document, should we boost all chunks from the document or only chunks from pages where the entity appears?
+
+| Option | Approach | Pros | Cons |
+|--------|----------|------|------|
+| 1. Document-Level | Boost ALL chunks from matched doc | Simple implementation | Low precision - boosts irrelevant pages |
+| **2. Page-Level** | Boost only chunks from matched pages | High precision - only relevant pages boosted | Slightly more complex |
+
+**Decision:** Option 2 (Page-Level Boosting) - **IMPLEMENTED**
+
+**Rationale:**
+- A 10-K document has 100+ pages covering diverse topics
+- Query "NVIDIA risks" should boost only Risk Factors pages (15-25), not Marketing (1-10)
+- The MENTIONS relationship already stores page numbers (`r.page` property)
+- Minimal additional complexity: new `find_document_pages_mentioning()` method
+
+**Implementation:**
+1. `queries.py`: Added `find_document_pages_mentioning()` returning `{"document_id": str, "pages": list[int]}`
+2. `_kg_search()`: Uses page-level query, includes `pages` in kg_evidence
+3. `_apply_kg_boost()`: Page-level matching with document-level fallback:
+   - If KG has pages AND chunk has page_number → page-level match (for 10-Ks)
+   - If KG lacks pages OR chunk lacks page_number → document-level fallback (for news/articles)
+
+**Files Updated:**
+- ✅ `backend/src/knowledge_graph/queries.py` - Added page-level method
+- ✅ PHASE_2B_HOW_TO_GUIDE.md - Updated Sections 6.1 and 11.1
+- ✅ RAG_README.md - Updated KG Boost documentation
+- ✅ DEVELOPMENT_REFERENCE.md - Updated Query Pipeline section
+
+---
+
 ## Test Queries for Validation
 
 > ✅ **IMPLEMENTED** - Added to PHASE_2B_HOW_TO_GUIDE.md Section 11.4c "KG Integration Validation Tests"
 > 
 > These queries verify KG integration improves retrieval quality.
 
-### 1. Direct Entity Match (1-hop)
+### 1. Direct Entity Match (1-hop, Page-Level)
 
 **Query:** "What are NVIDIA's risk factors?"
 
 **Expected Behavior:**
 - Entity extracted: "NVIDIA" (Organization)
-- KG finds: NVDA_10K_2025
-- Chunks from NVDA_10K_2025 get +0.1 boost
+- KG finds: NVDA_10K_2025 + pages [15, 22, 45, ...]
+- Only chunks from those specific pages get +0.1 boost (page-level precision)
 - Citation shows: `KG Match: NVIDIA (Organization) - direct mention`
 
 **Verification:**
 ```python
-# Check kg_evidence is present
+# Check kg_evidence is present with pages
 assert results[0].get("kg_evidence", {}).get("matched_entity") == "NVIDIA"
 assert results[0].get("kg_evidence", {}).get("match_type") == "direct_mention"
+assert "pages" in results[0].get("kg_evidence", {})  # Page-level info present
 ```
 
 ### 2. Multi-Entity Query (2-hop)

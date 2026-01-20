@@ -1207,6 +1207,7 @@ Structure:
 - GraphQueries class:
   - __init__(self, store: Neo4jStore)
   - find_documents_mentioning(self, entity_text: str, entity_type: EntityType = None) -> list[str]
+  - find_document_pages_mentioning(self, entity_text: str, entity_type: EntityType = None) -> list[dict]
   - find_related_entities(self, entity_text: str, hops: int = 1) -> list[dict]
   - find_entities_in_document(self, document_id: str) -> list[dict]
   - find_co_occurring_entities(self, entity_text: str) -> list[dict]
@@ -1215,19 +1216,25 @@ Structure:
 
 Key Queries:
 
-1. find_documents_mentioning (1-hop):
+1. find_documents_mentioning (1-hop, document-level):
    "Find all documents that mention Apple"
    MATCH (d:Document)-[:MENTIONS]->(e {text: $entity_text})
-   RETURN d.document_id as document_id, d.ticker as ticker
+   RETURN d.document_id as document_id
 
-2. find_related_entities (2-hop):
+2. find_document_pages_mentioning (1-hop, page-level):
+   "Find documents AND specific pages that mention Apple"
+   MATCH (d:Document)-[r:MENTIONS]->(e {text: $entity_text})
+   RETURN d.document_id as document_id, collect(DISTINCT r.page) as pages
+   **Used by HybridRetriever for page-level KG boosting (more precise than document-level)**
+
+3. find_related_entities (2-hop):
    "Find entities related to Apple through shared documents"
    MATCH (e1 {text: $entity_text})<-[:MENTIONS]-(d:Document)-[:MENTIONS]->(e2)
    WHERE e1 <> e2
    RETURN e2.text as entity, labels(e2)[0] as type, count(d) as shared_docs
    ORDER BY shared_docs DESC
 
-3. find_co_occurring_entities:
+4. find_co_occurring_entities:
    "Find entities that frequently appear with China"
    MATCH (e1 {text: $entity_text})<-[:MENTIONS]-(d:Document)-[:MENTIONS]->(e2)
    WHERE e1 <> e2
@@ -1236,7 +1243,7 @@ Key Queries:
    RETURN e2.text as entity, labels(e2)[0] as type, co_occurrences
    ORDER BY co_occurrences DESC
 
-4. entity_search (fuzzy):
+5. entity_search (fuzzy):
    "Find entities matching 'apple'" (case-insensitive, partial match)
    MATCH (e)
    WHERE toLower(e.text) CONTAINS toLower($query)
@@ -1244,29 +1251,36 @@ Key Queries:
    LIMIT 10
 
 Return Format:
-- Document queries return list of document_id strings (for RAG integration)
+- `find_documents_mentioning`: list of document_id strings (document-level)
+- `find_document_pages_mentioning`: list of dicts with document_id and pages (page-level)
 - Entity queries return list of dicts with entity info
 
-**Architecture Note (Entity Context):**
+**Architecture Note (Page-Level KG Boosting):**
 
-`GraphQueries` returns **raw document IDs only**. Entity context (kg_evidence) is added by 
-`HybridRetriever._kg_search()` which wraps these queries:
+`GraphQueries` provides two document lookup methods. The page-level method is preferred for
+KG boosting because it only boosts chunks from pages where the entity was actually mentioned:
 
 ```
 GraphQueries.find_documents_mentioning("Apple")
-    → Returns: ["AAPL_10K_2024", "AAPL_10K_2023"]  (just IDs)
+    → Returns: ["AAPL_10K_2024", "AAPL_10K_2023"]  (just IDs - boosts ALL chunks)
+
+GraphQueries.find_document_pages_mentioning("Apple")
+    → Returns: [{"document_id": "AAPL_10K_2024", "pages": [15, 22, 45]}, ...]
+       (IDs + pages - boosts only chunks from those specific pages)
 
 HybridRetriever._kg_search("Apple supply chain risks")
+    → Uses find_document_pages_mentioning() for page-level boosting
     → Returns: [
-        {"id": "AAPL_10K_2024", "source": "kg", "kg_evidence": {...}},
+        {"id": "AAPL_10K_2024", "source": "kg", "kg_evidence": {..., "pages": [15, 22, 45]}},
         ...
-      ]  (IDs + entity context)
+      ]  (IDs + entity context + page info)
 ```
 
 This separation of concerns allows:
 1. `GraphQueries` to be reusable for any graph traversal need
-2. `_kg_search` to add retrieval-specific context (matched entity, match type)
-3. Entity evidence to flow through the pipeline to LLM citations
+2. `_kg_search` to add retrieval-specific context (matched entity, match type, pages)
+3. Page-level boosting for more precise retrieval (not boosting irrelevant pages)
+4. Entity evidence to flow through the pipeline to LLM citations
 
 See Section 11.1 for `_kg_search` implementation with entity evidence.
 
@@ -1447,7 +1461,7 @@ Changes to index_document() function:
 Updated Vector Format for Upsert:
 {
   "id": "AAPL_10K_2024_chunk_42",
-  "values": [0.1, 0.2, ...],  # Dense vector (1536 floats)
+  "values": [0.1, 0.2, ...],  # Dense vector (1024 floats for Titan v2)
   "sparse_values": {
     "indices": [12345, 67890, ...],
     "values": [0.5, 0.3, ...]
@@ -1571,7 +1585,7 @@ else:
 **Expected Output:**
 ```
 Test query: "supply chain risks China"
-Dense vector dimension: 1536
+Dense vector dimension: 1024
 Sparse vector indices: 4
 
 ✓ Hybrid search works! Top 3 results:
@@ -1789,34 +1803,38 @@ Verify: docker-compose exec backend python -c "from src.ingestion.query_expansio
 **Command:**
 ```bash
 docker-compose exec backend python -c "
+import asyncio
 from src.ingestion.query_expansion import QueryExpander, QueryAnalysis
 
-expander = QueryExpander()
+async def test():
+    expander = QueryExpander()
 
-# Test 1: Simple query (should be 1-hop)
-query1 = 'Tell me about NVIDIA'
-analysis1 = expander.analyze(query1)
-print(f'Query: {query1}')
-print(f'  Variants: {len(analysis1.variants)}')
-print(f'  KG Complexity: {analysis1.kg_complexity}')
-print(f'  Use 2-hop: {analysis1.use_2hop}')
-print(f'  Reason: {analysis1.complexity_reason}')
+    # Test 1: Simple query (should be 1-hop)
+    query1 = 'Tell me about NVIDIA'
+    analysis1 = await expander.analyze(query1)
+    print(f'Query: {query1}')
+    print(f'  Variants: {len(analysis1.variants)}')
+    print(f'  KG Complexity: {analysis1.kg_complexity}')
+    print(f'  Use 2-hop: {analysis1.use_2hop}')
+    print(f'  Reason: {analysis1.complexity_reason}')
 
-# Test 2: Complex query (should be 2-hop)
-query2 = \"What are Apple's Taiwan semiconductor suppliers?\"
-analysis2 = expander.analyze(query2)
-print(f'\\nQuery: {query2}')
-print(f'  Variants: {len(analysis2.variants)}')
-print(f'  KG Complexity: {analysis2.kg_complexity}')
-print(f'  Use 2-hop: {analysis2.use_2hop}')
-print(f'  Reason: {analysis2.complexity_reason}')
+    # Test 2: Complex query (should be 2-hop)
+    query2 = \"What are Apple's Taiwan semiconductor suppliers?\"
+    analysis2 = await expander.analyze(query2)
+    print(f'\\nQuery: {query2}')
+    print(f'  Variants: {len(analysis2.variants)}')
+    print(f'  KG Complexity: {analysis2.kg_complexity}')
+    print(f'  Use 2-hop: {analysis2.use_2hop}')
+    print(f'  Reason: {analysis2.complexity_reason}')
 
-# Test 3: Legacy expand() method still works
-query3 = 'What are the main risks for Tesla?'
-variants = expander.expand(query3)
-print(f'\\nLegacy expand() test:')
-print(f'  Original: {query3}')
-print(f'  Expanded to {len(variants)} variants')
+    # Test 3: Legacy expand() method still works
+    query3 = 'What are the main risks for Tesla?'
+    variants = await expander.expand(query3)
+    print(f'\\nLegacy expand() test:')
+    print(f'  Original: {query3}')
+    print(f'  Expanded to {len(variants)} variants')
+
+asyncio.run(test())
 "
 ```
 
@@ -2532,11 +2550,16 @@ with `match_type: "related_via"` so the LLM understands the connection path.
 ```python
 def _kg_search(self, query: str, use_2hop: bool = False) -> list[dict]:
     """
-    Extract entities from query and find related documents WITH context.
-    Returns document IDs plus entity evidence for explainability.
+    Extract entities from query and find related documents WITH page-level context.
+    Returns document IDs plus entity evidence including specific pages for precise boosting.
     
     Note: This method is in HybridRetriever, NOT GraphQueries.
-    It wraps GraphQueries.find_documents_mentioning() and adds entity evidence.
+    It wraps GraphQueries.find_document_pages_mentioning() and adds entity evidence.
+    
+    **Page-Level Boosting:**
+    Uses find_document_pages_mentioning() to get specific pages where entities appear.
+    This enables _apply_kg_boost() to only boost chunks from those pages, not the entire
+    document. Much more precise than document-level boosting.
     
     Args:
         query: The user's search query
@@ -2552,31 +2575,40 @@ def _kg_search(self, query: str, use_2hop: bool = False) -> list[dict]:
                 matched_entity: str,
                 entity_type: str,
                 match_type: "direct_mention" | "related_via",
+                pages: list[int],  # Specific pages for page-level boosting
                 related_to: str (if match_type == "related_via"),
                 shared_docs: int (if indirect match)
               }
     """
     entities = self._extractor.extract_entities(query, "query", 0)
-    results: list[dict] = []
-    seen_docs: set[str] = set()
+    
+    # Track documents with accumulated pages (merges pages from multiple entities)
+    # Structure: {doc_id: {"evidence": {...}, "pages": set(...)}}
+    doc_results: dict[str, dict] = {}
     
     for entity in entities:
-        # 1-hop: Direct document mentions (always executed)
+        # 1-hop: Direct document mentions with page info (always executed)
         try:
-            doc_ids = self._queries.find_documents_mentioning(entity.text, fuzzy=True)
+            # Use page-level query for precise boosting
+            doc_pages = self._queries.find_document_pages_mentioning(entity.text, fuzzy=True)
             
-            for doc_id in doc_ids:
-                if doc_id not in seen_docs:
-                    seen_docs.add(doc_id)
-                    results.append({
-                        "id": doc_id,
-                        "source": "kg",
-                        "kg_evidence": {
+            for doc_info in doc_pages:
+                doc_id = doc_info["document_id"]
+                pages = doc_info["pages"]
+                
+                if doc_id not in doc_results:
+                    # First time seeing this document
+                    doc_results[doc_id] = {
+                        "evidence": {
                             "matched_entity": entity.text,
                             "entity_type": entity.entity_type.value,
                             "match_type": "direct_mention",
-                        }
-                    })
+                        },
+                        "pages": set(pages),
+                    }
+                else:
+                    # Document already seen - merge pages from additional entity matches
+                    doc_results[doc_id]["pages"].update(pages)
         except Exception as e:
             logger.warning("kg_1hop_failed", entity=entity.text, error=str(e))
             # Continue with other entities - don't fail entire KG search
@@ -2587,29 +2619,48 @@ def _kg_search(self, query: str, use_2hop: bool = False) -> list[dict]:
             try:
                 related = self._queries.find_related_entities(entity.text, hops=1, limit=5)
                 for rel in related:
-                    rel_docs = self._queries.find_documents_mentioning(rel["entity"], fuzzy=True)
-                    for doc_id in rel_docs:
-                        if doc_id not in seen_docs:
-                            seen_docs.add(doc_id)
-                            results.append({
-                                "id": doc_id,
-                                "source": "kg",
-                                "kg_evidence": {
+                    # Use page-level query for related entities too
+                    rel_doc_pages = self._queries.find_document_pages_mentioning(rel["entity"], fuzzy=True)
+                    for doc_info in rel_doc_pages:
+                        doc_id = doc_info["document_id"]
+                        pages = doc_info["pages"]
+                        
+                        if doc_id not in doc_results:
+                            doc_results[doc_id] = {
+                                "evidence": {
                                     "matched_entity": rel["entity"],
                                     "entity_type": rel["type"],
                                     "match_type": "related_via",
                                     "related_to": entity.text,
                                     "shared_docs": rel["shared_docs"],
-                                }
-                            })
+                                },
+                                "pages": set(pages),
+                            }
+                        else:
+                            # Merge pages (keep original evidence - first match wins)
+                            doc_results[doc_id]["pages"].update(pages)
             except Exception as e:
                 logger.warning("kg_2hop_failed", entity=entity.text, error=str(e))
                 # 2-hop failure is non-critical - 1-hop results still valid
+    
+    # Convert to final results format with pages as list
+    results = [
+        {
+            "id": doc_id,
+            "source": "kg",
+            "kg_evidence": {
+                **info["evidence"],
+                "pages": sorted(info["pages"]),  # Convert set to sorted list
+            }
+        }
+        for doc_id, info in doc_results.items()
+    ]
     
     logger.debug(
         "kg_search_complete",
         query_entities=len(entities),
         docs_found=len(results),
+        total_pages=sum(len(r["kg_evidence"].get("pages", [])) for r in results),
         direct_matches=sum(1 for r in results if r["kg_evidence"]["match_type"] == "direct_mention"),
         indirect_matches=sum(1 for r in results if r["kg_evidence"]["match_type"] == "related_via"),
     )
@@ -2617,9 +2668,11 @@ def _kg_search(self, query: str, use_2hop: bool = False) -> list[dict]:
     return results
 ```
 
-**_apply_kg_boost Implementation (Chunk-Level KG Boosting):**
+**_apply_kg_boost Implementation (Page-Level KG Boosting):**
 
-After RRF fusion of dense + BM25 results, apply a boost to chunks from KG-matched documents:
+After RRF fusion of dense + BM25 results, apply a boost to chunks from KG-matched pages.
+This is **page-level boosting** - only chunks from pages where the entity was mentioned get boosted,
+not all chunks from the entire document.
 
 ```python
 def _apply_kg_boost(
@@ -2629,38 +2682,80 @@ def _apply_kg_boost(
     boost: float = 0.1
 ) -> list[dict]:
     """
-    Apply boost to chunks from KG-matched documents.
+    Apply boost to chunks from KG-matched pages (page-level precision).
     
-    This bridges document-level KG matches to chunk-level ranking:
-    - KG returns document IDs with entity evidence
-    - Dense/BM25 return chunks with scores
-    - This method boosts chunks whose document_id is in KG results
+    **Page-Level Boosting:**
+    Unlike document-level boosting (which would boost ALL chunks from a 100-page 10-K),
+    this method only boosts chunks from specific pages where entities were mentioned.
+    
+    Flow:
+    - KG returns document IDs + page numbers where entity appears
+    - Dense/BM25 return chunks with start_page/end_page in metadata
+    - This method boosts chunks whose start_page is in the KG pages list
     
     Args:
         chunk_results: Results from RRF fusion (dense + BM25)
-        kg_results: Results from _kg_search with kg_evidence
+        kg_results: Results from _kg_search with kg_evidence containing 'pages'
         boost: Additive boost to RRF score (default 0.1)
                RRF scores typically range 0.01-0.05, so +0.1 is significant
     
     Returns:
-        chunk_results with boosted scores and kg_evidence attached
+        chunk_results with boosted scores and kg_evidence attached (only for matching pages)
     """
-    # Build lookup of KG evidence by document ID
-    kg_evidence_by_doc: dict[str, dict] = {}
+    # Build lookup of KG evidence by (document_id, page) for page-level matching
+    # Structure: {doc_id: {"pages": set(...), "evidence": {...}}}
+    kg_pages_by_doc: dict[str, dict] = {}
     for kg_result in kg_results:
         doc_id = kg_result["id"]
-        if doc_id not in kg_evidence_by_doc:
-            kg_evidence_by_doc[doc_id] = kg_result.get("kg_evidence", {})
+        evidence = kg_result.get("kg_evidence", {})
+        pages = evidence.get("pages", [])
+        
+        if doc_id not in kg_pages_by_doc:
+            kg_pages_by_doc[doc_id] = {
+                "pages": set(pages),
+                "evidence": evidence,
+            }
+        else:
+            # Merge pages if multiple entities mention same document
+            kg_pages_by_doc[doc_id]["pages"].update(pages)
     
-    # Apply boost to matching chunks
+    boosted_count = 0
+    doc_level_fallback_count = 0
+    
+    # Apply boost to chunks - page-level when possible, doc-level fallback for news/articles
     for result in chunk_results:
-        doc_id = result.get("metadata", {}).get("document_id")
-        if doc_id and doc_id in kg_evidence_by_doc:
+        metadata = result.get("metadata", {})
+        doc_id = metadata.get("document_id")
+        # Chunks use start_page/end_page (from semantic_chunking.py), not page_number
+        start_page = metadata.get("start_page")
+        
+        if not doc_id or doc_id not in kg_pages_by_doc:
+            continue
+        
+        kg_info = kg_pages_by_doc[doc_id]
+        kg_pages = kg_info["pages"]
+        should_boost = False
+        
+        # Strategy: Page-level when available, document-level fallback otherwise
+        # This handles both 10-Ks (multi-page PDFs) and news articles (no pages)
+        if kg_pages and start_page is not None:
+            # Page-level match: both KG and chunk have page info
+            # Check if chunk's start_page is in the KG pages set
+            if start_page in kg_pages:
+                should_boost = True
+        elif not kg_pages or start_page is None:
+            # Document-level fallback: either KG or chunk lacks page info
+            # This handles news articles, single-page docs, legacy data
+            should_boost = True
+            doc_level_fallback_count += 1
+        
+        if should_boost:
             # Boost the RRF score
             result["rrf_score"] = result.get("rrf_score", 0) + boost
+            boosted_count += 1
             
             # Attach KG evidence for LLM explainability
-            result["kg_evidence"] = kg_evidence_by_doc[doc_id]
+            result["kg_evidence"] = kg_info["evidence"]
             
             # Track that KG contributed to this result
             if "sources" in result:
@@ -2679,11 +2774,35 @@ def _apply_kg_boost(
     logger.debug(
         "kg_boost_applied",
         total_chunks=len(chunk_results),
-        boosted_chunks=sum(1 for r in chunk_results if "kg_evidence" in r),
+        boosted_chunks=boosted_count,
+        page_level_boosts=boosted_count - doc_level_fallback_count,
+        doc_level_fallbacks=doc_level_fallback_count,
         boost_value=boost,
+        matching_docs=len(kg_pages_by_doc),
     )
     
     return boosted_results
+```
+
+**Why Page-Level is Better (with Document-Level Fallback):**
+
+| Document Type | Boost Strategy | Behavior |
+|--------------|----------------|----------|
+| 10-K PDFs (100+ pages) | Page-level | Only pages 15-25 (Risk Factors) boosted for "NVIDIA risks" |
+| News articles (no pages) | Document-level fallback | All chunks from article boosted (typically 1-5 chunks) |
+| Single-page docs | Either | Works correctly either way |
+
+| Scenario | Old Document-Level | New Page-Level (with fallback) |
+|----------|-------------------|-------------------------------|
+| Query: "NVIDIA risks" on 10-K | Boosts ALL 500 chunks | Boosts only ~20 chunks from Risk Factors pages |
+| Query: "NVIDIA news" on article | Boosts all chunks | Same - fallback to document-level |
+
+**Fallback Logic:**
+```
+if KG has pages AND chunk has start_page:
+    → Page-level match (precise)
+elif KG lacks pages OR chunk lacks start_page:
+    → Document-level fallback (for news/articles)
 ```
 
 Full Pipeline (8 steps - updated with KG boost and complexity analysis):
@@ -2694,10 +2813,10 @@ Full Pipeline (8 steps - updated with KG boost and complexity analysis):
    a. Dense search (Pinecone) → chunks with scores
    b. BM25 search (Pinecone sparse) → chunks with scores
 3. **Knowledge Graph lookup: _kg_search(query, use_2hop=analysis.use_2hop)**
-   - 1-hop always: Find docs mentioning query entities
-   - 2-hop if complex: Also find docs mentioning related entities
+   - 1-hop always: Find docs + pages mentioning query entities
+   - 2-hop if complex: Also find docs + pages mentioning related entities
 4. RRF Fusion: Merge dense + BM25 results (in-memory)
-5. **KG Boost: Apply +0.1 boost to chunks from KG-matched documents**
+5. **KG Boost: Apply +0.1 boost to chunks from KG-matched pages (page-level precision)**
 6. Cross-Encoder Reranking: Score top 15 (Nova Lite)
 7. Contextual Compression: Extract relevant sentences from top 5 (Nova Lite)
 8. Return with source citations AND KG evidence for explainability

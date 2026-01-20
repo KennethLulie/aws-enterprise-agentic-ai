@@ -84,20 +84,22 @@
 | backend/src/cache/__init__.py | Cache package (Phase 4+ placeholders) |
 | backend/src/db/__init__.py | Database package exports (SQLAlchemy session management) |
 | backend/src/db/session.py | SQLAlchemy engine, session, connection pooling |
-| backend/src/ingestion/__init__.py | Data ingestion package exports (VLMExtractor, DocumentProcessor, exceptions) |
+| backend/src/ingestion/__init__.py | Data ingestion package exports (VLMExtractor, DocumentProcessor, QueryExpander, QueryAnalysis, exceptions) |
 | backend/src/ingestion/vlm_extractor.py | VLM-based PDF extraction using Claude Sonnet 4.5 Vision (Bedrock) with automatic fallback to deprecated Claude 3.5 Sonnet V2 |
 | backend/src/ingestion/document_processor.py | High-level document processor with manifest tracking, consolidation, batch processing, and company name extraction from cover page |
 | backend/src/ingestion/semantic_chunking.py | spaCy-based semantic text chunking with section boundary detection for 10-K documents |
 | backend/src/ingestion/parent_child_chunking.py | Hierarchical parent/child chunking (1024-token parents, 256-token children) for RAG |
 | backend/src/ingestion/contextual_chunking.py | Contextual enrichment for RAG chunks (Anthropic approach - prepends document context) |
+| backend/src/ingestion/query_expansion.py | Query expansion + KG complexity analysis using Nova Lite (QueryExpander, QueryAnalysis) |
 | backend/src/utils/__init__.py | Utility helpers package |
 | backend/src/utils/embeddings.py | Bedrock Titan v2 embeddings utility for RAG vectorization (1024 dimensions) |
-| backend/src/utils/pinecone_client.py | Pinecone vector store client wrapper for RAG operations (dotproduct metric, 1024 dims) |
+| backend/src/utils/pinecone_client.py | Pinecone vector store client with hybrid search support (dense + sparse vectors, dotproduct metric) |
+| backend/src/utils/bm25_encoder.py | BM25 sparse vector encoder for Pinecone hybrid search (TF weighting, stopword removal) |
 | backend/src/knowledge_graph/__init__.py | Knowledge graph package for entity extraction (spaCy) and graph queries (Neo4j) |
 | backend/src/knowledge_graph/ontology.py | Financial domain ontology: EntityType, RelationType enums, spaCy mappings, EntityRuler patterns |
 | backend/src/knowledge_graph/extractor.py | Entity extraction using spaCy NER + custom financial patterns (EntityExtractor, Entity dataclass) |
 | backend/src/knowledge_graph/store.py | Neo4j graph store adapter with connection pooling, CRUD operations, batch processing (Neo4jStore) |
-| backend/src/knowledge_graph/queries.py | Graph traversal queries: 1-hop, 2-hop, co-occurrence, fuzzy search; returns UPPERCASE entity types for consistency (GraphQueries, GraphQueryError) |
+| backend/src/knowledge_graph/queries.py | Graph traversal queries: 1-hop, 2-hop, co-occurrence, fuzzy search; page-level document lookup for precise KG boosting; returns UPPERCASE entity types for consistency (GraphQueries, GraphQueryError) |
 | backend/tests/__init__.py | Tests package |
 | backend/tests/test_agent.py | Agent and graph tests |
 | backend/tests/test_api.py | API endpoint tests |
@@ -155,7 +157,7 @@
 | scripts/setup.sh | One-time setup script |
 | scripts/dev.sh | Dev helper script (start/stop/logs/test/shell/clean) |
 | scripts/validate_setup.py | Prerequisites validation script |
-| scripts/extract_and_index.py | VLM document extraction and Pinecone indexing batch script (--status, --dry-run, --force, --doc, --index-only, --reindex, --index-doc) |
+| scripts/extract_and_index.py | VLM document extraction and Pinecone indexing with BM25 sparse vectors for hybrid search (--status, --dry-run, --force, --doc, --index-only, --reindex, --index-doc, --add-sparse) |
 | scripts/rag_diagnostic.py | RAG diagnostic tool for Pinecone inspection and query testing (--stats, --inspect, --query, --all) |
 | scripts/load_10k_to_sql.py | SQL data loading script for 10-K financial data (--validate-only, --dry-run, --ticker, --force) |
 | scripts/index_entities.py | Entity indexing script for Knowledge Graph population (--dry-run, --force, --extracted-dir, --neo4j-uri) |

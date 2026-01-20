@@ -660,9 +660,9 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 
 **Query Pipeline (8 steps):**
 1. **Query Expansion:** Generate 3 variants via Nova Lite (+20-30% recall)
-2. **Parallel Retrieval:** Dense search + BM25 search (chunks) + KG lookup (doc IDs)
+2. **Parallel Retrieval:** Dense search + BM25 search (chunks) + KG lookup (doc IDs + pages)
 3. **RRF Fusion:** Merge dense + BM25 chunk results
-4. **KG Boost:** Apply +0.1 boost to chunks from KG-matched docs, attach entity evidence
+4. **KG Boost:** Apply +0.1 boost to chunks from KG-matched pages (page-level precision)
 5. **Cross-Encoder Reranking:** Nova Lite scores relevance (+20-25% precision)
 6. **Contextual Compression:** LLMChainExtractor extracts relevant sentences
 7. **Response Formatting:** Include KG evidence in citations for explainability
@@ -681,8 +681,8 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 
 | Feature | Description |
 |---------|-------------|
-| **Entity Evidence** | KG returns WHY docs matched: entity, type, match_type (direct/indirect) |
-| **Chunk-Level Boosting** | +0.1 boost to RRF score for chunks from KG-matched documents |
+| **Entity Evidence** | KG returns WHY docs matched: entity, type, match_type, pages |
+| **Page-Level Boosting** | +0.1 boost to RRF score for chunks from KG-matched **pages** (not entire docs) |
 | **Multi-Hop Reasoning** | 2-hop queries triggered for complex queries (2+ entities) |
 | **LLM Explainability** | KG evidence included in citations for transparency |
 
@@ -695,16 +695,19 @@ Agent can search the web, query SQL databases, and retrieve from documents.
     "kg_evidence": {
       "matched_entity": "Apple",
       "entity_type": "Organization",
-      "match_type": "direct_mention"  # or "related_via"
+      "match_type": "direct_mention",  # or "related_via"
+      "pages": [15, 22, 45]  # Specific pages for page-level boosting
     }
   }
 ]
 ```
 
-**KG Boost Implementation:**
+**KG Boost Implementation (Page-Level with Fallback):**
 - Applied AFTER RRF fusion (not in RRF itself)
-- Chunks whose `document_id` matches KG results get +0.1 boost
-- `kg_evidence` attached to boosted chunks for LLM context
+- KG returns doc_id + pages where entity appears
+- For multi-page docs (10-Ks): Only chunks from matching pages get +0.1 boost
+- For single-page/no-page docs (news articles): Falls back to document-level boost
+- `kg_evidence` (including pages) attached to boosted chunks for LLM context
 
 **See:** `docs/KNOWLEDGE_GRAPH_UPDATE_PLAN.md` for detailed enhancement plan
 

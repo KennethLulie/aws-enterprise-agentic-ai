@@ -47,6 +47,9 @@ Usage:
     # Index a single document
     python scripts/extract_and_index.py --index-doc NVDA_10K_2025
 
+    # Upgrade existing index to hybrid (add sparse vectors)
+    python scripts/extract_and_index.py --add-sparse
+
 Reference:
     - PHASE_2A_HOW_TO_GUIDE.md Section 5.3 for extraction requirements
     - PHASE_2A_HOW_TO_GUIDE.md Section 9.3 for indexing requirements
@@ -91,40 +94,55 @@ except ImportError:
 # =============================================================================
 
 
-def check_dependencies() -> list[str]:
+def check_dependencies(indexing_only: bool = False) -> list[str]:
     """
     Check for required dependencies and return list of missing ones.
+
+    Args:
+        indexing_only: If True, skip VLM extraction dependencies (pdf2image, PIL, poppler).
+                       Used for --index-only, --reindex, --add-sparse commands.
 
     Returns:
         List of error messages for missing dependencies.
     """
     errors: list[str] = []
 
-    # Check Python packages
-    required_packages = [
+    # Core packages (always required)
+    core_packages = [
         ("structlog", "pip install structlog"),
         ("boto3", "pip install boto3"),
-        ("pdf2image", "pip install pdf2image"),
-        ("PIL", "pip install Pillow"),
         ("tenacity", "pip install tenacity"),
     ]
 
-    for package, install_cmd in required_packages:
+    for package, install_cmd in core_packages:
         try:
             __import__(package)
         except ImportError:
             errors.append(f"Missing Python package: {package} (install with: {install_cmd})")
 
-    # Check poppler-utils (required by pdf2image)
-    import shutil
-    if not shutil.which("pdfinfo"):
-        errors.append(
-            "Missing system dependency: poppler-utils\n"
-            "  Install with:\n"
-            "    Ubuntu/Debian: sudo apt-get install poppler-utils\n"
-            "    macOS: brew install poppler\n"
-            "    Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases"
-        )
+    # VLM extraction packages (only needed for PDF extraction, not indexing)
+    if not indexing_only:
+        vlm_packages = [
+            ("pdf2image", "pip install pdf2image"),
+            ("PIL", "pip install Pillow"),
+        ]
+
+        for package, install_cmd in vlm_packages:
+            try:
+                __import__(package)
+            except ImportError:
+                errors.append(f"Missing Python package: {package} (install with: {install_cmd})")
+
+        # Check poppler-utils (required by pdf2image)
+        import shutil
+        if not shutil.which("pdfinfo"):
+            errors.append(
+                "Missing system dependency: poppler-utils\n"
+                "  Install with:\n"
+                "    Ubuntu/Debian: sudo apt-get install poppler-utils\n"
+                "    macOS: brew install poppler\n"
+                "    Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases"
+            )
 
     return errors
 
@@ -145,8 +163,13 @@ def check_aws_credentials() -> tuple[bool, str]:
         return False, f"AWS credentials error: {e}"
 
 
+# Check if we're in indexing-only mode (skip VLM dependencies)
+# Pre-parse argv to detect --index-only, --reindex, --add-sparse, --index-doc
+_indexing_only_flags = {"--index-only", "--reindex", "--add-sparse", "--index-doc", "--status"}
+_is_indexing_only = any(flag in sys.argv for flag in _indexing_only_flags)
+
 # Check dependencies before importing our modules
-_dep_errors = check_dependencies()
+_dep_errors = check_dependencies(indexing_only=_is_indexing_only)
 if _dep_errors:
     print("\033[31mMissing dependencies:\033[0m")
     for err in _dep_errors:
@@ -165,6 +188,7 @@ from src.ingestion.parent_child_chunking import ParentChildChunker
 from src.ingestion.contextual_chunking import ContextualEnricher
 from src.utils.embeddings import BedrockEmbeddings, EmbeddingError
 from src.utils.pinecone_client import PineconeClient, PineconeClientError
+from src.utils.bm25_encoder import BM25Encoder, BM25EncoderError
 
 # =============================================================================
 # Constants
@@ -189,7 +213,31 @@ ESTIMATED_PAGES_REFERENCE = 10
 
 # Index schema version - increment when changing vector format
 # This triggers re-indexing when schema changes
-CURRENT_INDEX_SCHEMA_VERSION = "v2_parent_child"
+# v2_parent_child: Parent/child chunking with contextual enrichment
+# v3_hybrid: Added BM25 sparse vectors for hybrid search
+CURRENT_INDEX_SCHEMA_VERSION = "v3_hybrid"
+
+# BM25 encoder for sparse vector generation (module-level singleton)
+# Initialized once for consistent hashing across all documents
+_bm25_encoder: BM25Encoder | None = None
+
+
+def get_bm25_encoder() -> BM25Encoder:
+    """
+    Get or create the BM25 encoder singleton.
+
+    Uses a module-level singleton to ensure consistent token hashing
+    across all documents during indexing. The BM25 encoder uses
+    deterministic MD5 hashing, so the same tokens always produce
+    the same sparse vector indices.
+
+    Returns:
+        BM25Encoder: The shared encoder instance.
+    """
+    global _bm25_encoder
+    if _bm25_encoder is None:
+        _bm25_encoder = BM25Encoder()
+    return _bm25_encoder
 
 
 # =============================================================================
@@ -817,9 +865,12 @@ async def index_document(
             "error": f"Embedding count mismatch: got {len(embeddings)}, expected {len(enriched_children)}",
         }
 
-    # Step 4: Build Pinecone vectors
+    # Step 4: Build Pinecone vectors with sparse vectors for hybrid search
     # Create lookup for parents by ID
     parents_by_id = {p["parent_id"]: p for p in parents}
+
+    # Get BM25 encoder for sparse vector generation
+    bm25_encoder = get_bm25_encoder()
 
     vectors = []
     for i, child in enumerate(enriched_children):
@@ -852,10 +903,21 @@ async def index_document(
             "headline": doc_metadata.get("headline"),
         }
 
+        # Generate sparse vector for hybrid search (BM25)
+        # Use the enriched child text for consistent encoding with query-time
+        try:
+            sparse_vector = bm25_encoder.encode(child["text"])
+        except BM25EncoderError as e:
+            # Log warning but continue with empty sparse vector
+            # Dense search will still work, just without BM25 boost
+            print(f"    Warning: BM25 encoding failed for chunk {child['child_id']}: {e}")
+            sparse_vector = {"indices": [], "values": []}
+
         # Sanitize metadata by removing None values (Pinecone rejects null)
         vector = {
             "id": child["child_id"],
             "values": embeddings[i],
+            "sparse_values": sparse_vector,  # BM25 sparse vector for hybrid search
             "metadata": sanitize_metadata(raw_metadata),
         }
         vectors.append(vector)
@@ -1127,6 +1189,11 @@ Examples:
         metavar="DOC_ID",
         help="Index single document by ID (e.g., NVDA_10K_2025)",
     )
+    parser.add_argument(
+        "--add-sparse",
+        action="store_true",
+        help="Add sparse vectors to existing index (upgrades Phase 2a index to hybrid)",
+    )
 
     return parser.parse_args()
 
@@ -1152,6 +1219,54 @@ def save_manifest(manifest: dict[str, Any], extracted_dir: Path) -> None:
 
 async def async_main(args: argparse.Namespace) -> int:
     """Async main function."""
+
+    # Handle --add-sparse command (upgrade existing index to hybrid)
+    # This is essentially a re-index but specifically for adding sparse vectors
+    if args.add_sparse:
+        print(f"{CYAN}Upgrading index to hybrid search (adding sparse vectors)...{RESET}")
+        print(f"  This will re-index all documents with BM25 sparse vectors.")
+        print(f"  Extracted directory: {args.extracted_dir}")
+
+        # Load manifest
+        manifest = load_manifest(args.extracted_dir)
+
+        # Check we have indexed documents
+        indexed_docs = [
+            doc_id for doc_id, info in manifest.get("documents", {}).items()
+            if info.get("indexed_to_pinecone")
+        ]
+
+        if not indexed_docs:
+            print(f"{YELLOW}No indexed documents found. Run indexing first.{RESET}")
+            return 1
+
+        print(f"  Found {len(indexed_docs)} documents to upgrade with sparse vectors.")
+
+        # Run full re-index (force=True) to add sparse vectors
+        # The index_document function now includes sparse vectors automatically
+        results, errors = await index_all_documents(
+            extracted_dir=args.extracted_dir,
+            manifest=manifest,
+            force=True,  # Force re-index to add sparse vectors
+            doc_id_filter=None,
+        )
+
+        # Save updated manifest
+        if results:
+            save_manifest(manifest, args.extracted_dir)
+            print(f"{GREEN}Manifest updated with v3_hybrid schema.{RESET}")
+
+        # Print summary
+        print_indexing_summary(results, errors, args.extracted_dir)
+
+        # Show hybrid-specific summary
+        successful = [r for r in results if not r.get("skipped") and not r.get("error")]
+        if successful:
+            total_vectors = sum(r.get("vector_count", 0) for r in successful)
+            print(f"\n{GREEN}✓ Sparse vectors added: {total_vectors} vectors now have BM25 sparse values{RESET}")
+            print(f"{GREEN}✓ Index ready for hybrid search{RESET}")
+
+        return 1 if errors else 0
 
     # Handle --index-only or --index-doc commands (indexing mode)
     if args.index_only or args.index_doc or args.reindex:
@@ -1276,8 +1391,11 @@ def main() -> int:
     # Parse arguments
     args = parse_args()
 
-    # Check if raw directory exists
-    if not args.raw_dir.exists():
+    # Determine if we're in indexing-only mode (don't need raw PDFs)
+    is_indexing_only = args.index_only or args.reindex or args.add_sparse or args.index_doc
+
+    # Check if raw directory exists (only for extraction mode)
+    if not is_indexing_only and not args.status and not args.raw_dir.exists():
         print(f"{RED}Error: Raw documents directory not found: {args.raw_dir}{RESET}")
         print(f"\nTo fix this:")
         print(f"  1. Create the directory: mkdir -p {args.raw_dir}")
@@ -1285,15 +1403,15 @@ def main() -> int:
         print(f"  3. Run this script again")
         return 1
 
-    # Check if raw directory has any PDFs
-    pdf_files = list(args.raw_dir.glob("*.pdf"))
-    if not pdf_files and not args.status:
-        print(f"{YELLOW}Warning: No PDF files found in {args.raw_dir}{RESET}")
-        print(f"\nTo extract documents:")
-        print(f"  1. Add PDF files to {args.raw_dir}")
-        print(f"  2. Name 10-K filings like: TICKER_10K_YEAR.pdf (e.g., AAPL_10K_2024.pdf)")
-        print(f"  3. Run this script again")
-        if not args.status:
+    # Check if raw directory has any PDFs (only for extraction mode)
+    if not is_indexing_only and not args.status:
+        pdf_files = list(args.raw_dir.glob("*.pdf")) if args.raw_dir.exists() else []
+        if not pdf_files:
+            print(f"{YELLOW}Warning: No PDF files found in {args.raw_dir}{RESET}")
+            print(f"\nTo extract documents:")
+            print(f"  1. Add PDF files to {args.raw_dir}")
+            print(f"  2. Name 10-K filings like: TICKER_10K_YEAR.pdf (e.g., AAPL_10K_2024.pdf)")
+            print(f"  3. Run this script again")
             return 0  # Not an error, just nothing to do
 
     # Verify AWS credentials (skip for --status which doesn't need API calls)

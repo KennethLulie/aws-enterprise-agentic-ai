@@ -193,6 +193,98 @@ class GraphQueries:
             )
             raise GraphQueryError(f"Failed to find documents: {e}") from e
 
+    def find_document_pages_mentioning(
+        self,
+        entity_text: str,
+        entity_type: EntityType | None = None,
+        fuzzy: bool = False,
+        limit: int = 100,
+    ) -> list[dict]:
+        """
+        Find documents and specific pages mentioning an entity (page-level).
+
+        This is an enhanced version of find_documents_mentioning() that returns
+        not just document IDs but also the specific page numbers where the entity
+        was mentioned. This enables page-level KG boosting for more precise
+        retrieval - only chunks from relevant pages are boosted.
+
+        Args:
+            entity_text: The entity text to search for (case-insensitive).
+            entity_type: Optional filter by entity type.
+            fuzzy: If True, use CONTAINS for partial matching (catches variants
+                   like "NVIDIA" matching "NVIDIA Corporation"). Default False.
+            limit: Maximum number of documents to return.
+
+        Returns:
+            List of dicts with document_id and pages:
+            [{"document_id": "NVDA_10K_2024", "pages": [15, 22, 45]}, ...]
+
+        Example:
+            >>> results = queries.find_document_pages_mentioning("NVIDIA")
+            >>> for r in results:
+            ...     print(f"{r['document_id']}: pages {r['pages']}")
+            NVDA_10K_2024: pages [15, 22, 45, 67]
+        """
+        # Ensure driver is initialized
+        self._store.verify_connection()
+
+        # Choose match operator based on fuzzy flag
+        match_operator = "CONTAINS" if fuzzy else "="
+
+        # Build query based on whether entity_type filter is provided
+        # Collect page numbers from MENTIONS relationship
+        if entity_type:
+            label = entity_type.name.title()
+            query = f"""
+            MATCH (d:Document)-[r:MENTIONS]->(e:{label})
+            WHERE toLower(e.text) {match_operator} toLower($entity_text)
+            RETURN d.document_id as document_id,
+                   collect(DISTINCT r.page) as pages
+            LIMIT $limit
+            """
+        else:
+            query = f"""
+            MATCH (d:Document)-[r:MENTIONS]->(e:Entity)
+            WHERE toLower(e.text) {match_operator} toLower($entity_text)
+            RETURN d.document_id as document_id,
+                   collect(DISTINCT r.page) as pages
+            LIMIT $limit
+            """
+
+        try:
+            with self._store.driver.session() as session:
+                result = session.run(
+                    query,
+                    entity_text=entity_text,
+                    limit=limit,
+                )
+                doc_pages = [
+                    {
+                        "document_id": record["document_id"],
+                        "pages": [p for p in record["pages"] if p is not None],
+                    }
+                    for record in result
+                ]
+
+            logger.debug(
+                "find_document_pages_mentioning",
+                entity_text=entity_text,
+                entity_type=entity_type.value if entity_type else None,
+                fuzzy=fuzzy,
+                result_count=len(doc_pages),
+                total_pages=sum(len(d["pages"]) for d in doc_pages),
+            )
+
+            return doc_pages
+
+        except Exception as e:
+            logger.error(
+                "find_document_pages_mentioning_failed",
+                entity_text=entity_text,
+                error=str(e),
+            )
+            raise GraphQueryError(f"Failed to find document pages: {e}") from e
+
     # =========================================================================
     # Entity Queries (return entity info dicts)
     # =========================================================================
@@ -492,9 +584,7 @@ class GraphQueries:
             END
         ] as path_nodes
         LIMIT 1
-        """ % (
-            max_hops * 2
-        )  # Each hop is entity-doc-entity, so double
+        """ % (max_hops * 2)  # Each hop is entity-doc-entity, so double
 
         try:
             with self._store.driver.session() as session:
@@ -646,7 +736,9 @@ class GraphQueries:
                 result = session.run(query)
                 # Normalize type keys to uppercase to match EntityType.value format
                 summary = {
-                    record["type"].upper() if record["type"] else "UNKNOWN": record["count"]
+                    (record["type"].upper() if record["type"] else "UNKNOWN"): record[
+                        "count"
+                    ]
                     for record in result
                 }
 

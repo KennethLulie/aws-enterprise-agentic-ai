@@ -751,8 +751,9 @@ If something isn't working, follow this systematic debugging process:
   - Infrastructure: Neo4j AuraDB Free (200K nodes, $0/month)
   - 1-hop for simple queries, 2-hop for complex queries (2+ entities)
   - Base ontology: 10 entity types (Organization, Person, Location, Regulation, Concept, etc.)
-  - **Entity Evidence for Explainability:** KG returns WHY docs matched (entity, type, match_type)
-  - **Chunk-Level Boosting:** +0.1 boost to chunks from KG-matched documents
+  - **Entity Evidence for Explainability:** KG returns WHY docs matched (entity, type, match_type, pages)
+  - **Page-Level Boosting:** +0.1 boost to chunks from KG-matched pages (not entire documents)
+  - **Fallback:** Document-level boost for content without page info (news articles)
   - **LLM Context:** Entity evidence included in citations for transparency
   - Impact: +10-15% precision on entity-specific queries
 
@@ -794,7 +795,7 @@ PDF → Claude VLM → Clean Text → ┬→ Semantic Chunking → Titan Embed �
 - **VLM extraction** (Claude Vision) for all documents via batch script
 - Query expansion (3 alternative phrasings via Nova Lite, +20-30% recall)
 - RRF (Reciprocal Rank Fusion) for combining semantic + keyword chunk results
-- **KG Boost** (chunk-level boosting from document-level KG matches)
+- **KG Boost** (page-level boosting from KG entity matches, with document-level fallback)
 - **KG Evidence** (entity context attached to results for LLM explainability)
 - Cross-encoder reranking (Nova Lite scores relevance, +20-25% precision)
 - Contextual Compression (LLMChainExtractor)
@@ -905,6 +906,15 @@ risk_factors (id, company_id, fiscal_year, category, title, summary, severity)
 - Knowledge Graph populated with entities from all documents
 - Tool selection is intelligent and contextual
 - Combined queries work (e.g., "Compare Apple's China revenue to their disclosed risks")
+
+**Future Optimizations (Deferred - Acceptable at Demo Scale):**
+
+| Optimization | Current State | Impact | When to Revisit |
+|--------------|---------------|--------|-----------------|
+| **Neo4j TEXT index** | BTREE index on `e.text`, queries use `toLower()` which bypasses index | ~10-50ms full scan on 3K entities (acceptable) | If entity count > 50K or query times > 200ms |
+| **Neo4j query timeout** | No explicit timeout configured | Relies on driver default (30s) | If Neo4j latency issues observed |
+
+*Note: These are pre-existing patterns in `queries.py` that work well at demo scale (~3K entities). TEXT indexes (Neo4j 5.9+) provide case-insensitive matching without `toLower()` function calls.*
 
 ---
 
