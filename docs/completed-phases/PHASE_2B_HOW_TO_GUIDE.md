@@ -1,13 +1,13 @@
 # Phase 2b: Intelligence Layer & Full Integration - Complete How-To Guide
 
-> 🚧 **PHASE 2b IN PROGRESS**
+> ✅ **PHASE 2b COMPLETED** (January 20, 2026)
 >
 > | Component | URL |
 > |-----------|-----|
 > | **Frontend (CloudFront)** | `https://d2bhnqevtvjc7f.cloudfront.net` |
 > | **Backend (App Runner)** | `https://yhvmf3inyx.us-east-1.awsapprunner.com` |
 >
-> Building on Phase 2a with advanced retrieval intelligence.
+> All Phase 2b components are production-ready: Knowledge Graph (Neo4j), Hybrid Search (Dense + BM25 + RRF), Query Expansion, Cross-Encoder Reranking, and Contextual Compression.
 
 **Purpose:** This guide adds the intelligence layer to the agent: Knowledge Graph for entity-based queries, advanced RAG with hybrid search and reranking, and multi-tool orchestration for complex queries that combine SQL and document retrieval.
 

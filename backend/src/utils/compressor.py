@@ -456,8 +456,8 @@ Relevant sentences:"""
         # Semaphore to limit concurrent LLM calls
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_CALLS)
 
-        async def compress_single(result: dict[str, Any]) -> dict[str, Any] | None:
-            """Compress a single result, return None if NOT_RELEVANT."""
+        async def compress_single(result: dict[str, Any]) -> dict[str, Any]:
+            """Compress a single result with fallback to parent_text."""
             metadata = result.get("metadata", {})
             # Check both top-level and metadata for parent_text
             # (HybridRetriever may flatten fields to top level)
@@ -508,21 +508,24 @@ Relevant sentences:"""
             *[compress_single(r) for r in results]
         )
 
+        # Filter out None results (shouldn't happen, but defensive)
+        valid_results: list[dict[str, Any]] = [r for r in compressed_results if r is not None]
+
         # Count how many used parent_text fallback (NOT_RELEVANT from LLM)
         skipped_count = sum(
-            1 for r in compressed_results if r.get("_compression_skipped")
+            1 for r in valid_results if r.get("_compression_skipped")
         )
 
         self._log.info(
             "compress_results_complete",
             query=query[:50],
             input_count=len(results),
-            output_count=len(compressed_results),
+            output_count=len(valid_results),
             compression_skipped=skipped_count,
-            compression_applied=len(compressed_results) - skipped_count,
+            compression_applied=len(valid_results) - skipped_count,
         )
 
-        return compressed_results
+        return valid_results
 
 
 # =============================================================================

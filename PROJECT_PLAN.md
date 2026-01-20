@@ -1764,6 +1764,33 @@ Data foundation and core agent tools implemented:
 - ✅ Health Check Enhancement
   - Pinecone status with vector count included
 
+### ✅ Phase 2b: Intelligence Layer - COMPLETED (January 20, 2026)
+
+Advanced RAG with hybrid search and knowledge graph:
+- ✅ Knowledge Graph with Neo4j AuraDB
+  - spaCy NER for cost-efficient entity extraction
+  - Entity types: Organization, Person, Location, Concept, etc.
+  - MENTIONS relationships with page-level tracking
+  - 1-hop and 2-hop graph traversal queries
+- ✅ Hybrid Search Pipeline (HybridRetriever)
+  - Dense vectors (Titan v2 1024d) + BM25 sparse vectors
+  - Query expansion via Nova Lite (3 variants, +20-30% recall)
+  - RRF (Reciprocal Rank Fusion) for multi-source merging
+  - KG boost with page-level precision
+  - Cross-encoder reranking (+20-25% precision)
+  - Contextual compression for focused context
+- ✅ Multi-tool Orchestration
+  - SQL + RAG combined queries
+  - Optimized system prompt with complexity detection
+  - Citation format guidance
+- ✅ AWS Secrets Configuration
+  - Pinecone API key and index name in Secrets Manager
+  - Neo4j URI, user, password in Secrets Manager
+  - App Runner deployment with new secrets
+- ✅ Production Verification
+  - Pinecone health check: 781 vectors indexed
+  - HybridRetriever with graceful degradation (hybrid=True default)
+
 ---
 
 ## Next Steps
@@ -1787,20 +1814,22 @@ Data foundation and core agent tools implemented:
 - ✅ **API Versioning:** /api/v1/ for future compatibility
 - ✅ **Database Migrations:** Alembic for schema management
 
-**Phase 2: Core Agent Tools - How-To Guides Complete**
+**Phase 2: Core Agent Tools - COMPLETED**
 
-Implementation guides are ready:
-- 📖 `docs/PHASE_2A_HOW_TO_GUIDE.md` - Data Foundation (VLM extraction, SQL tool, basic RAG)
-- 📖 `docs/PHASE_2B_HOW_TO_GUIDE.md` - Intelligence Layer (Knowledge Graph, hybrid retrieval, multi-tool orchestration)
+All Phase 2 components are now production-ready:
+- ✅ `docs/completed-phases/PHASE_2A_HOW_TO_GUIDE.md` - Data Foundation (VLM extraction, SQL tool, basic RAG)
+- ✅ `docs/completed-phases/PHASE_2B_HOW_TO_GUIDE.md` - Intelligence Layer (Knowledge Graph, hybrid retrieval, multi-tool orchestration)
 
 Phase 2 component status:
 - ✅ **2a. Tavily Search Tool** - Completed in Phase 0
 - ✅ **2b. SQL Query Tool** - Completed in Phase 2a (January 19, 2026)
 - ✅ **2c. RAG Document Tool** - Completed in Phase 2a (January 19, 2026)
 - ✅ **2d. Market Data Tool** - Completed in Phase 0
-- 🚧 **Knowledge Graph** - Phase 2b active (Neo4j with spaCy entity extraction)
-- 🚧 **Hybrid Search** - Phase 2b active (BM25 + dense embeddings + RRF fusion)
-- 🚧 **Cross-encoder Reranking** - Phase 2b planned
+- ✅ **Knowledge Graph** - Completed in Phase 2b (January 20, 2026)
+- ✅ **Hybrid Search** - Completed in Phase 2b (BM25 + dense embeddings + RRF fusion)
+- ✅ **Cross-encoder Reranking** - Completed in Phase 2b (Nova Lite)
+
+**Ready for Phase 3: Observability with Arize Phoenix**
 
 **Pre-Phase 0 Checklist (Completed):**
 - [x] Docker Desktop installed and running

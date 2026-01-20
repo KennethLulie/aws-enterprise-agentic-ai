@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-20 (Phase 2b in progress: KG indexing complete, HybridRetriever module complete, RAG tool integration complete)
+**Last Updated:** 2026-01-20 (Phase 2b COMPLETED: All RAG components production-ready, AWS Secrets configured for Pinecone and Neo4j)
 
 ---
 
@@ -146,12 +146,12 @@
 | docs/SECURITY.md | Security and secrets management guide |
 | docs/integration-test-checklist.md | Phase 0 end-to-end test checklist |
 | docs/RAG_README.md | RAG system architecture, design decisions, and alternatives |
-| docs/PHASE_2B_HOW_TO_GUIDE.md | Phase 2b step-by-step guide (intelligence layer) |
 | docs/KNOWLEDGE_GRAPH_UPDATE_PLAN.md | KG enhancement plan (entity evidence, chunk boosting, multi-hop) |
 | docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md | Completed Phase 0 guide (archived) |
 | docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md | Completed Phase 1a guide (archived) |
 | docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md | Completed Phase 1b guide (archived) |
-| docs/PHASE_2A_HOW_TO_GUIDE.md | Completed Phase 2a guide |
+| docs/completed-phases/PHASE_2A_HOW_TO_GUIDE.md | Completed Phase 2a guide (archived) |
+| docs/completed-phases/PHASE_2B_HOW_TO_GUIDE.md | Completed Phase 2b guide (archived) |
 | docs/completed-phases/PHASE_2_REQUIREMENTS.md | Phase 2 requirements planning document (archived) |
 | docs/completed-phases/RAG_IMPROVEMENTS_DELTA.md | RAG chunking improvements delta (section boundaries, 256-token chunks, company extraction) |
 
@@ -201,18 +201,15 @@
 | Note: Using Neon PostgreSQL (external) - no Aurora module needed |
 | Note: LangGraph checkpoint tables are created by PostgresSaver.setup(), not Alembic |
 
-### Phase 2b - Intelligence Layer (In Progress)
-| File | Purpose |
-|------|---------|
-| backend/src/retrieval/hybrid_retriever.py | ✅ HybridRetriever orchestrating dense+BM25+KG+RRF+reranking |
-| backend/src/retrieval/__init__.py | ✅ Retrieval package exports (HybridRetriever, exceptions, types) |
-| backend/src/ingestion/query_expansion.py | ✅ Query analysis: expansion + KG complexity (Nova Lite) |
-| backend/src/utils/rrf.py | ✅ Reciprocal Rank Fusion for merging dense + BM25 results |
-| backend/src/utils/reranker.py | ✅ Cross-encoder reranking (Nova Lite) |
-| backend/src/utils/compressor.py | ✅ Contextual compression (Nova Lite) |
-| backend/src/utils/bm25_encoder.py | ✅ BM25 sparse vector encoding |
+### Phase 2b - Intelligence Layer ✅ COMPLETED (January 20, 2026)
+All Phase 2b files have been created and moved to "Currently Existing Files" section:
+- ✅ HybridRetriever (dense+BM25+KG+RRF+reranking+compression)
+- ✅ Query expansion with KG complexity analysis
+- ✅ RRF fusion, cross-encoder reranking, contextual compression
+- ✅ BM25 sparse vector encoding
+- ✅ AWS Secrets configured (Pinecone, Neo4j)
 
-### Phase 2+ - Future Features
+### Phase 3+ - Future Features
 | File | Purpose |
 |------|---------|
 | lambda/document-ingestion/handler.py | S3-triggered document processing (enterprise scaling) |

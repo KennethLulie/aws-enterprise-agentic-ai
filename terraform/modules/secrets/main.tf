@@ -27,8 +27,8 @@ locals {
     "tavily-api-key",
     "fmp-api-key",
     "database-url",
-    "pinecone",      # Phase 2b: RAG (keys: api_key, index_name)
-    "neo4j",         # Phase 2b: Knowledge Graph (keys: uri, user, password)
+    "pinecone", # Phase 2b: RAG (keys: api_key, index_name)
+    "neo4j",    # Phase 2b: Knowledge Graph (keys: uri, user, password)
   ]
 }
 

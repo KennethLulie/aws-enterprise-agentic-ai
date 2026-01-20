@@ -170,7 +170,7 @@ def _get_hybrid_retriever() -> "HybridRetriever":
     if _hybrid_retriever is not None:
         # Verify Neo4j connection is still healthy (Issue 3: stale connection handling)
         try:
-            _hybrid_retriever._neo4j.verify_connectivity()
+            _hybrid_retriever._neo4j.verify_connection()
         except Exception as e:
             logger.warning(
                 "hybrid_retriever_connection_stale",
@@ -812,8 +812,10 @@ async def _retrieve_hybrid(
         )
 
         # Format with KG evidence and sources
+        # Cast RetrievalResultItem (TypedDict) to dict for _format_results
+        results_as_dicts: list[dict[str, Any]] = [dict(r) for r in final_results]
         return _format_results(
-            final_results,
+            results_as_dicts,
             query,
             is_hybrid=True,
             retrieval_sources=retrieval_sources,

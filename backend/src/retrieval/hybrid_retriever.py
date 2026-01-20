@@ -83,7 +83,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 import structlog
 
-from src.utils.rrf import rrf_fusion
+from src.utils.rrf import RRFResult, rrf_fusion
 
 if TYPE_CHECKING:
     from src.ingestion.query_expansion import QueryExpander
@@ -145,6 +145,7 @@ class RetrievalResultItem(TypedDict, total=False):
     sources: list[str]
     kg_evidence: KGEvidence
     metadata: dict[str, Any]
+    _compression_skipped: bool  # Internal flag for out-of-scope detection
 
 
 class RetrievalResult(TypedDict):
@@ -394,15 +395,17 @@ class HybridRetriever:
         # =====================================================================
         # Step 5: KG Boost (page-level precision)
         # =====================================================================
+        # Convert RRFResult TypedDict to plain dict for downstream processing
+        fused_as_dicts: list[dict[str, Any]] = [dict(r) for r in fused_results]
         if kg_results:
-            fused_results = self._apply_kg_boost(
-                fused_results, kg_results, boost=DEFAULT_KG_BOOST
+            fused_as_dicts = self._apply_kg_boost(
+                fused_as_dicts, kg_results, boost=DEFAULT_KG_BOOST
             )
 
         # =====================================================================
         # Step 6: Parent Deduplication
         # =====================================================================
-        deduplicated = self._deduplicate_by_parent(fused_results)
+        deduplicated = self._deduplicate_by_parent(fused_as_dicts)
         self._log.debug(
             "deduplication_complete",
             before=len(fused_results),
@@ -504,24 +507,25 @@ class HybridRetriever:
 
         # Combine results, handling any exceptions
         combined: list[dict[str, Any]] = []
-        for i, result in enumerate(results_per_variant):
-            if isinstance(result, Exception):
+        for i, variant_result in enumerate(results_per_variant):
+            if isinstance(variant_result, BaseException):
                 self._log.warning(
                     "variant_dense_search_failed",
                     variant_index=i,
-                    error=str(result),
+                    error=str(variant_result),
                 )
                 continue
-            combined.extend(result)
+            # variant_result is list[dict[str, Any]] after BaseException check
+            combined.extend(variant_result)
 
         # Deduplicate by ID (same chunk from multiple variants)
         seen_ids: set[str] = set()
         deduplicated: list[dict[str, Any]] = []
-        for result in combined:
-            result_id = result.get("id")
+        for item in combined:
+            result_id = item.get("id")
             if result_id and result_id not in seen_ids:
                 seen_ids.add(result_id)
-                deduplicated.append(result)
+                deduplicated.append(item)
 
         return deduplicated
 
@@ -590,24 +594,25 @@ class HybridRetriever:
 
         # Combine results, handling any exceptions
         combined: list[dict[str, Any]] = []
-        for i, result in enumerate(results_per_variant):
-            if isinstance(result, Exception):
+        for i, variant_result in enumerate(results_per_variant):
+            if isinstance(variant_result, BaseException):
                 self._log.warning(
                     "variant_bm25_search_failed",
                     variant_index=i,
-                    error=str(result),
+                    error=str(variant_result),
                 )
                 continue
-            combined.extend(result)
+            # variant_result is list[dict[str, Any]] after BaseException check
+            combined.extend(variant_result)
 
         # Deduplicate by ID
         seen_ids: set[str] = set()
         deduplicated: list[dict[str, Any]] = []
-        for result in combined:
-            result_id = result.get("id")
+        for item in combined:
+            result_id = item.get("id")
             if result_id and result_id not in seen_ids:
                 seen_ids.add(result_id)
-                deduplicated.append(result)
+                deduplicated.append(item)
 
         return deduplicated
 
@@ -635,9 +640,11 @@ class HybridRetriever:
         sparse_vector = self._bm25.encode(query)
 
         # Search Pinecone with hybrid (dense + sparse)
+        # Cast SparseVector TypedDict to dict for Pinecone API
+        sparse_dict: dict[str, list[Any]] = dict(sparse_vector)  # type: ignore[arg-type]
         results = self._pinecone.query(
             vector=query_vector,
-            sparse_vector=sparse_vector,
+            sparse_vector=sparse_dict,
             top_k=top_k,
             filter=metadata_filter,
             include_metadata=True,
@@ -755,7 +762,7 @@ class HybridRetriever:
                     # 2-hop failure is non-critical - 1-hop results still valid
 
         # Convert to final results format with pages as list
-        results = [
+        kg_result_list: list[dict[str, Any]] = [
             {
                 "id": doc_id,
                 "source": "kg",
@@ -770,17 +777,23 @@ class HybridRetriever:
         self._log.debug(
             "kg_search_complete",
             query_entities=len(entities),
-            docs_found=len(results),
-            total_pages=sum(len(r["kg_evidence"].get("pages", [])) for r in results),
+            docs_found=len(kg_result_list),
+            total_pages=sum(
+                len(r["kg_evidence"].get("pages", [])) for r in kg_result_list
+            ),
             direct_matches=sum(
-                1 for r in results if r["kg_evidence"]["match_type"] == "direct_mention"
+                1
+                for r in kg_result_list
+                if r["kg_evidence"]["match_type"] == "direct_mention"
             ),
             indirect_matches=sum(
-                1 for r in results if r["kg_evidence"]["match_type"] == "related_via"
+                1
+                for r in kg_result_list
+                if r["kg_evidence"]["match_type"] == "related_via"
             ),
         )
 
-        return results
+        return kg_result_list
 
     # =========================================================================
     # KG Boost

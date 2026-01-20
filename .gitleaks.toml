@@ -29,6 +29,8 @@ paths = [
     '''\.git/''',
     # Generated extraction artifacts - contain file hashes, not secrets
     '''documents/extracted/''',
+    # Terraform lock files contain provider integrity hashes (zh:xxx), not secrets
+    '''\.terraform\.lock\.hcl$''',
 ]
 regexes = [
     # Example/placeholder values in documentation
