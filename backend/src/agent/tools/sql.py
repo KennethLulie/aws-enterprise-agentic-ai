@@ -477,32 +477,35 @@ def _build_mock_result(query: str) -> str:
 @tool("sql_query", args_schema=SQLQueryInput)
 async def sql_query(query: str) -> str:
     """
-    Query structured financial metrics and numbers from 10-K SEC filings.
+    Query STRUCTURED financial data from 10-K SEC filings stored in PostgreSQL.
 
-    Use this tool for questions about QUANTITATIVE financial data:
-    - Revenue, profit, margins, EPS, and other numeric metrics
-    - Company comparisons by financial performance
-    - Segment and geographic revenue breakdowns
-    - Year-over-year financial changes
+    USE THIS TOOL FOR:
+    - Specific NUMBERS: revenue, net income, margins, EPS, growth rates
+    - COMPARISONS across companies: "which company has highest X"
+    - SEGMENT revenue breakdowns: Data Center, Gaming, Automotive, etc.
+    - GEOGRAPHIC revenue: Americas, Europe, Asia Pacific, etc.
+    - Year-over-year CALCULATIONS: growth rates, changes, trends
     - Risk factor CATEGORIES and counts (not detailed descriptions)
 
-    DO NOT use this tool for:
-    - Detailed explanations of WHY something happened
-    - Full text descriptions or narratives from filings
-    - Specific quotes or passages from documents
-    - Understanding context or reasoning behind numbers
+    DO NOT USE FOR:
+    - Qualitative questions about risks, strategy, or outlook (use rag_retrieval)
+    - Current news or market information (use tavily_search)
+    - Questions about WHY numbers changed (use rag_retrieval for context)
+    - Full text descriptions or narratives from filings (use rag_retrieval)
+    - Real-time stock prices or market data (use market_data)
 
-    Examples:
-        - "What was NVIDIA's revenue in 2024?"
-        - "Which company has the highest net margin?"
-        - "Show segment revenue breakdown for tech companies"
-        - "Compare gross margins across all companies"
+    AVAILABLE DATA (known, may expand):
+    - Companies include: AMD, GOOG, MU (Micron), NVDA (and potentially others)
+    - Fiscal years: 2024-2025 (varies by company - query to see available)
+    - Tables: companies, financial_metrics, segment_revenue, geographic_revenue, risk_factors
+
+    FALLBACK: Returns mock data with sample NVDA financials if database is unavailable.
 
     Args:
         query: Natural language question about financial metrics and numbers.
 
     Returns:
-        Formatted table/response with data and the SQL query used.
+        Formatted table/response with data and the SQL query used for transparency.
     """
     settings = get_settings()
 

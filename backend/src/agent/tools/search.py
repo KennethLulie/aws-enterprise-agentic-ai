@@ -142,13 +142,23 @@ async def _call_tavily_api(
 @tool("tavily_search", args_schema=SearchInput)
 async def tavily_search(query: str) -> Dict[str, Any]:
     """
-    Search the internet for current information, news, and real-time data.
+    Search the web for CURRENT and RECENT information not in 10-K filings.
 
-    USE THIS TOOL when users ask to:
-    - "Google" or "search the web" for something
-    - Find current news or recent events
-    - Look up real-time information not in the database
-    - Verify or update information from documents with current data
+    USE THIS TOOL FOR:
+    - BREAKING NEWS: recent announcements, earnings calls, press releases
+    - CURRENT market conditions: analyst ratings, market sentiment, trends
+    - RECENT developments: regulatory actions, lawsuits, partnerships, acquisitions
+    - Information NEWER than the 10-K filing dates (post-fiscal year events)
+    - Context for comparing news claims to official 10-K disclosures
+    - When users say "Google", "search the web", or "look up online"
+
+    DO NOT USE FOR:
+    - Historical 10-K data or financial metrics (use sql_query)
+    - Official company disclosures or SEC filing text (use rag_retrieval)
+    - Precise financial numbers from filings (use sql_query)
+    - Risk factors or strategy from 10-K documents (use rag_retrieval)
+
+    FALLBACK: Returns mock results if Tavily API key is not configured.
 
     This is your web search capability - equivalent to a Google search.
 
@@ -156,7 +166,7 @@ async def tavily_search(query: str) -> Dict[str, Any]:
         query: The search query to look up on the web.
 
     Returns:
-        Search results with titles, snippets, and URLs from relevant web pages.
+        Web search results with titles, snippets, and URLs from relevant pages.
     """
 
     settings = get_settings()

@@ -307,13 +307,35 @@ async def fetch_market_data(
 @tool(
     "market_data",
     args_schema=MarketDataInput,
-    description="Get market data for one or more tickers via Financial Modeling Prep.",
 )
 async def market_data_tool(tickers: List[str]) -> Dict[str, Any]:
     """
-    Retrieve market data for one or more tickers via Financial Modeling Prep.
+    Get REAL-TIME stock prices and market data via Financial Modeling Prep.
 
-    Uses mock data if `FMP_API_KEY` is not configured to keep Phase 0 runnable.
+    USE THIS TOOL FOR:
+    - CURRENT stock prices: "What is NVIDIA's stock price?"
+    - REAL-TIME market data: price, change, change percent, volume
+    - Multiple tickers at once: "Compare prices of NVDA, AMD, MU"
+    - Market snapshot for portfolio overview
+
+    DO NOT USE FOR:
+    - Historical financial data from 10-K filings (use sql_query)
+    - Company fundamentals like revenue or margins (use sql_query)
+    - News or analyst opinions (use tavily_search)
+    - Qualitative company information (use rag_retrieval)
+
+    AVAILABLE DATA:
+    - Any publicly traded US stock ticker
+    - Real-time quotes: price, change, change_percent, volume, timestamp
+    - Data source: Financial Modeling Prep API
+
+    FALLBACK: Returns mock data ($123.45) if FMP API key is not configured or rate limit exceeded.
+
+    Args:
+        tickers: List of stock tickers to fetch (e.g., ['NVDA', 'AMD']).
+
+    Returns:
+        Market data with current prices, changes, and trading volume for each ticker.
     """
 
     return await fetch_market_data(tickers)

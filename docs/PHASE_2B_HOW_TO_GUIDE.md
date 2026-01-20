@@ -3457,57 +3457,6 @@ print('\\n✓ Test 4 passed: Graceful degradation when KG fails')
 
 ---
 
-## 12. Multi-Tool Orchestration
-
-### What We're Doing
-Enabling complex queries that combine SQL (for structured data), RAG (for document context), and Tavily (for current news) in a single response. This involves updating tool descriptions to help the agent select the right tool(s) for each query type.
-
-### Why This Matters
-- **Complete Answers:** Some questions need numbers, context, AND current events
-- **Seamless Experience:** User doesn't specify which tool to use
-- **Demo Value:** Shows agent intelligence in tool selection
-- **Cross-Source Analysis:** Enables comparing news claims to 10-K disclosures
-
-### 12.1 Tool Selection Matrix
-
-Understanding which tool to use for which query type:
-
-| Query Type | SQL | RAG | Tavily | Example |
-|------------|-----|-----|--------|---------|
-| Specific numbers | ✓ | - | - | "What is Apple's revenue?" |
-| Comparisons | ✓ | - | - | "Which company has highest margin?" |
-| Risk factors | - | ✓ | - | "What risks does Tesla mention?" |
-| Business strategy | - | ✓ | - | "How does Apple describe their services strategy?" |
-| Current news | - | - | ✓ | "What's the latest news on NVIDIA?" |
-| Numbers + context | ✓ | ✓ | - | "What is Apple's China revenue and what risks do they mention?" |
-| News vs 10-K | - | ✓ | ✓ | "Does recent Apple news align with their 10-K?" |
-| Full analysis | ✓ | ✓ | ✓ | "Analyze Apple's China situation with current news" |
-
-### 12.2 Verify Agent Tool Selection
-
-**Command:**
-```bash
-docker-compose exec backend python -c "
-from src.agent.graph import graph
-
-# Test query that should use both SQL and RAG
-result = graph.invoke({
-    'messages': [{
-        'role': 'user', 
-        'content': 'What is Apple\\'s revenue from China, and what risks do they mention about their China operations?'
-    }]
-})
-
-# Check which tools were called
-print('Response:')
-print(result['messages'][-1].content)
-"
-```
-
-**Expected Behavior:**
-1. Agent recognizes this needs SQL (for China revenue numbers)
-2. Agent recognizes this needs RAG (for risk narrative)
-3. Agent calls both tools and combines results
 
 ### 12.3 Test Multi-Tool Queries
 
@@ -3653,23 +3602,30 @@ print('Tavily:', tavily_search.__doc__[:150])
 
 These queries demonstrate the sophisticated analysis capability:
 
+**Note:** Tests use companies in our document set: AMD, GOOG, MU (Micron), NVDA.
+
 **Test: News vs 10-K Comparison**
 ```bash
-# This should use RAG (for 10-K risks) + Tavily (for current news)
-curl -X POST http://localhost:8000/api/v1/chat \
+# First login to get session cookie
+curl -c cookies.txt -X POST http://localhost:8000/api/login \
   -H "Content-Type: application/json" \
-  -d '{"message": "Search for recent news about Apple China concerns, and compare what you find to the risks Apple disclosed in their 10-K filing."}'
+  -d '{"password": "YOUR_DEMO_PASSWORD"}'
+
+# This should use RAG (for 10-K risks) + Tavily (for current news)
+curl -b cookies.txt -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Search for recent news about NVIDIA AI chip supply concerns, and compare what you find to the risks NVIDIA disclosed in their 10-K filing."}'
 ```
 
 **Expected Agent Behavior:**
-1. Use Tavily to search for "Apple China news"
-2. Use RAG to search 10-K for "China risks" or "Greater China"
+1. Use Tavily to search for "NVIDIA AI chip supply news"
+2. Use RAG to search 10-K for supply chain risks with ticker=NVDA
 3. Synthesize: "Recent news reports X, which aligns with/adds to the 10-K disclosure that..."
 
 **Test: Full Financial Analysis**
 ```bash
-# This should use SQL + RAG + Tavily
-curl -X POST http://localhost:8000/api/v1/chat \
+# This should use SQL + RAG + Tavily (3 tools)
+curl -b cookies.txt -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "Give me a complete analysis of NVIDIA: their revenue and margins, key risks they disclose, and any recent news about AI chip demand."}'
 ```
@@ -3680,16 +3636,29 @@ curl -X POST http://localhost:8000/api/v1/chat \
 3. Tavily: Search for recent NVIDIA AI chip news
 4. Synthesize into comprehensive analysis with citations
 
+**Test: Simple Query (ONE tool only)**
+```bash
+# This should use only RAG - no SQL or Tavily needed
+curl -b cookies.txt -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What are the risk factors AMD disclosed in their 10-K?"}'
+```
+
+**Expected Agent Behavior:**
+1. Identify as SIMPLE query (qualitative only)
+2. Use ONLY rag_retrieval with ticker=AMD
+3. Return risk factors with citations
+
 ### 12.6 Multi-Tool Orchestration Checklist
 
-- [ ] Agent correctly identifies multi-tool queries
-- [ ] SQL tool called for quantitative parts
-- [ ] RAG tool called for qualitative parts
-- [ ] Tavily tool called for current news context
-- [ ] Tool descriptions updated with USE/DO NOT USE sections
-- [ ] Cross-document analysis queries work (news vs 10-K)
-- [ ] Full analysis queries combine all three tools
-- [ ] Response synthesizes data from all sources with proper citations
+- [x] Agent correctly identifies multi-tool queries
+- [x] SQL tool called for quantitative parts
+- [x] RAG tool called for qualitative parts
+- [x] Tavily tool called for current news context
+- [x] Tool descriptions updated with USE/DO NOT USE sections
+- [x] Cross-document analysis queries work (news vs 10-K)
+- [x] Full analysis queries combine all three tools
+- [x] Response synthesizes data from all sources with proper citations
 
 ---
 
@@ -3811,61 +3780,66 @@ Verify: docker-compose exec backend python -c "from src.agent.nodes.chat import 
 
 ### 12b.4 Test Cross-Document Analysis
 
+**Note:** Tests use companies in our document set: AMD, GOOG, MU (Micron), NVDA.
+
+```bash
+# First login to get session cookie
+curl -c cookies.txt -X POST http://localhost:8000/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"password": "YOUR_DEMO_PASSWORD"}'
+```
+
 **Test 1: Numerical Claim Verification**
 ```bash
-curl -X POST http://localhost:8000/api/v1/chat \
+curl -b cookies.txt -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "News reports say Apple services revenue hit a record in 2024. Can you verify this against their 10-K filing?"}'
+  -d '{"message": "I heard NVIDIA had record revenue in 2024. Can you verify this claim using their 10-K filing?"}'
 ```
 
 **Expected Response Pattern:**
 ```
 Based on my analysis across multiple sources:
 
-**CLAIM VERIFICATION: CONFIRMED**
+**CLAIM VERIFICATION: CONFIRMED** (or PARTIALLY_SUPPORTED)
 
-The claim that Apple services revenue hit a record is accurate.
+The claim about NVIDIA's record revenue can be verified.
 
 **Evidence:**
 
-1. **From 10-K Financial Data (FY2024):**
-   - Services Revenue: $96.2 billion
-   - Year-over-Year Growth: +12.9% (from $85.2B in FY2023)
-   - Source: Apple 10-K 2024, Consolidated Financial Statements
+1. **From 10-K Financial Data:**
+   According to FY2024 financial data, NVIDIA revenue was $X billion...
+   Source: NVDA 10-K 2025, Consolidated Financial Statements
 
 2. **From 10-K Narrative (Item 7: MD&A):**
-   "Services revenue increased 13 percent during 2024 compared to 2023 
-   due primarily to higher revenue from advertising, the App Store and 
-   cloud services."
-   - Source: Apple 10-K 2024, Item 7, Page 32
+   NVDA 10-K 2025, Item 7, Page [N] states...
+   [Revenue growth discussion]
 
-**Conclusion:** The FY2024 services revenue of $96.2B is indeed the 
-highest on record, confirming the news report.
+**Conclusion:** [Statement on verification with clear CONFIRMED/CONTRADICTED/PARTIALLY_SUPPORTED]
 ```
 
 **Test 2: Risk Alignment Analysis**
 ```bash
-curl -X POST http://localhost:8000/api/v1/chat \
+curl -b cookies.txt -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "Search for recent news about semiconductor supply issues, then tell me which companies in the database disclosed supply chain risks and how exposed they are."}'
 ```
 
 **Test 3: Full Company Deep Dive**
 ```bash
-curl -X POST http://localhost:8000/api/v1/chat \
+curl -b cookies.txt -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Give me a comprehensive analysis of Tesla: key financials, major disclosed risks, and how recent news might relate to those risks."}'
+  -d '{"message": "Give me a comprehensive analysis of AMD: key financials, major disclosed risks, and how recent news might relate to those risks."}'
 ```
 
 ### 12b.5 Cross-Document Analysis Checklist
 
-- [ ] Agent can verify numerical claims against SQL data
-- [ ] Agent can find relevant 10-K disclosures for news topics
-- [ ] Agent properly cites sources by type (10-K, news, live search)
-- [ ] Agent handles discrepancies between sources appropriately
-- [ ] Agent synthesizes multi-source answers coherently
-- [ ] Analysis guidance added to chat node system prompt
-- [ ] Test queries produce well-structured multi-source responses
+- [x] Agent can verify numerical claims against SQL data
+- [x] Agent can find relevant 10-K disclosures for news topics
+- [x] Agent properly cites sources by type (10-K, news, live search)
+- [x] Agent handles discrepancies between sources appropriately
+- [x] Agent synthesizes multi-source answers coherently
+- [x] Analysis guidance added to chat node system prompt (CITATION FORMAT + VERIFICATION PATTERN)
+- [x] Test queries produce well-structured multi-source responses
 
 ---
 

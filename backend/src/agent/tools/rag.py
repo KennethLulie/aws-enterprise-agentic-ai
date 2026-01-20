@@ -87,7 +87,7 @@ class RAGQueryInput(BaseModel):
     )
     ticker: str | None = Field(
         default=None,
-        description="Filter by company ticker symbol (e.g., 'NVDA', 'AAPL').",
+        description="Filter by company ticker symbol (e.g., 'NVDA', 'AMD').",
     )
     document_type: str | None = Field(
         default=None,
@@ -856,45 +856,42 @@ async def rag_retrieval(
     section: str | None = None,
 ) -> str:
     """
-    Search 10-K document text for information.
+    Search 10-K document TEXT and reference documents for qualitative information.
 
-    Use for:
-    - Risk factors and challenges
-    - Business descriptions and strategy
-    - Qualitative questions about company operations
-    - Context around numbers from SQL queries
-    - Understanding WHY something happened or company reasoning
-    - Specific quotes or passages from SEC filings
+    USE THIS TOOL FOR:
+    - RISK FACTORS: supply chain, regulatory, competition, macroeconomic, cybersecurity
+    - BUSINESS DESCRIPTIONS: strategy, competitive advantages, operations, products
+    - MANAGEMENT DISCUSSION: outlook, challenges, opportunities, market trends
+    - CONTEXT for numbers: "why did revenue change", "what affects margins"
+    - Specific QUOTES or passages from SEC filings
+    - Cross-referencing claims from news articles against official disclosures
 
-    DO NOT use this tool for:
-    - Simple numeric lookups (revenue, margins, EPS) - use sql_query instead
-    - Financial metric comparisons across companies - use sql_query instead
-    - Aggregated data or counts - use sql_query instead
+    DO NOT USE FOR:
+    - Specific numbers like revenue or margins (use sql_query)
+    - Current news or real-time information (use tavily_search)
+    - Calculations or comparisons across companies (use sql_query)
+    - Real-time stock prices or market data (use market_data)
 
-    Supports hybrid retrieval (default) combining:
-    - Dense vector search for semantic similarity
-    - BM25 sparse search for keyword matching
-    - Knowledge Graph for entity relationships
-    - Cross-encoder reranking for precision
+    AVAILABLE DOCUMENTS (known, may expand):
+    - 10-K filings include: AMD (2024), GOOG (2025), MU/Micron (2024), NVDA (2025) - and potentially others
+    - Coverage varies by company - search to discover available filings and years
+    - Reference documents include: NVIDIA strategic analysis, IDC memory market reports
 
-    Set hybrid=False for faster, simpler dense-only search when:
-    - Query is simple and specific
-    - Speed is more important than precision
-    - KG/reranking components are unavailable
+    FALLBACK: Returns mock results with sample NVDA passages if Pinecone is unavailable.
 
-    Supports filtering by ticker symbol, document type, and section.
-    Returns source citations with relevance scores and KG evidence when available.
+    Supports hybrid retrieval (default) combining dense search, BM25, Knowledge Graph,
+    and cross-encoder reranking. Set hybrid=False for faster dense-only search.
 
     Args:
         query: The search query text describing what information you need.
         top_k: Number of results to return (default 5, max 20).
         hybrid: Use hybrid retrieval (default True). False for dense-only.
-        ticker: Optional filter by company ticker (e.g., 'NVDA', 'AAPL').
+        ticker: Optional filter by company ticker (e.g., 'NVDA', 'AMD').
         document_type: Optional filter by document type ('10k' or 'reference').
         section: Optional filter by section name.
 
     Returns:
-        Formatted string with relevant passages, citations, and KG evidence.
+        Relevant passages with source citations (document, page, section) and KG evidence.
     """
     settings = get_settings()
 
