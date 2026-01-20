@@ -974,11 +974,14 @@ class SendMessageRequest(BaseModel):
 
 **3d. Query Pipeline:**
 
-12. **Query Expansion** (`backend/src/ingestion/query_expansion.py`)
-    - Generate 3 alternative phrasings via Nova Lite
-    - Multi-query retrieval
-    - Parallel searches
-    - Impact: +20-30% recall
+12. **Query Analysis** (`backend/src/ingestion/query_expansion.py`)
+    - Single Nova Lite call returns:
+      - 3 alternative phrasings (variants)
+      - KG complexity: "simple" or "complex"
+      - Complexity reason
+    - `QueryAnalysis` dataclass: variants + kg_complexity + reason
+    - KG complexity determines 1-hop vs 2-hop traversal
+    - Impact: +20-30% recall, better KG decisions
 
 13. **Embeddings** (`backend/src/utils/embeddings.py`)
     - Bedrock Titan v2 integration (1024 dimensions)

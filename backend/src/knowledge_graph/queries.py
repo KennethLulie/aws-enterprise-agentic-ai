@@ -22,6 +22,11 @@ Integration with RAG:
     to filter or boost Pinecone vector search results, providing
     graph-enhanced retrieval.
 
+Output Format:
+    Entity queries return dicts with a "type" field in UPPERCASE format
+    (e.g., "ORGANIZATION", "PERSON") to match EntityType.value from ontology.py.
+    This ensures consistency with EntityExtractor output in HybridRetriever._kg_search().
+
 Usage:
     from src.knowledge_graph.queries import GraphQueries
     from src.knowledge_graph.store import Neo4jStore
@@ -162,7 +167,7 @@ class GraphQueries:
             """
 
         try:
-            with self._store._driver.session() as session:
+            with self._store.driver.session() as session:
                 result = session.run(
                     query,
                     entity_text=entity_text,
@@ -212,13 +217,14 @@ class GraphQueries:
         Returns:
             List of dicts with entity info:
             - entity: Entity text
-            - type: Entity type label
+            - type: Entity type (UPPERCASE, e.g., "ORGANIZATION")
             - shared_docs: Number of shared documents (relevance score)
 
         Example:
             >>> related = queries.find_related_entities("NVIDIA", hops=1)
             >>> for r in related[:5]:
             ...     print(f"{r['entity']} ({r['type']}): {r['shared_docs']} shared docs")
+            AMD (ORGANIZATION): 45 shared docs
         """
         self._store.verify_connection()
 
@@ -248,7 +254,7 @@ class GraphQueries:
             """
 
         try:
-            with self._store._driver.session() as session:
+            with self._store.driver.session() as session:
                 result = session.run(
                     query,
                     entity_text=entity_text,
@@ -257,7 +263,8 @@ class GraphQueries:
                 entities = [
                     {
                         "entity": record["entity"],
-                        "type": record["type"],
+                        # Normalize to uppercase to match EntityType.value format
+                        "type": record["type"].upper() if record["type"] else None,
                         "shared_docs": record["shared_docs"],
                     }
                     for record in result
@@ -300,13 +307,14 @@ class GraphQueries:
         Returns:
             List of dicts with entity info:
             - entity: Entity text
-            - type: Entity type label
+            - type: Entity type (UPPERCASE, e.g., "ORGANIZATION")
             - mentions: Number of times mentioned in the document
 
         Example:
             >>> entities = queries.find_entities_in_document("NVDA_10K_2025")
             >>> for e in entities[:10]:
             ...     print(f"{e['entity']} ({e['type']}): {e['mentions']} mentions")
+            NVIDIA (ORGANIZATION): 156 mentions
         """
         self._store.verify_connection()
 
@@ -331,7 +339,7 @@ class GraphQueries:
             """
 
         try:
-            with self._store._driver.session() as session:
+            with self._store.driver.session() as session:
                 result = session.run(
                     query,
                     document_id=document_id,
@@ -340,7 +348,8 @@ class GraphQueries:
                 entities = [
                     {
                         "entity": record["entity"],
-                        "type": record["type"],
+                        # Normalize to uppercase to match EntityType.value format
+                        "type": record["type"].upper() if record["type"] else None,
                         "mentions": record["mentions"],
                     }
                     for record in result
@@ -383,12 +392,12 @@ class GraphQueries:
         Returns:
             List of dicts with entity info:
             - entity: Entity text
-            - type: Entity type label
+            - type: Entity type (UPPERCASE, e.g., "LOCATION")
             - co_occurrences: Number of shared documents
 
         Example:
             >>> co_entities = queries.find_co_occurring_entities("China")
-            >>> # Finds entities like "Taiwan", "Asia", "manufacturing"
+            >>> # Finds entities like "Taiwan" (LOCATION), "Asia" (LOCATION)
         """
         self._store.verify_connection()
 
@@ -405,7 +414,7 @@ class GraphQueries:
         """
 
         try:
-            with self._store._driver.session() as session:
+            with self._store.driver.session() as session:
                 result = session.run(
                     query,
                     entity_text=entity_text,
@@ -415,7 +424,8 @@ class GraphQueries:
                 entities = [
                     {
                         "entity": record["entity"],
-                        "type": record["type"],
+                        # Normalize to uppercase to match EntityType.value format
+                        "type": record["type"].upper() if record["type"] else None,
                         "co_occurrences": record["co_occurrences"],
                     }
                     for record in result
@@ -457,12 +467,13 @@ class GraphQueries:
         Returns:
             List of path steps, each a dict with:
             - node: Entity or document name
-            - type: Node type (Entity type or "Document")
-            - relationship: Relationship type to next node (if any)
+            - type: Node type (UPPERCASE, e.g., "ORGANIZATION", "DOCUMENT")
 
         Example:
             >>> path = queries.find_path_between_entities("NVIDIA", "AMD")
-            >>> # Returns path like: NVIDIA -> NVDA_10K_2025 -> AMD
+            >>> # Returns path like: [{"node": "NVIDIA", "type": "ORGANIZATION"},
+            >>> #                     {"node": "NVDA_10K_2025", "type": "DOCUMENT"},
+            >>> #                     {"node": "AMD", "type": "ORGANIZATION"}]
         """
         self._store.verify_connection()
 
@@ -476,8 +487,8 @@ class GraphQueries:
         MATCH path = shortestPath((e1)-[*..%d]-(e2))
         RETURN [n in nodes(path) |
             CASE
-                WHEN 'Document' IN labels(n) THEN {node: n.document_id, type: 'Document'}
-                ELSE {node: n.text, type: labels(n)[1]}
+                WHEN 'Document' IN labels(n) THEN {node: n.document_id, type: 'DOCUMENT'}
+                ELSE {node: n.text, type: toUpper([l IN labels(n) WHERE l <> 'Entity'][0])}
             END
         ] as path_nodes
         LIMIT 1
@@ -486,7 +497,7 @@ class GraphQueries:
         )  # Each hop is entity-doc-entity, so double
 
         try:
-            with self._store._driver.session() as session:
+            with self._store.driver.session() as session:
                 result = session.run(
                     query,
                     entity1=entity1,
@@ -541,12 +552,12 @@ class GraphQueries:
         Returns:
             List of dicts with entity info:
             - entity: Entity text
-            - type: Entity type label
+            - type: Entity type (UPPERCASE, e.g., "ORGANIZATION")
             - mention_count: Total mentions across all documents
 
         Example:
             >>> matches = queries.entity_search("nvid")
-            >>> # Returns: [{"entity": "NVIDIA", "type": "Organization", ...}]
+            >>> # Returns: [{"entity": "NVIDIA", "type": "ORGANIZATION", ...}]
         """
         self._store.verify_connection()
 
@@ -573,7 +584,7 @@ class GraphQueries:
             """
 
         try:
-            with self._store._driver.session() as session:
+            with self._store.driver.session() as session:
                 result = session.run(
                     cypher_query,
                     search_text=search_query,
@@ -582,7 +593,8 @@ class GraphQueries:
                 entities = [
                     {
                         "entity": record["entity"],
-                        "type": record["type"],
+                        # Normalize to uppercase to match EntityType.value format
+                        "type": record["type"].upper() if record["type"] else None,
                         "mention_count": record["mention_count"],
                     }
                     for record in result
@@ -614,12 +626,12 @@ class GraphQueries:
         Get count of entities by type in the graph.
 
         Returns:
-            Dict mapping entity type names to counts.
+            Dict mapping entity type names (UPPERCASE) to counts.
 
         Example:
             >>> summary = queries.get_entity_types_summary()
             >>> print(summary)
-            {'Organization': 744, 'Date': 492, 'Concept': 357, ...}
+            {'ORGANIZATION': 744, 'DATE': 492, 'CONCEPT': 357, ...}
         """
         self._store.verify_connection()
 
@@ -630,9 +642,13 @@ class GraphQueries:
         """
 
         try:
-            with self._store._driver.session() as session:
+            with self._store.driver.session() as session:
                 result = session.run(query)
-                summary = {record["type"]: record["count"] for record in result}
+                # Normalize type keys to uppercase to match EntityType.value format
+                summary = {
+                    record["type"].upper() if record["type"] else "UNKNOWN": record["count"]
+                    for record in result
+                }
 
             logger.debug("get_entity_types_summary", types=len(summary))
 

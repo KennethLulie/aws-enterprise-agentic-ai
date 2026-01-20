@@ -67,9 +67,9 @@ This RAG system enables natural language querying over complex financial documen
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           QUERY PROCESSING                                   │
 │                                                                              │
-│   1. Query Expansion - Generate alternative phrasings                        │
+│   1. Query Analysis - Generate variants + determine KG complexity           │
 │   2. Entity Extraction - Identify "Apple", "supply chain", "risks"          │
-│   3. Parallel Search - Hit all three retrieval systems simultaneously       │
+│   3. Parallel Search - Hit all three systems (KG uses complexity signal)    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                      │
                  ┌───────────────────┼───────────────────┐
@@ -505,10 +505,11 @@ KG queries return not just document IDs, but entity evidence explaining WHY each
 # Instead of just returning document IDs:
 [{"id": "AAPL_10K_2024"}, {"id": "NVDA_10K_2024"}]
 
-# Return entity evidence:
+# Return entity evidence (from HybridRetriever._kg_search):
 [
   {
     "id": "AAPL_10K_2024",
+    "source": "kg",
     "kg_evidence": {
       "matched_entity": "Apple",
       "entity_type": "Organization",
@@ -517,11 +518,13 @@ KG queries return not just document IDs, but entity evidence explaining WHY each
   },
   {
     "id": "NVDA_10K_2024",
+    "source": "kg",
     "kg_evidence": {
       "matched_entity": "supply chain",
       "entity_type": "Concept",
       "match_type": "related_via",
-      "related_to": "Apple"
+      "related_to": "Apple",
+      "shared_docs": 3
     }
   }
 ]
@@ -572,16 +575,18 @@ When a user asks a question, the system executes this pipeline:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ STEP 1: QUERY EXPANSION                                                      │
+│ STEP 1: QUERY ANALYSIS & EXPANSION                                           │
 │                                                                              │
 │ Original: "What are Apple's supply chain risks?"                            │
 │                                                                              │
-│ Expanded:                                                                    │
-│   • "Apple supply chain risk factors"                                        │
-│   • "Apple manufacturing and sourcing risks"                                 │
-│   • "Apple operational risks related to suppliers"                           │
+│ Output (single Nova Lite call):                                              │
+│   • Variants: ["Apple supply chain risk factors", ...]                       │
+│   • KG Complexity: "complex"                                                 │
+│   • Reason: "Relationship between Apple and supply chain entities"          │
 │                                                                              │
-│ Purpose: Cast a wider net, improve recall by 20-30%                         │
+│ Purpose:                                                                     │
+│   • Cast a wider net, improve recall by 20-30%                              │
+│   • Determine KG traversal depth (1-hop vs 2-hop)                           │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -600,9 +605,20 @@ When a user asks a question, the system executes this pipeline:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ STEP 3: RRF FUSION                                                           │
 │                                                                              │
-│ Merge ~45 results into unified ranking                                       │
+│ Merge dense + BM25 results into unified ranking                              │
 │ Duplicates consolidated, scores combined                                     │
 │ Output: Top 15 candidates with combined scores                               │
+│ Note: KG results NOT included (document-level vs chunk-level)               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3b: KG BOOST                                                            │
+│                                                                              │
+│ Apply +0.1 boost to chunks from KG-matched documents                        │
+│ Attach kg_evidence to boosted chunks for LLM explainability                 │
+│ Re-sort by boosted RRF score                                                 │
+│ See "KG Boost (After RRF)" section for details                              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -635,7 +651,13 @@ When a user asks a question, the system executes this pipeline:
 │   • Direct answer to the question                                            │
 │   • Supporting evidence from retrieved passages                              │
 │   • Source citations (document, page, section)                               │
+│   • KG evidence in citations (entity, type, match reason)                    │
 │   • Confidence indication if information is incomplete                       │
+│                                                                              │
+│ Citation format with KG evidence:                                            │
+│   [1] Source: AAPL_10K_2024, Item 1A, Page 15 (Relevance: 9/10)             │
+│       KG Match: Apple (Organization) - direct mention                        │
+│   {passage text}                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -643,9 +665,10 @@ When a user asks a question, the system executes this pipeline:
 
 | Step | Target Latency | Notes |
 |------|----------------|-------|
-| Query expansion | ~200ms | Single LLM call |
-| Parallel retrieval | ~150ms | All searches concurrent |
+| Query analysis | ~200ms | Single LLM call (variants + KG complexity) |
+| Parallel retrieval | ~150ms | All searches concurrent (dense + BM25 + KG) |
 | RRF fusion | ~10ms | In-memory computation |
+| KG boost | ~5ms | In-memory lookup and score adjustment |
 | Cross-encoder rerank | ~400ms | 15 LLM scoring calls (batched) |
 | Compression | ~200ms | Single LLM call |
 | Synthesis | ~500ms | Final LLM call |

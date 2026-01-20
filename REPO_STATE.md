@@ -97,7 +97,7 @@
 | backend/src/knowledge_graph/ontology.py | Financial domain ontology: EntityType, RelationType enums, spaCy mappings, EntityRuler patterns |
 | backend/src/knowledge_graph/extractor.py | Entity extraction using spaCy NER + custom financial patterns (EntityExtractor, Entity dataclass) |
 | backend/src/knowledge_graph/store.py | Neo4j graph store adapter with connection pooling, CRUD operations, batch processing (Neo4jStore) |
-| backend/src/knowledge_graph/queries.py | Graph traversal queries for entity lookup, related entities, co-occurrence, fuzzy search (GraphQueries) |
+| backend/src/knowledge_graph/queries.py | Graph traversal queries: 1-hop, 2-hop, co-occurrence, fuzzy search; returns UPPERCASE entity types for consistency (GraphQueries, GraphQueryError) |
 | backend/tests/__init__.py | Tests package |
 | backend/tests/test_agent.py | Agent and graph tests |
 | backend/tests/test_api.py | API endpoint tests |
@@ -197,10 +197,11 @@
 ### Phase 2b - Intelligence Layer (In Progress)
 | File | Purpose |
 |------|---------|
-| backend/src/ingestion/hybrid_retriever.py | HybridRetriever orchestrating dense+BM25+KG+RRF+reranking |
+| backend/src/retrieval/hybrid_retriever.py | HybridRetriever orchestrating dense+BM25+KG+RRF+reranking |
+| backend/src/retrieval/__init__.py | Retrieval package exports (query-time components) |
+| backend/src/ingestion/query_expansion.py | Query analysis: expansion + KG complexity (Nova Lite) |
 | backend/src/utils/rrf.py | Reciprocal Rank Fusion for merging dense + BM25 results |
 | backend/src/utils/reranker.py | Cross-encoder reranking (Nova Lite) |
-| backend/src/utils/query_expander.py | Query expansion (Nova Lite) |
 | backend/src/utils/compressor.py | Contextual compression (Nova Lite) |
 | backend/src/utils/bm25_encoder.py | BM25 sparse vector encoding |
 

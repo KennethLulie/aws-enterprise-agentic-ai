@@ -479,48 +479,6 @@ def compress(self, query: str, results: list[dict]) -> list[dict]:
 
 ---
 
-## Error Handling & User Experience
-
-### What Users See When KG Fails
-
-KG failures should be **invisible to users** - the system degrades gracefully to dense+BM25 retrieval.
-
-| Failure Mode | User Impact | What Happens Internally |
-|--------------|-------------|-------------------------|
-| Neo4j connection fails | None visible | KG search skipped, dense+BM25 only |
-| Entity extraction fails | None visible | KG search returns empty, no boost applied |
-| 2-hop query times out | None visible | 1-hop results preserved, 2-hop skipped |
-| All KG fails | None visible | Results lack `kg_evidence`, no KG Match shown in citations |
-
-### Error Messages (Internal Logging Only)
-
-```python
-# Log levels for KG failures
-logger.warning("kg_search_skipped", reason="neo4j_connection_failed")
-logger.warning("kg_1hop_failed", entity="NVIDIA", error="timeout")
-logger.warning("kg_2hop_failed", entity="Apple", error="query_too_complex")
-logger.debug("kg_boost_applied", boosted_chunks=5, total_chunks=15)
-```
-
-### Citation Display Rules
-
-**With KG Evidence:**
-```
-[1] Source: NVDA_10K_2025, Page 15 (Relevance: 9/10)
-    KG Match: NVIDIA (Organization) - direct mention
-The Company's business operations...
-```
-
-**Without KG Evidence (graceful degradation):**
-```
-[1] Source: NVDA_10K_2025, Page 15 (Relevance: 9/10)
-The Company's business operations...
-```
-
-The user simply doesn't see the "KG Match:" line - no error message, no indication that KG was unavailable.
-
----
-
 ## Documentation Inconsistencies
 
 ### PROJECT_PLAN.md Issues
@@ -602,10 +560,25 @@ The user simply doesn't see the "KG Match:" line - no error message, no indicati
 | Option | Description | Pros | Cons |
 |--------|-------------|------|------|
 | 1. Always 2-hop | All queries use 2-hop | Comprehensive | Slower, noisier |
-| 2. 2+ entities | 2-hop only for complex queries | Balanced | May miss some cases |
-| 3. Classifier | ML model decides | Optimal | Requires training |
+| 2. 2+ entities | Count extracted entities | Simple | Misses single-entity complex queries |
+| 3. Classifier | Separate ML model decides | Optimal | Requires training, extra latency |
+| **4. LLM in Query Expansion** | Nova Lite classifies during expansion | **Free** (same LLM call), accurate | Slightly larger prompt |
 
-**Recommendation:** Option 2 (2+ entities) for Phase 2b simplicity.
+**Recommendation:** Option 4 (LLM classification in Query Expansion) - **CHOSEN**
+
+**Rationale:**
+- Query expansion already calls Nova Lite for variants
+- Adding complexity classification is ~20 extra tokens (negligible cost)
+- LLM understands query intent better than entity count
+- No extra latency (same LLM call)
+- Catches cases entity count misses (e.g., "supply chain risks" = 1 entity but complex)
+
+**Implementation:**
+- `QueryExpander.analyze()` returns `QueryAnalysis(variants, kg_complexity, reason)`
+- `kg_complexity` is "simple" or "complex"
+- `_kg_search(query, use_2hop=analysis.use_2hop)` uses the classification
+
+See PHASE_2B_HOW_TO_GUIDE.md Section 8 for full specification.
 
 ---
 
@@ -616,10 +589,10 @@ The user simply doesn't see the "KG Match:" line - no error message, no indicati
 | Option | Path | Pros | Cons |
 |--------|------|------|------|
 | 1. `ingestion/` | `backend/src/ingestion/hybrid_retriever.py` | Matches PHASE_2B guide | `ingestion/` implies write-time, not query-time |
-| 2. `retrieval/` | `backend/src/retrieval/hybrid_retriever.py` | Semantically correct (query-time retrieval) | New directory to create |
+| **2. `retrieval/`** | `backend/src/retrieval/hybrid_retriever.py` | Semantically correct (query-time retrieval) | New directory to create |
 | 3. `rag/` | `backend/src/rag/hybrid_retriever.py` | Groups RAG components | Another new directory |
 
-**Recommendation:** Option 2 (`backend/src/retrieval/`) - Create a new `retrieval/` directory for query-time components.
+**Decision:** Option 2 (`backend/src/retrieval/`) - **IMPLEMENTED**
 
 **Rationale:**
 - `ingestion/` contains document processing: VLM extraction, chunking, embedding
@@ -632,25 +605,27 @@ backend/src/
 ├── ingestion/           # Document processing (write-time)
 │   ├── vlm_extractor.py
 │   ├── semantic_chunking.py
+│   ├── query_expansion.py  # Query analysis (variants + KG complexity)
 │   └── ...
-├── retrieval/           # Query processing (read-time)  ◄── NEW
+├── retrieval/           # Query processing (read-time)  ◄── IMPLEMENTED
 │   ├── __init__.py
 │   └── hybrid_retriever.py
 ├── knowledge_graph/     # Entity storage and queries
 └── utils/               # Shared utilities (BM25, RRF, reranker, compressor)
 ```
 
-**Files to Update if Option 2 chosen:**
-- Create `backend/src/retrieval/__init__.py`
-- Create `backend/src/retrieval/hybrid_retriever.py`
-- Update PHASE_2B_HOW_TO_GUIDE.md import paths
-- Update REPO_STATE.md with new directory
+**Files Updated:**
+- ✅ PHASE_2B_HOW_TO_GUIDE.md - All import paths updated to `src.retrieval`
+- ✅ REPO_STATE.md - Path updated + fixed `query_expansion.py` typo
+- ✅ Section 11.2 renamed to "Create Retrieval Package Init"
 
 ---
 
 ## Test Queries for Validation
 
-> These queries should be used to verify KG integration improves retrieval quality.
+> ✅ **IMPLEMENTED** - Added to PHASE_2B_HOW_TO_GUIDE.md Section 11.4c "KG Integration Validation Tests"
+> 
+> These queries verify KG integration improves retrieval quality.
 
 ### 1. Direct Entity Match (1-hop)
 
@@ -728,6 +703,9 @@ with patch.object(queries, 'find_documents_mentioning', side_effect=Exception("C
 
 ### KG Performance Monitoring
 
+> ✅ **PLANNED FOR PHASE 3** - Added to PROJECT_PLAN.md Phase 3 (Observability with Arize Phoenix)
+> KG metrics will be tracked via Phoenix/CloudWatch alongside other RAG metrics.
+
 **Metrics to Track:**
 
 | Metric | How to Measure | Target |
@@ -738,7 +716,7 @@ with patch.object(queries, 'find_documents_mentioning', side_effect=Exception("C
 | KG latency | Time spent in `_kg_search()` | < 200ms |
 | Failure rate | % of queries where KG fails | < 5% |
 
-**Logging for Analysis:**
+**Logging for Analysis (to implement in Phase 3):**
 ```python
 logger.info(
     "kg_retrieval_complete",
@@ -747,7 +725,7 @@ logger.info(
     kg_docs_found=len(kg_results),
     chunks_boosted=boosted_count,
     kg_latency_ms=kg_duration_ms,
-    used_2hop=len(entities) > 1,
+    used_2hop=analysis.use_2hop,  # Updated: from QueryAnalysis
 )
 ```
 

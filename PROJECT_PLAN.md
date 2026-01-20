@@ -685,7 +685,7 @@ If something isn't working, follow this systematic debugging process:
 - **Structured logging** of search queries and results
 - *Implementation:* `backend/src/agent/tools/search.py`
 
-**2b. SQL Query Tool** 🚧 *TO BE IMPLEMENTED*
+**2b. SQL Query Tool** ✅ *COMPLETED IN PHASE 2a*
 - **Uses existing Neon PostgreSQL** from Phase 1b (no new provisioning needed)
 - **Data Source:** Real 10-K financial metrics extracted via VLM (not synthetic data)
 - **Tables:** companies, financial_metrics, segment_revenue, geographic_revenue, risk_factors
@@ -704,11 +704,11 @@ If something isn't working, follow this systematic debugging process:
   - "What percentage of Apple's revenue comes from iPhone?"
 - **Error handling:** Graceful failures with helpful error messages
 - **Circuit breaker:** Prevent repeated failures from overwhelming database
-- *Implementation:* `backend/src/agent/tools/sql.py` (currently stub, needs real implementation)
+- *Implementation:* `backend/src/agent/tools/sql.py`
 
-**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)** 🔄 *IN PROGRESS*
+**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)** ✅ *BASIC COMPLETE, HYBRID IN PROGRESS*
 
-> **Status:** Basic RAG (dense search) completed in Phase 2a. Knowledge Graph indexing complete. Hybrid retrieval + KG integration in progress (Phase 2b).
+> **Status:** Basic RAG (dense search) ✅ completed in Phase 2a. Knowledge Graph indexing ✅ complete. Hybrid retrieval + KG integration 🔄 in progress (Phase 2b).
 > 
 > **Full Architecture:** See `docs/RAG_README.md` for comprehensive architecture. Implementation details in `docs/PHASE_2A_HOW_TO_GUIDE.md` (basic RAG) and `docs/PHASE_2B_HOW_TO_GUIDE.md` (hybrid retrieval, knowledge graph).
 > 
@@ -772,11 +772,11 @@ PDF → Claude VLM → Clean Text → ┬→ Semantic Chunking → Titan Embed �
 6. (10-Ks only) Parsed tables → Store metrics in PostgreSQL
 
 **Query Pipeline (8 steps):**
-1. Query → Expansion (3 variants via Nova Lite)
+1. Query Analysis (Nova Lite, single call) → 3 variants + KG complexity ("simple"/"complex")
 2. Parallel retrieval:
    - Dense search (Pinecone) → chunks
    - BM25 search (Pinecone sparse) → chunks
-   - KG entity lookup (Neo4j) → document IDs + entity evidence
+   - KG entity lookup (Neo4j, uses complexity) → 1-hop if simple, +2-hop if complex
 3. RRF Fusion (merge dense + BM25 chunks)
 4. **KG Boost** (apply +0.1 to chunks from KG-matched docs, attach entity evidence)
 5. Cross-Encoder Rerank (Nova Lite scores relevance)
@@ -924,6 +924,12 @@ risk_factors (id, company_id, fiscal_year, category, title, summary, severity)
   - Cache hit rate (inference cache effectiveness)
   - Cost per request (actual AWS costs)
   - Error rate by type (timeout, API error, validation error, etc.)
+  - **Knowledge Graph metrics (from Phase 2b):**
+    - KG hit rate (% of queries where KG found matches, target: >60%)
+    - Boost impact (avg position change of KG-boosted chunks, target: +2-3)
+    - 2-hop usage (% of complex queries triggering 2-hop, target: 20-40%)
+    - KG latency (time in `_kg_search()`, target: <200ms)
+    - KG failure rate (% of queries where KG fails, target: <5%)
 - Error rate monitoring
 - Tool usage analytics
 - Cost tracking per conversation
@@ -1242,10 +1248,10 @@ aws-enterprise-agentic-ai/
 │   │   │   └── query_expansion.py  # Query expansion for RAG
 │   │   ├── knowledge_graph/
 │   │   │   ├── __init__.py
-│   │   │   ├── efficient_extractor.py  # NLP-based entity extraction (spaCy)
-│   │   │   ├── store.py          # Neo4j/PostgreSQL adapter
-│   │   │   ├── queries.py        # Graph traversal queries (1-2 hop)
-│   │   │   └── ontology.py       # Financial domain ontology
+│   │   │   ├── ontology.py       # Financial domain ontology (EntityType, RelationType)
+│   │   │   ├── extractor.py      # NLP-based entity extraction (spaCy + financial patterns)
+│   │   │   ├── store.py          # Neo4j adapter with connection pooling, batch ops
+│   │   │   └── queries.py        # Graph traversal queries (1-hop, 2-hop, fuzzy search)
 │   │   ├── api/
 │   │   │   ├── __init__.py
 │   │   │   ├── main.py           # FastAPI app

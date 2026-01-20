@@ -1247,6 +1247,29 @@ Return Format:
 - Document queries return list of document_id strings (for RAG integration)
 - Entity queries return list of dicts with entity info
 
+**Architecture Note (Entity Context):**
+
+`GraphQueries` returns **raw document IDs only**. Entity context (kg_evidence) is added by 
+`HybridRetriever._kg_search()` which wraps these queries:
+
+```
+GraphQueries.find_documents_mentioning("Apple")
+    → Returns: ["AAPL_10K_2024", "AAPL_10K_2023"]  (just IDs)
+
+HybridRetriever._kg_search("Apple supply chain risks")
+    → Returns: [
+        {"id": "AAPL_10K_2024", "source": "kg", "kg_evidence": {...}},
+        ...
+      ]  (IDs + entity context)
+```
+
+This separation of concerns allows:
+1. `GraphQueries` to be reusable for any graph traversal need
+2. `_kg_search` to add retrieval-specific context (matched entity, match type)
+3. Entity evidence to flow through the pipeline to LLM citations
+
+See Section 11.1 for `_kg_search` implementation with entity evidence.
+
 Reference:
 - Neo4jStore from Section 4
 - Neo4j Cypher documentation
@@ -1293,9 +1316,9 @@ Documents mentioning China:
   ...
 
 Entities related to Apple:
-  Organization: iPhone (shared docs: 45)
-  Location: China (shared docs: 32)
-  Person: Tim Cook (shared docs: 28)
+  ORGANIZATION: iPhone (shared docs: 45)
+  LOCATION: China (shared docs: 32)
+  PERSON: Tim Cook (shared docs: 28)
   ...
 ```
 
@@ -1572,17 +1595,20 @@ Sparse vector indices: 4
 
 ---
 
-## 8. Query Expansion
+## 8. Query Analysis & Expansion
 
 ### What We're Doing
-Implementing query expansion using Nova Lite to generate alternative phrasings that improve recall.
+Implementing query analysis using Nova Lite to:
+1. Generate alternative phrasings that improve recall
+2. Classify query complexity for KG traversal depth (1-hop vs 2-hop)
 
 ### Why This Matters
 - **Vocabulary Gap:** Users may phrase queries differently than document text
 - **Recall Improvement:** 3 query variants find more relevant documents (+20-30%)
-- **Cost Effective:** Nova Lite is cheaper than main model for this task
+- **KG Optimization:** Complexity classification determines 1-hop vs 2-hop traversal
+- **Cost Effective:** Single Nova Lite call provides both expansion AND complexity analysis
 
-### 8.1 Create Query Expansion Module
+### 8.1 Create Query Analysis Module
 
 **Agent Prompt:**
 ```
@@ -1590,46 +1616,106 @@ Create `backend/src/ingestion/query_expansion.py`
 
 Requirements:
 1. Generate 3 alternative phrasings of user query using Nova Lite
-2. Return original + variants for parallel search
-3. Cache results for repeated queries (optional)
+2. Classify query complexity for KG traversal (simple vs complex)
+3. Return both in a single LLM call (cost-efficient)
+4. Cache results for repeated queries (optional)
 
 Structure:
+- QueryAnalysis dataclass:
+  - variants: tuple[str, ...]  # Original + alternative phrasings
+  - kg_complexity: str  # "simple" or "complex"
+  - complexity_reason: str  # Brief explanation
+
 - QueryExpander class:
   - __init__(self, model_id: str = "amazon.nova-lite-v1:0")
     > **Note:** Use Nova Lite model ID from DEVELOPMENT_REFERENCE.md: `amazon.nova-lite-v1:0`
-  - expand(self, query: str, num_variants: int = 3) -> list[str]
+  - analyze(self, query: str, num_variants: int = 3) -> QueryAnalysis
   - _call_nova_lite(self, prompt: str) -> str
 
-Expansion Prompt:
-"Generate {num_variants} alternative phrasings of this search query.
-Each variant should capture the same intent but use different words.
-Return only the variants, one per line, no numbering.
+Analysis Prompt (JSON output for reliable parsing):
+"Analyze this search query and respond in JSON format:
 
-Original query: {query}
+Query: {query}
 
-Alternative phrasings:"
+{
+  "variants": ["alt1", "alt2", "alt3"],
+  "kg_complexity": "simple" or "complex",
+  "complexity_reason": "brief explanation"
+}
+
+Guidelines:
+- variants: 3 alternative phrasings with same intent but different words
+- kg_complexity: 
+  - "simple": Direct entity lookup (e.g., "Tell me about NVIDIA", "Apple's 2024 revenue")
+  - "complex": Needs relationship traversal (e.g., "Apple's Taiwan suppliers", "competitors to NVIDIA", "how X affects Y")
+- complexity_reason: One sentence explaining the classification
+
+Respond ONLY with valid JSON, no other text."
 
 Example:
 Input: "What are Apple's supply chain risks?"
 Output:
-- "What are Apple's supply chain risks?"  (original)
-- "Apple Inc supply chain vulnerabilities"
-- "AAPL supplier and manufacturing risks"
-- "Apple supply chain risk factors 10-K"
+{
+  "variants": [
+    "Apple Inc supply chain vulnerabilities",
+    "AAPL supplier and manufacturing risks",
+    "Apple supply chain risk factors 10-K"
+  ],
+  "kg_complexity": "complex",
+  "complexity_reason": "Query involves relationship between Apple and supply chain entities"
+}
+
+Example 2:
+Input: "Tell me about NVIDIA"
+Output:
+{
+  "variants": [
+    "NVIDIA Corporation overview",
+    "NVDA company information",
+    "NVIDIA business description"
+  ],
+  "kg_complexity": "simple",
+  "complexity_reason": "Direct entity lookup, no relationship traversal needed"
+}
+
+**KG Complexity Decision Tree:**
+| Query Pattern | Complexity | Why |
+|---------------|------------|-----|
+| Single entity lookup | simple | Direct 1-hop: find docs mentioning entity |
+| Entity + attribute | simple | Still direct: "Apple's revenue" |
+| Two+ entities with relationship | complex | Need 2-hop: "Apple's China suppliers" |
+| Relationship keywords (affects, related, between) | complex | Implies graph traversal |
+| Comparative queries | complex | Need multiple entity graphs |
+| Indirect lookups (competitors, partners, similar) | complex | Need related entities |
 
 Key Features:
-- Always include original query in output
-- Parse Nova Lite response to extract variants
+- Always include original query in variants output
+- Parse JSON response (with fallback to text parsing if JSON fails)
 - Handle edge cases: short queries, junk output
 - Limit query length to prevent abuse
 - **Deduplicate variants** (Nova Lite sometimes returns similar/identical variants)
-- **Timeout handling** (30s default, fail gracefully to original query only)
+- **Timeout handling** (30s default, fall back to original query + "simple" complexity)
+- **Default to "simple"** if LLM response is unclear (safer, faster)
 
-**Reliability Requirements (Important):**
+**Implementation (with KG complexity analysis):**
 
 ```python
+from dataclasses import dataclass
 from functools import lru_cache
+import json
 import asyncio
+
+@dataclass
+class QueryAnalysis:
+    """Result of query analysis: variants + KG complexity."""
+    variants: tuple[str, ...]  # Original + alternative phrasings
+    kg_complexity: str  # "simple" or "complex"
+    complexity_reason: str  # Brief explanation
+    
+    @property
+    def use_2hop(self) -> bool:
+        """Convenience property for KG traversal decision."""
+        return self.kg_complexity == "complex"
 
 class QueryExpander:
     def __init__(self, model_id: str = "amazon.nova-lite-v1:0", timeout: float = 30.0):
@@ -1637,24 +1723,52 @@ class QueryExpander:
         self.timeout = timeout
     
     @lru_cache(maxsize=100)  # Cache for repeated queries
-    def expand(self, query: str, num_variants: int = 3) -> tuple[str, ...]:
-        """Expand query with caching and timeout handling."""
+    def analyze(self, query: str, num_variants: int = 3) -> QueryAnalysis:
+        """
+        Analyze query: generate variants AND determine KG complexity.
+        Single LLM call for both tasks (cost-efficient).
+        """
         try:
-            variants = self._expand_with_timeout(query, num_variants)
-            # Deduplicate
+            response = self._call_nova_lite_with_timeout(query, num_variants)
+            parsed = json.loads(response)
+            
+            # Extract variants and deduplicate
+            variants = parsed.get("variants", [])
             seen = {query.lower().strip()}
-            unique = [query]
+            unique = [query]  # Always include original
             for v in variants:
                 if v.lower().strip() not in seen:
                     seen.add(v.lower().strip())
                     unique.append(v)
-            return tuple(unique[:num_variants + 1])
+            
+            return QueryAnalysis(
+                variants=tuple(unique[:num_variants + 1]),
+                kg_complexity=parsed.get("kg_complexity", "simple"),
+                complexity_reason=parsed.get("complexity_reason", "")
+            )
+        except json.JSONDecodeError:
+            logger.warning("query_analysis_json_failed", query=query[:50])
+            # Fall back to text parsing for variants, default complexity
+            return self._fallback_parse(query, response)
         except asyncio.TimeoutError:
-            logger.warning("query_expansion_timeout", query=query[:50])
-            return (query,)  # Fall back to original only
+            logger.warning("query_analysis_timeout", query=query[:50])
+            return QueryAnalysis(
+                variants=(query,),
+                kg_complexity="simple",  # Default to simple (faster, safer)
+                complexity_reason="Timeout - defaulting to simple"
+            )
         except Exception as e:
-            logger.error("query_expansion_failed", error=str(e))
-            return (query,)  # Graceful degradation
+            logger.error("query_analysis_failed", error=str(e))
+            return QueryAnalysis(
+                variants=(query,),
+                kg_complexity="simple",
+                complexity_reason=f"Error - defaulting to simple: {str(e)[:50]}"
+            )
+    
+    # Legacy method for backwards compatibility
+    def expand(self, query: str, num_variants: int = 3) -> tuple[str, ...]:
+        """Legacy method - returns only variants."""
+        return self.analyze(query, num_variants).variants
 ```
 
 Cost Note:
@@ -1670,34 +1784,59 @@ Reference:
 Verify: docker-compose exec backend python -c "from src.ingestion.query_expansion import QueryExpander; print('OK')"
 ```
 
-### 8.2 Test Query Expansion
+### 8.2 Test Query Analysis
 
 **Command:**
 ```bash
 docker-compose exec backend python -c "
-from src.ingestion.query_expansion import QueryExpander
+from src.ingestion.query_expansion import QueryExpander, QueryAnalysis
 
 expander = QueryExpander()
 
-query = 'What are the main risks for Tesla?'
-variants = expander.expand(query)
+# Test 1: Simple query (should be 1-hop)
+query1 = 'Tell me about NVIDIA'
+analysis1 = expander.analyze(query1)
+print(f'Query: {query1}')
+print(f'  Variants: {len(analysis1.variants)}')
+print(f'  KG Complexity: {analysis1.kg_complexity}')
+print(f'  Use 2-hop: {analysis1.use_2hop}')
+print(f'  Reason: {analysis1.complexity_reason}')
 
-print(f'Original: {query}')
-print(f'\\nExpanded to {len(variants)} variants:')
-for i, v in enumerate(variants):
-    print(f'  {i+1}. {v}')
+# Test 2: Complex query (should be 2-hop)
+query2 = \"What are Apple's Taiwan semiconductor suppliers?\"
+analysis2 = expander.analyze(query2)
+print(f'\\nQuery: {query2}')
+print(f'  Variants: {len(analysis2.variants)}')
+print(f'  KG Complexity: {analysis2.kg_complexity}')
+print(f'  Use 2-hop: {analysis2.use_2hop}')
+print(f'  Reason: {analysis2.complexity_reason}')
+
+# Test 3: Legacy expand() method still works
+query3 = 'What are the main risks for Tesla?'
+variants = expander.expand(query3)
+print(f'\\nLegacy expand() test:')
+print(f'  Original: {query3}')
+print(f'  Expanded to {len(variants)} variants')
 "
 ```
 
 **Expected Output:**
 ```
-Original: What are the main risks for Tesla?
+Query: Tell me about NVIDIA
+  Variants: 4
+  KG Complexity: simple
+  Use 2-hop: False
+  Reason: Direct entity lookup, no relationship traversal needed
 
-Expanded to 4 variants:
-  1. What are the main risks for Tesla?
-  2. Tesla Inc risk factors and challenges
-  3. TSLA business risks disclosed in 10-K
-  4. Tesla company risks and uncertainties
+Query: What are Apple's Taiwan semiconductor suppliers?
+  Variants: 4
+  KG Complexity: complex
+  Use 2-hop: True
+  Reason: Query involves relationship between Apple, Taiwan, and supplier entities
+
+Legacy expand() test:
+  Original: What are the main risks for Tesla?
+  Expanded to 4 variants
 ```
 
 ### 8.3 Update Ingestion Package Init
@@ -1707,23 +1846,28 @@ Expanded to 4 variants:
 Update `backend/src/ingestion/__init__.py`
 
 Add imports and exports for query expansion:
-1. from src.ingestion.query_expansion import QueryExpander
-2. Add to __all__: "QueryExpander"
+1. from src.ingestion.query_expansion import QueryExpander, QueryAnalysis
+2. Add to __all__: "QueryExpander", "QueryAnalysis"
 
 Reference:
 - QueryExpander module just created
 
-Verify: docker-compose exec backend python -c "from src.ingestion import QueryExpander; print('OK')"
+Verify: docker-compose exec backend python -c "from src.ingestion import QueryExpander, QueryAnalysis; print('OK')"
 ```
 
-### 8.4 Query Expansion Checklist
+### 8.4 Query Analysis Checklist
 
-- [ ] query_expansion.py created with QueryExpander class
+- [ ] query_expansion.py created with QueryExpander class and QueryAnalysis dataclass
 - [ ] Nova Lite model ID correct: amazon.nova-lite-v1:0
-- [ ] expand() returns original + 3 variants
+- [ ] **analyze() returns QueryAnalysis with variants + kg_complexity**
+- [ ] **kg_complexity is "simple" or "complex"**
+- [ ] **complexity_reason explains the classification**
+- [ ] expand() (legacy) returns original + 3 variants
 - [ ] Variants are meaningfully different
-- [ ] Edge cases handled (short queries, errors)
-- [ ] Ingestion __init__.py exports QueryExpander
+- [ ] JSON parsing with fallback to text parsing
+- [ ] Edge cases handled (short queries, errors, timeouts)
+- [ ] **Default to "simple" complexity on errors (safer)**
+- [ ] Ingestion __init__.py exports QueryExpander and QueryAnalysis
 
 ---
 
@@ -1869,7 +2013,7 @@ rrf_results = [
 # Simulated KG results with entity evidence
 kg_results = [
     {'id': 'AAPL_10K_2024', 'source': 'kg', 'kg_evidence': {
-        'matched_entity': 'Apple', 'entity_type': 'Organization', 'match_type': 'direct_mention'
+        'matched_entity': 'Apple', 'entity_type': 'ORGANIZATION', 'match_type': 'direct_mention'
     }},
 ]
 
@@ -1980,13 +2124,37 @@ Key Features:
 - Handle non-numeric responses (default to 5)
 - Batch scoring for efficiency (if model supports)
 - Include original scores in output for debugging
+- **CRITICAL: Preserve `kg_evidence` and `sources` from input results**
 
 Output Format:
 [
-  {"id": "doc1", "relevance_score": 9, "rrf_score": 0.032, "text": "..."},
+  {"id": "doc1", "relevance_score": 9, "rrf_score": 0.032, "text": "...", "kg_evidence": {...}, "sources": [...]},
   {"id": "doc2", "relevance_score": 8, "rrf_score": 0.031, "text": "..."},
   ...
 ]
+
+**kg_evidence Preservation (Required for LLM Explainability):**
+```python
+def rerank(self, query: str, results: list[dict], top_k: int = 5) -> list[dict]:
+    # ... scoring logic ...
+    
+    reranked_results = []
+    for original_result, score in sorted_results[:top_k]:
+        reranked = {
+            "id": original_result["id"],
+            "relevance_score": score,
+            "rrf_score": original_result.get("rrf_score", 0),
+            "metadata": original_result.get("metadata", {}),
+        }
+        # PRESERVE kg_evidence from KG boost step
+        if "kg_evidence" in original_result:
+            reranked["kg_evidence"] = original_result["kg_evidence"]
+        if "sources" in original_result:
+            reranked["sources"] = original_result["sources"]
+        reranked_results.append(reranked)
+    
+    return reranked_results
+```
 
 Cost Note:
 - ~15 LLM calls per query (one per candidate)
@@ -2061,6 +2229,8 @@ Verify: docker-compose exec backend python -c "from src.utils import CrossEncode
 - [ ] score_relevance returns numeric score (1-10)
 - [ ] rerank sorts by relevance score descending
 - [ ] Handles edge cases (non-numeric responses default to 5)
+- [ ] **`rerank()` preserves `kg_evidence` from input results**
+- [ ] **`rerank()` preserves `sources` from input results**
 - [ ] Utils __init__.py exports CrossEncoderReranker
 - [ ] Test reranking improves result ordering
 
@@ -2118,10 +2288,14 @@ Key Features:
 - Store compressed result in new `compressed_text` field
 - Short passages (<100 tokens in parent_text) can skip compression
 
-compress_results() should handle parent/child structure:
+compress_results() should handle parent/child structure and preserve kg_evidence:
 ```python
 def compress_results(self, query: str, results: list[dict]) -> list[dict]:
-    """Compress parent_text while preserving child_text_raw for citations."""
+    """
+    Compress parent_text while preserving child_text_raw for citations.
+    
+    CRITICAL: Must preserve kg_evidence and sources for LLM explainability.
+    """
     compressed_results = []
     for result in results:
         metadata = result.get("metadata", {})
@@ -2136,11 +2310,31 @@ def compress_results(self, query: str, results: list[dict]) -> list[dict]:
         compressed = self.compress(query, parent_text)
         if compressed != "NOT_RELEVANT":
             result["compressed_text"] = compressed
-            # Preserve child_text_raw for citation preview
+            # Preserve child_text_raw for citation preview (already in result)
+            # PRESERVE kg_evidence for LLM explainability
+            # (kg_evidence and sources are already in result, just don't remove them)
             compressed_results.append(result)
     
     return compressed_results
 ```
+
+**kg_evidence Preservation (Critical):**
+
+The `kg_evidence` dict must survive compression to reach `_format_result_with_kg()`:
+
+```
+_kg_search() → _apply_kg_boost() → rerank() → compress_results() → _format_result_with_kg()
+     │                │                │              │                      │
+     │                │                │              │                      └── Reads kg_evidence
+     │                │                │              └── Must NOT remove kg_evidence
+     │                │                └── Must copy kg_evidence to reranked results
+     │                └── Attaches kg_evidence to chunks
+     └── Creates kg_evidence
+```
+
+Since `compress_results()` modifies the result in-place and only adds `compressed_text`, 
+the `kg_evidence` field is automatically preserved. Just ensure you don't create a new 
+dict that omits it.
 
 Example:
 Input passage: "Apple Inc. reported revenue of $394B in fiscal 2024. 
@@ -2227,6 +2421,8 @@ Verify: docker-compose exec backend python -c "from src.utils import ContextualC
 - [ ] Stores result in `compressed_text` field
 - [ ] NOT_RELEVANT passages filtered out
 - [ ] Source metadata preserved
+- [ ] **`compress_results()` preserves `kg_evidence` (don't recreate result dicts)**
+- [ ] **`compress_results()` preserves `sources` (don't recreate result dicts)**
 - [ ] Utils __init__.py exports ContextualCompressor
 - [ ] Test compression reduces passage length
 
@@ -2260,7 +2456,13 @@ Integrating all retrieval components (dense, BM25, KG, query expansion, RRF, rer
 
 **Agent Prompt:**
 ```
-Create `backend/src/ingestion/hybrid_retriever.py`
+Create `backend/src/retrieval/hybrid_retriever.py`
+
+**Note:** First create the retrieval directory with `__init__.py`:
+```bash
+mkdir -p backend/src/retrieval
+touch backend/src/retrieval/__init__.py
+```
 
 Requirements:
 1. Orchestrate full hybrid retrieval pipeline
@@ -2288,15 +2490,59 @@ These are passed to `__init__` and stored as `self._extractor` and `self._querie
 The `_kg_search` method extracts entities from the query and finds related documents,
 returning entity evidence for LLM explainability and chunk-level boosting.
 
+**Note:** This method is in `HybridRetriever`, NOT `GraphQueries`. It wraps 
+`GraphQueries.find_documents_mentioning()` and adds entity evidence.
+
+**Multi-Hop Strategy (1-hop vs 2-hop):**
+
+The method uses adaptive hop depth based on **LLM-determined query complexity** from 
+`QueryAnalysis.kg_complexity` (see Section 8). This is more accurate than entity count.
+
+| Query Complexity | Strategy | Example |
+|------------------|----------|---------|
+| simple | 1-hop only | "Tell me about NVIDIA" |
+| complex | 1-hop + 2-hop | "Apple's Taiwan semiconductor risks" |
+
+**Why LLM Classification > Entity Count:**
+
+| Query | Entity Count | LLM Classification | Correct? |
+|-------|-------------|-------------------|----------|
+| "Tell me about NVIDIA" | 1 | simple | ✅ Both correct |
+| "Apple's China suppliers" | 2 | complex | ✅ Both correct |
+| "Supply chain disruption risks" | 1 | **complex** | ✅ LLM catches complexity |
+| "Apple revenue 2024" | 2 | **simple** | ✅ LLM avoids false positive |
+
+**Why Multi-Hop Matters:**
+
+```
+Query: "How is Apple affected by Taiwan semiconductor issues?"
+LLM Classification: complex (relationship between entities)
+
+1-hop only: Find docs mentioning "Apple" 
+            → Misses TSMC connection (Apple doesn't mention TSMC directly)
+
+2-hop:      Find Apple → related entities (TSMC) → docs mentioning TSMC
+            → Captures docs about Taiwan/TSMC semiconductor manufacturing
+            → Even if those docs don't mention "Apple" explicitly
+```
+
+This captures **indirect relationships** that 1-hop misses. The 2-hop results are marked 
+with `match_type: "related_via"` so the LLM understands the connection path.
+
 ```python
-def _kg_search(self, query: str) -> list[dict]:
+def _kg_search(self, query: str, use_2hop: bool = False) -> list[dict]:
     """
     Extract entities from query and find related documents WITH context.
+    Returns document IDs plus entity evidence for explainability.
     
-    Returns document IDs plus entity evidence for:
-    1. Explainability - LLM knows WHY each document was matched
-    2. Chunk boosting - Chunks from KG-matched docs get score boost
-    3. Audit trail - Traceable entity paths for compliance
+    Note: This method is in HybridRetriever, NOT GraphQueries.
+    It wraps GraphQueries.find_documents_mentioning() and adds entity evidence.
+    
+    Args:
+        query: The user's search query
+        use_2hop: Whether to use 2-hop traversal (from QueryAnalysis.use_2hop)
+                  True = complex query, use 2-hop for indirect relationships
+                  False = simple query, 1-hop only for direct matches
     
     Returns:
         list[dict]: Each dict contains:
@@ -2315,53 +2561,50 @@ def _kg_search(self, query: str) -> list[dict]:
     seen_docs: set[str] = set()
     
     for entity in entities:
-        # 1-hop: Direct document mentions (always)
-        doc_ids = self._queries.find_documents_mentioning(
-            entity.text, 
-            fuzzy=True  # Catch "NVIDIA Corporation" when searching "NVIDIA"
-        )
+        # 1-hop: Direct document mentions (always executed)
+        try:
+            doc_ids = self._queries.find_documents_mentioning(entity.text, fuzzy=True)
+            
+            for doc_id in doc_ids:
+                if doc_id not in seen_docs:
+                    seen_docs.add(doc_id)
+                    results.append({
+                        "id": doc_id,
+                        "source": "kg",
+                        "kg_evidence": {
+                            "matched_entity": entity.text,
+                            "entity_type": entity.entity_type.value,
+                            "match_type": "direct_mention",
+                        }
+                    })
+        except Exception as e:
+            logger.warning("kg_1hop_failed", entity=entity.text, error=str(e))
+            # Continue with other entities - don't fail entire KG search
         
-        for doc_id in doc_ids:
-            if doc_id not in seen_docs:
-                seen_docs.add(doc_id)
-                results.append({
-                    "id": doc_id,
-                    "source": "kg",
-                    "kg_evidence": {
-                        "matched_entity": entity.text,
-                        "entity_type": entity.entity_type.value,
-                        "match_type": "direct_mention",
-                    }
-                })
-        
-        # 2-hop: Related entities (only for complex queries with 2+ entities)
-        # This finds documents that mention entities RELATED to query entities
-        # Example: Query "Apple Taiwan" → finds TSMC docs via Apple-TSMC relationship
-        if len(entities) > 1:
-            related = self._queries.find_related_entities(
-                entity.text, 
-                hops=1, 
-                limit=5
-            )
-            for rel in related:
-                rel_docs = self._queries.find_documents_mentioning(
-                    rel["entity"], 
-                    fuzzy=True
-                )
-                for doc_id in rel_docs:
-                    if doc_id not in seen_docs:
-                        seen_docs.add(doc_id)
-                        results.append({
-                            "id": doc_id,
-                            "source": "kg",
-                            "kg_evidence": {
-                                "matched_entity": rel["entity"],
-                                "entity_type": rel["type"],
-                                "match_type": "related_via",
-                                "related_to": entity.text,
-                                "shared_docs": rel["shared_docs"],
-                            }
-                        })
+        # 2-hop: Related entities (only for complex queries as determined by LLM)
+        # Wrapped in separate try/except so 1-hop results are preserved if 2-hop fails
+        if use_2hop:
+            try:
+                related = self._queries.find_related_entities(entity.text, hops=1, limit=5)
+                for rel in related:
+                    rel_docs = self._queries.find_documents_mentioning(rel["entity"], fuzzy=True)
+                    for doc_id in rel_docs:
+                        if doc_id not in seen_docs:
+                            seen_docs.add(doc_id)
+                            results.append({
+                                "id": doc_id,
+                                "source": "kg",
+                                "kg_evidence": {
+                                    "matched_entity": rel["entity"],
+                                    "entity_type": rel["type"],
+                                    "match_type": "related_via",
+                                    "related_to": entity.text,
+                                    "shared_docs": rel["shared_docs"],
+                                }
+                            })
+            except Exception as e:
+                logger.warning("kg_2hop_failed", entity=entity.text, error=str(e))
+                # 2-hop failure is non-critical - 1-hop results still valid
     
     logger.debug(
         "kg_search_complete",
@@ -2443,17 +2686,44 @@ def _apply_kg_boost(
     return boosted_results
 ```
 
-Full Pipeline (8 steps - updated with KG boost):
-1. Query Expansion: Generate 3 variants (Nova Lite)
+Full Pipeline (8 steps - updated with KG boost and complexity analysis):
+1. **Query Analysis: Generate 3 variants + KG complexity (Nova Lite, single call)**
+   - Returns: QueryAnalysis(variants, kg_complexity, complexity_reason)
+   - kg_complexity: "simple" or "complex" (determines 2-hop usage)
 2. Parallel Retrieval: For each variant:
    a. Dense search (Pinecone) → chunks with scores
    b. BM25 search (Pinecone sparse) → chunks with scores
-3. Knowledge Graph lookup: Extract entities, find documents WITH entity evidence
+3. **Knowledge Graph lookup: _kg_search(query, use_2hop=analysis.use_2hop)**
+   - 1-hop always: Find docs mentioning query entities
+   - 2-hop if complex: Also find docs mentioning related entities
 4. RRF Fusion: Merge dense + BM25 results (in-memory)
 5. **KG Boost: Apply +0.1 boost to chunks from KG-matched documents**
 6. Cross-Encoder Reranking: Score top 15 (Nova Lite)
 7. Contextual Compression: Extract relevant sentences from top 5 (Nova Lite)
 8. Return with source citations AND KG evidence for explainability
+
+**Pipeline Flow with Query Analysis:**
+```
+User Query
+    │
+    ▼
+QueryExpander.analyze(query)
+    │
+    ├── Returns: QueryAnalysis
+    │     ├── variants: ("original", "alt1", "alt2", "alt3")
+    │     ├── kg_complexity: "complex"
+    │     └── use_2hop: True
+    │
+    ▼
+Parallel Retrieval (using variants)
+    │
+    ├── Dense search (for each variant)
+    ├── BM25 search (for each variant)
+    └── _kg_search(query, use_2hop=analysis.use_2hop) ◄── Uses complexity!
+    │
+    ▼
+RRF Fusion → KG Boost → Reranking → Compression
+```
 
 Pipeline Parameters:
 - dense_top_k: 15 (per variant)
@@ -2475,7 +2745,7 @@ Output Format (Parent/Child Compatible + KG Evidence):
     "sources": ["dense", "bm25", "kg_boost"],
     "kg_evidence": {
       "matched_entity": "Apple",
-      "entity_type": "Organization",
+      "entity_type": "ORGANIZATION",
       "match_type": "direct_mention"
     },
     "metadata": {
@@ -2500,7 +2770,7 @@ Output Format (Parent/Child Compatible + KG Evidence):
 - `sources`: Which retrieval methods found this result (includes "kg_boost" if KG-matched)
 - `kg_evidence`: (Optional) Entity evidence from Knowledge Graph:
   - `matched_entity`: The entity that matched (e.g., "Apple", "China")
-  - `entity_type`: EntityType value (e.g., "Organization", "Location")
+  - `entity_type`: EntityType value in UPPERCASE (e.g., "ORGANIZATION", "LOCATION")
   - `match_type`: "direct_mention" or "related_via"
   - `related_to`: (if indirect) The query entity this was related to
   - `shared_docs`: (if indirect) Number of shared documents in relationship
@@ -2590,28 +2860,55 @@ def retrieve(self, query: str, top_k: int = 5, ...) -> list[dict]:
 5. Reranking is OPTIONAL - use RRF scores directly if Nova Lite quota exceeded
 6. Compression is OPTIONAL - return full passages if compression fails
 
+**Internal Logging (Not Shown to Users):**
+
+```python
+# Log levels for KG failures - users never see these
+logger.warning("kg_search_skipped", reason="neo4j_connection_failed")
+logger.warning("kg_1hop_failed", entity="NVIDIA", error="timeout")
+logger.warning("kg_2hop_failed", entity="Apple", error="query_too_complex")
+logger.debug("kg_boost_applied", boosted_chunks=5, total_chunks=15)
+
+# Other component failures
+logger.warning("bm25_search_failed", error="sparse_index_unavailable")
+logger.warning("query_expansion_failed", error="nova_lite_timeout")
+logger.warning("reranking_failed", error="rate_limit_exceeded")
+logger.warning("compression_failed", error="response_too_long")
+```
+
+These logs are for debugging and monitoring only. The user experience remains seamless.
+
 Reference:
 - All components from Sections 3-10
 - PHASE_2_REQUIREMENTS.md query pipeline architecture
 - [backend.mdc] for Python patterns
 
-Verify: docker-compose exec backend python -c "from src.ingestion.hybrid_retriever import HybridRetriever; print('OK')"
+Verify: docker-compose exec backend python -c "from src.retrieval.hybrid_retriever import HybridRetriever; print('OK')"
 ```
 
-### 11.2 Update Ingestion Package Init with HybridRetriever
+### 11.2 Create Retrieval Package Init
 
 **Agent Prompt:**
 ```
-Update `backend/src/ingestion/__init__.py`
+Create `backend/src/retrieval/__init__.py`
 
-Add imports and exports for hybrid retriever:
-1. from src.ingestion.hybrid_retriever import HybridRetriever
-2. Add to __all__: "HybridRetriever"
+Requirements:
+1. Export HybridRetriever from this package
+2. Follow standard Python package patterns
+
+Contents:
+```python
+"""Retrieval package - Query-time retrieval components."""
+from src.retrieval.hybrid_retriever import HybridRetriever
+
+__all__ = ["HybridRetriever"]
+```
 
 Reference:
 - HybridRetriever module just created
+- This is a new package for query-time retrieval (separate from ingestion which is write-time)
 
-Verify: docker-compose exec backend python -c "from src.ingestion import HybridRetriever; print('OK')"
+Verify: docker-compose exec backend python -c "from src.retrieval import HybridRetriever; print('OK')"
 ```
 
 ### 11.3 Update RAG Tool with Hybrid Retrieval
@@ -2675,11 +2972,41 @@ Matched: {first 100 chars of child_text_raw}...
 
 **KG Evidence in Response (Explainability):**
 
-When `kg_evidence` is present in the result, include it in the citation for transparency:
+When `kg_evidence` is present in the result, include it in the citation for transparency.
+When `kg_evidence` is absent (KG failed or no match), simply omit the KG Match line - **no error shown to user**.
+
+**Citation Display Rules:**
+
+| Scenario | Citation Format |
+|----------|-----------------|
+| With KG evidence | `[1] Source: ...\n    KG Match: NVIDIA (Organization) - direct mention\n{text}` |
+| Without KG evidence | `[1] Source: ...\n{text}` (no KG Match line, no error) |
+
+**User Experience (Important):**
+
+KG failures should be **invisible to users** - the system degrades gracefully:
+
+| Failure Mode | User Impact | Internal Behavior |
+|--------------|-------------|-------------------|
+| Neo4j connection fails | None visible | KG search skipped, dense+BM25 only |
+| Entity extraction fails | None visible | KG search returns empty, no boost applied |
+| 2-hop query times out | None visible | 1-hop results preserved, 2-hop skipped |
+| All KG fails | None visible | Results lack `kg_evidence`, no KG Match in citations |
+
+The user simply doesn't see the "KG Match:" line when KG is unavailable - no error message, no indication that KG was unavailable.
 
 ```python
 def _format_result_with_kg(result: dict, index: int) -> str:
-    """Format a single result with KG evidence for explainability."""
+    """
+    Format a single result with KG evidence for explainability.
+    
+    Uses MEDIUM verbosity (entity + type + relationship):
+    - Minimal: "KG Match: NVIDIA (Organization)" - too little context
+    - Medium: "KG Match: NVIDIA (Organization) - direct mention" ← CHOSEN
+    - Verbose: Full path trace with shared_docs - token bloat
+    
+    See KNOWLEDGE_GRAPH_UPDATE_PLAN.md Decision 2 for rationale.
+    """
     metadata = result.get("metadata", {})
     kg_evidence = result.get("kg_evidence", {})
     
@@ -2776,6 +3103,192 @@ Matched: Our supply chain and manufacturing operations are global and complex...
 ...
 ```
 
+### 11.4b Test kg_evidence Preservation Through Pipeline
+
+**Purpose:** Verify that `kg_evidence` survives all pipeline steps and reaches `_format_result_with_kg()`.
+
+**Command:**
+```bash
+docker-compose exec backend python -c "
+from src.retrieval import HybridRetriever
+# Assume retriever is initialized with all components
+
+# Run a query that should trigger KG matches
+query = 'What are Apple supply chain risks?'
+results = retriever.retrieve(query, top_k=5, use_kg=True, compress=True)
+
+# Verify kg_evidence survived the full pipeline
+print('\\nkg_evidence Preservation Check:')
+for i, result in enumerate(results):
+    has_kg = 'kg_evidence' in result
+    has_sources = 'sources' in result
+    kg_boost = 'kg_boost' in result.get('sources', [])
+    
+    print(f'  Result {i+1}:')
+    print(f'    has kg_evidence: {has_kg}')
+    if has_kg:
+        kg = result['kg_evidence']
+        print(f'    matched_entity: {kg.get(\"matched_entity\")}')
+        print(f'    match_type: {kg.get(\"match_type\")}')
+    print(f'    has sources: {has_sources}')
+    print(f'    kg_boost applied: {kg_boost}')
+
+# At least one result should have kg_evidence if KG found matches
+kg_results = [r for r in results if 'kg_evidence' in r]
+print(f'\\n✓ {len(kg_results)}/{len(results)} results have kg_evidence')
+
+if not kg_results:
+    print('⚠ Warning: No kg_evidence found. Possible issues:')
+    print('  - No entities extracted from query')
+    print('  - No KG matches found')
+    print('  - kg_evidence lost in rerank() or compress_results()')
+"
+```
+
+**Expected Output:**
+```
+kg_evidence Preservation Check:
+  Result 1:
+    has kg_evidence: True
+    matched_entity: Apple
+    match_type: direct_mention
+    has sources: True
+    kg_boost applied: True
+  Result 2:
+    has kg_evidence: True
+    matched_entity: supply chain
+    match_type: direct_mention
+    has sources: True
+    kg_boost applied: True
+  ...
+
+✓ 3/5 results have kg_evidence
+```
+
+**If kg_evidence is missing after reranking/compression:**
+1. Check `rerank()` copies `kg_evidence` from original results
+2. Check `compress_results()` doesn't recreate result dicts (should modify in-place)
+3. Add debug logging to trace where kg_evidence is lost
+
+### 11.4c KG Integration Validation Tests
+
+These tests verify KG integration improves retrieval quality across different scenarios.
+
+**Test 1: Direct Entity Match (1-hop)**
+
+```bash
+docker-compose exec backend python -c "
+from src.retrieval import HybridRetriever
+# Assume retriever is initialized
+
+query = \"What are NVIDIA's risk factors?\"
+results = retriever.retrieve(query, top_k=5, use_kg=True)
+
+print(f'Query: {query}')
+print(f'Results: {len(results)}')
+
+# Verify entity extraction and KG match
+for i, r in enumerate(results):
+    kg = r.get('kg_evidence', {})
+    if kg:
+        print(f'  [{i+1}] KG Match: {kg.get(\"matched_entity\")} ({kg.get(\"entity_type\")}) - {kg.get(\"match_type\")}')
+
+# Assertions
+assert any(r.get('kg_evidence', {}).get('matched_entity') == 'NVIDIA' for r in results), 'Expected NVIDIA entity match'
+assert any(r.get('kg_evidence', {}).get('match_type') == 'direct_mention' for r in results), 'Expected direct_mention type'
+print('\\n✓ Test 1 passed: Direct entity match working')
+"
+```
+
+**Test 2: Multi-Entity Query (2-hop)**
+
+```bash
+docker-compose exec backend python -c "
+from src.retrieval import HybridRetriever
+# Assume retriever is initialized
+
+query = \"How does Apple's supply chain depend on Taiwan?\"
+results = retriever.retrieve(query, top_k=10, use_kg=True)
+
+print(f'Query: {query}')
+
+# Check for 2-hop (related_via) matches
+direct_matches = [r for r in results if r.get('kg_evidence', {}).get('match_type') == 'direct_mention']
+related_matches = [r for r in results if r.get('kg_evidence', {}).get('match_type') == 'related_via']
+
+print(f'Direct matches (1-hop): {len(direct_matches)}')
+print(f'Related matches (2-hop): {len(related_matches)}')
+
+for r in related_matches[:3]:
+    kg = r.get('kg_evidence', {})
+    print(f'  - {kg.get(\"matched_entity\")} via {kg.get(\"related_to\")}')
+
+# This query should trigger 2-hop (complex query)
+assert len(related_matches) > 0, 'Expected 2-hop related_via matches for complex query'
+print('\\n✓ Test 2 passed: Multi-entity 2-hop working')
+"
+```
+
+**Test 3: No Entity Query (KG Skipped)**
+
+```bash
+docker-compose exec backend python -c "
+from src.retrieval import HybridRetriever
+# Assume retriever is initialized
+
+query = 'What is a 10-K filing?'
+results = retriever.retrieve(query, top_k=5, use_kg=True)
+
+print(f'Query: {query}')
+print(f'Results: {len(results)}')
+
+# Generic question - no entities to extract
+kg_results = [r for r in results if 'kg_evidence' in r]
+print(f'Results with kg_evidence: {len(kg_results)}')
+
+# Should still get results from dense + BM25
+assert len(results) > 0, 'Expected results from dense + BM25'
+# No entities = no KG evidence expected
+print('\\n✓ Test 3 passed: Graceful handling of no-entity queries')
+"
+```
+
+**Test 4: KG Failure Graceful Degradation**
+
+```bash
+docker-compose exec backend python -c "
+from unittest.mock import patch, MagicMock
+from src.retrieval import HybridRetriever
+# Assume retriever is initialized
+
+query = \"Tell me about Microsoft's cloud business\"
+
+# Simulate Neo4j failure
+with patch.object(retriever._queries, 'find_documents_mentioning', side_effect=Exception('Connection failed')):
+    results = retriever.retrieve(query, top_k=5, use_kg=True)
+
+print(f'Query: {query}')
+print(f'Results (with KG failure): {len(results)}')
+
+# Should still get results from dense + BM25
+assert len(results) > 0, 'Expected results despite KG failure'
+
+# No KG evidence (KG failed silently)
+kg_results = [r for r in results if 'kg_evidence' in r]
+assert len(kg_results) == 0, 'Expected no kg_evidence when KG fails'
+
+print('\\n✓ Test 4 passed: Graceful degradation when KG fails')
+"
+```
+
+**Expected Test Summary:**
+| Test | Scenario | Expected Behavior |
+|------|----------|-------------------|
+| 1 | Direct entity | 1-hop match, `direct_mention` type |
+| 2 | Multi-entity | 2-hop matches with `related_via` type |
+| 3 | No entities | Results from dense+BM25 only, no kg_evidence |
+| 4 | KG failure | Silent fallback, no error shown, no kg_evidence |
+
 ### 11.5 Hybrid RAG Integration Checklist
 
 - [ ] hybrid_retriever.py created with HybridRetriever class
@@ -2791,14 +3304,22 @@ Matched: Our supply chain and manufacturing operations are global and complex...
 - [ ] **KG Evidence for Explainability (New):**
   - [ ] `_kg_search()` returns entity evidence (matched_entity, entity_type, match_type)
   - [ ] `_apply_kg_boost()` attaches kg_evidence to boosted chunks
+  - [ ] **`rerank()` preserves kg_evidence through reranking step**
+  - [ ] **`compress_results()` preserves kg_evidence through compression step**
   - [ ] `_format_result_with_kg()` includes KG match info in citations
-  - [ ] Multi-hop (2-hop) used for complex queries (2+ entities)
+  - [ ] Multi-hop (2-hop) used for complex queries (LLM-determined complexity)
+  - [ ] **kg_evidence survives full pipeline to final LLM prompt (Section 11.4b)**
+- [ ] **KG Integration Validation Tests (Section 11.4c):**
+  - [ ] Test 1: Direct entity match (1-hop) working
+  - [ ] Test 2: Multi-entity query (2-hop) working  
+  - [ ] Test 3: No-entity query handled gracefully
+  - [ ] Test 4: KG failure graceful degradation working
 - [ ] **Parent/Child Architecture (Phase 2a compatibility):**
   - [ ] Output includes `parent_id`, `parent_text`, `child_text_raw` fields
   - [ ] `_deduplicate_by_parent()` deduplicates by parent_id after RRF
   - [ ] Compression operates on `parent_text` (1024 tokens)
   - [ ] `child_text_raw` preserved for citation "Matched:" preview
-- [ ] Ingestion __init__.py exports HybridRetriever
+- [ ] Retrieval __init__.py exports HybridRetriever
 - [ ] rag.py updated to use HybridRetriever
 - [ ] **Existing rag.py parent/child functions preserved:**
   - [ ] `_deduplicate_by_parent()` still works
@@ -2808,6 +3329,12 @@ Matched: Our supply chain and manufacturing operations are global and complex...
 - [ ] hybrid=True uses full pipeline with KG evidence
 - [ ] hybrid=False falls back to basic dense search
 - [ ] Test shows improved retrieval quality with KG explainability
+- [ ] **Graceful Degradation (User Experience):**
+  - [ ] KG failures invisible to users (no error messages shown)
+  - [ ] Citations omit "KG Match:" line when kg_evidence absent
+  - [ ] Internal logging captures failures for debugging
+  - [ ] 2-hop timeout preserves 1-hop results
+  - [ ] Pipeline continues with available sources when components fail
 
 ---
 
@@ -3335,7 +3862,7 @@ curl -X POST https://yhvmf3inyx.us-east-1.awsapprunner.com/api/v1/chat \
 **Command (verify parent/child fields preserved through hybrid pipeline):**
 ```bash
 docker-compose exec backend python -c "
-from src.ingestion.hybrid_retriever import HybridRetriever
+from src.retrieval.hybrid_retriever import HybridRetriever
 from src.config.settings import get_settings
 
 # Initialize retriever (uses cached clients)
@@ -3415,13 +3942,14 @@ Result 1:
 
 ### Advanced RAG
 - [ ] BM25 sparse vectors added to Pinecone
-- [ ] Query expansion generates 3 variants (Nova Lite)
+- [ ] Query analysis: generates 3 variants + KG complexity (Nova Lite, single call)
 - [ ] RRF fusion merges results correctly
 - [ ] Cross-encoder reranking improves precision (Nova Lite)
 - [ ] Contextual compression extracts relevant sentences (Nova Lite)
 - [ ] Hybrid retriever integrates all 6 pipeline steps
 - [ ] Utils __init__.py exports: BM25Encoder, rrf_fusion, CrossEncoderReranker, ContextualCompressor
-- [ ] Ingestion __init__.py exports: QueryExpander, HybridRetriever
+- [ ] Ingestion __init__.py exports: QueryExpander, QueryAnalysis
+- [ ] Retrieval __init__.py exports: HybridRetriever
 
 ### Parent/Child Architecture Compatibility (Phase 2a Integration)
 - [ ] HybridRetriever output includes: `parent_id`, `parent_text`, `child_text_raw`
@@ -3778,8 +4306,9 @@ Priority order:
 | `backend/src/utils/rrf.py` | Reciprocal Rank Fusion |
 | `backend/src/utils/reranker.py` | Cross-encoder reranking |
 | `backend/src/utils/compressor.py` | Contextual compression |
-| `backend/src/ingestion/query_expansion.py` | Query expansion via Nova Lite |
-| `backend/src/ingestion/hybrid_retriever.py` | Full hybrid retrieval pipeline |
+| `backend/src/ingestion/query_expansion.py` | Query analysis: expansion + KG complexity (Nova Lite) |
+| `backend/src/retrieval/__init__.py` | Retrieval package (query-time components) |
+| `backend/src/retrieval/hybrid_retriever.py` | Full hybrid retrieval pipeline |
 | `scripts/index_entities.py` | Entity indexing script |
 
 ### Files Modified
