@@ -777,7 +777,9 @@ async def _retrieve_hybrid(
 
         # Check for "out of scope" queries: low relevance + all compression skipped
         # This detects when the query is about something not in our document store
-        top_relevance = final_results[0].get("relevance_score", 0) if final_results else 0
+        top_relevance = (
+            final_results[0].get("relevance_score", 0) if final_results else 0
+        )
         all_compression_skipped = all(
             r.get("_compression_skipped", False) for r in final_results
         )
