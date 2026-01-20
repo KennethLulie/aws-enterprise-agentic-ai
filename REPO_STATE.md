@@ -91,10 +91,13 @@
 | backend/src/ingestion/parent_child_chunking.py | Hierarchical parent/child chunking (1024-token parents, 256-token children) for RAG |
 | backend/src/ingestion/contextual_chunking.py | Contextual enrichment for RAG chunks (Anthropic approach - prepends document context) |
 | backend/src/ingestion/query_expansion.py | Query expansion + KG complexity analysis using Nova Lite (QueryExpander, QueryAnalysis) |
-| backend/src/utils/__init__.py | Utility helpers package |
+| backend/src/utils/__init__.py | Utility helpers package exports: BedrockEmbeddings, PineconeClient, BM25Encoder, rrf_fusion, CrossEncoderReranker |
 | backend/src/utils/embeddings.py | Bedrock Titan v2 embeddings utility for RAG vectorization (1024 dimensions) |
 | backend/src/utils/pinecone_client.py | Pinecone vector store client with hybrid search support (dense + sparse vectors, dotproduct metric) |
 | backend/src/utils/bm25_encoder.py | BM25 sparse vector encoder for Pinecone hybrid search (TF weighting, stopword removal) |
+| backend/src/utils/rrf.py | Reciprocal Rank Fusion for merging dense + BM25 search results (rrf_fusion, RRFResult) |
+| backend/src/utils/reranker.py | Cross-encoder reranking using Nova Lite for relevance scoring (CrossEncoderReranker) |
+| backend/src/utils/compressor.py | Contextual compression using Nova Lite to extract query-relevant sentences (ContextualCompressor) |
 | backend/src/knowledge_graph/__init__.py | Knowledge graph package for entity extraction (spaCy) and graph queries (Neo4j) |
 | backend/src/knowledge_graph/ontology.py | Financial domain ontology: EntityType, RelationType enums, spaCy mappings, EntityRuler patterns |
 | backend/src/knowledge_graph/extractor.py | Entity extraction using spaCy NER + custom financial patterns (EntityExtractor, Entity dataclass) |
@@ -202,9 +205,9 @@
 | backend/src/retrieval/hybrid_retriever.py | HybridRetriever orchestrating dense+BM25+KG+RRF+reranking |
 | backend/src/retrieval/__init__.py | Retrieval package exports (query-time components) |
 | backend/src/ingestion/query_expansion.py | Query analysis: expansion + KG complexity (Nova Lite) |
-| backend/src/utils/rrf.py | Reciprocal Rank Fusion for merging dense + BM25 results |
-| backend/src/utils/reranker.py | Cross-encoder reranking (Nova Lite) |
-| backend/src/utils/compressor.py | Contextual compression (Nova Lite) |
+| backend/src/utils/rrf.py | ✅ Reciprocal Rank Fusion for merging dense + BM25 results |
+| backend/src/utils/reranker.py | ✅ Cross-encoder reranking (Nova Lite) |
+| backend/src/utils/compressor.py | ✅ Contextual compression (Nova Lite) |
 | backend/src/utils/bm25_encoder.py | BM25 sparse vector encoding |
 
 ### Phase 2+ - Future Features
