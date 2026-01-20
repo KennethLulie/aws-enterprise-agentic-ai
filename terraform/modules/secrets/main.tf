@@ -27,6 +27,8 @@ locals {
     "tavily-api-key",
     "fmp-api-key",
     "database-url",
+    "pinecone",      # Phase 2b: RAG (keys: api_key, index_name)
+    "neo4j",         # Phase 2b: Knowledge Graph (keys: uri, user, password)
   ]
 }
 
@@ -37,6 +39,35 @@ locals {
 data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
+
+# Look up actual secret ARNs (includes random suffix added by AWS)
+data "aws_secretsmanager_secret" "demo_password" {
+  name = "${local.secret_prefix}/demo-password"
+}
+
+data "aws_secretsmanager_secret" "auth_token_secret" {
+  name = "${local.secret_prefix}/auth-token-secret"
+}
+
+data "aws_secretsmanager_secret" "tavily_api_key" {
+  name = "${local.secret_prefix}/tavily-api-key"
+}
+
+data "aws_secretsmanager_secret" "fmp_api_key" {
+  name = "${local.secret_prefix}/fmp-api-key"
+}
+
+data "aws_secretsmanager_secret" "database_url" {
+  name = "${local.secret_prefix}/database-url"
+}
+
+data "aws_secretsmanager_secret" "pinecone" {
+  name = "${local.secret_prefix}/pinecone"
+}
+
+data "aws_secretsmanager_secret" "neo4j" {
+  name = "${local.secret_prefix}/neo4j"
+}
 
 #------------------------------------------------------------------------------
 # IAM Policy for Secrets Access

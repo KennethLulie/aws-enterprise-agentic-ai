@@ -140,11 +140,17 @@ resource "aws_apprunner_service" "main" {
 
         # Runtime environment secrets (format: ARN:jsonKey::)
         runtime_environment_secrets = {
-          DEMO_PASSWORD     = "${var.secret_arns["demo_password"]}:password::"
-          AUTH_TOKEN_SECRET = "${var.secret_arns["auth_token_secret"]}:secret::"
-          TAVILY_API_KEY    = "${var.secret_arns["tavily_api_key"]}:api_key::"
-          FMP_API_KEY       = "${var.secret_arns["fmp_api_key"]}:api_key::"
-          DATABASE_URL      = "${var.secret_arns["database_url"]}:url::"
+          DEMO_PASSWORD       = "${var.secret_arns["demo_password"]}:password::"
+          AUTH_TOKEN_SECRET   = "${var.secret_arns["auth_token_secret"]}:secret::"
+          TAVILY_API_KEY      = "${var.secret_arns["tavily_api_key"]}:api_key::"
+          FMP_API_KEY         = "${var.secret_arns["fmp_api_key"]}:api_key::"
+          DATABASE_URL        = "${var.secret_arns["database_url"]}:url::"
+          # Phase 2b: RAG and Knowledge Graph secrets
+          PINECONE_API_KEY    = "${var.secret_arns["pinecone"]}:api_key::"
+          PINECONE_INDEX_NAME = "${var.secret_arns["pinecone"]}:index_name::"
+          NEO4J_URI           = "${var.secret_arns["neo4j"]}:uri::"
+          NEO4J_USER          = "${var.secret_arns["neo4j"]}:user::"
+          NEO4J_PASSWORD      = "${var.secret_arns["neo4j"]}:password::"
         }
       }
     }

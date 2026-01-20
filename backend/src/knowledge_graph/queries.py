@@ -584,7 +584,9 @@ class GraphQueries:
             END
         ] as path_nodes
         LIMIT 1
-        """ % (max_hops * 2)  # Each hop is entity-doc-entity, so double
+        """ % (
+            max_hops * 2
+        )  # Each hop is entity-doc-entity, so double
 
         try:
             with self._store.driver.session() as session:

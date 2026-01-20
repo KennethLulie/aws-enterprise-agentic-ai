@@ -8,10 +8,16 @@ output "secrets_access_policy_arn" {
 }
 
 output "secret_arns" {
-  description = "List of secret ARN patterns for this project"
-  value = [
-    "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}/*"
-  ]
+  description = "Map of secret names to their actual ARNs (with AWS-generated suffix) for App Runner"
+  value = {
+    demo_password     = data.aws_secretsmanager_secret.demo_password.arn
+    auth_token_secret = data.aws_secretsmanager_secret.auth_token_secret.arn
+    tavily_api_key    = data.aws_secretsmanager_secret.tavily_api_key.arn
+    fmp_api_key       = data.aws_secretsmanager_secret.fmp_api_key.arn
+    database_url      = data.aws_secretsmanager_secret.database_url.arn
+    pinecone          = data.aws_secretsmanager_secret.pinecone.arn
+    neo4j             = data.aws_secretsmanager_secret.neo4j.arn
+  }
 }
 
 output "secret_prefix" {

@@ -34,6 +34,29 @@ This project showcases a production-ready AI agent system with:
 **AWS Region:** us-east-1 (N. Virginia - closest to Austin, TX)  
 **Architecture:** Scalable, enterprise-ready, cost-optimized
 
+## RAG Technology Stack
+
+Our production-ready RAG system integrates **10+ technologies** working together for state-of-the-art retrieval:
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Document Extraction** | Claude Sonnet 4.5 Vision (Bedrock) | VLM extraction from complex PDFs with table preservation |
+| **Embeddings** | AWS Bedrock Titan v2 (1024d) | Semantic vector generation for similarity search |
+| **Vector Store** | Pinecone Serverless | Dense + sparse hybrid search with free tier |
+| **Keyword Search** | BM25 Sparse Vectors | Exact term matching for domain terminology |
+| **Knowledge Graph** | Neo4j AuraDB | Entity relationships + multi-hop traversal |
+| **Entity Extraction** | spaCy NER | Cost-efficient extraction (20-50x cheaper than LLM) |
+| **Query Enhancement** | Nova Lite | Query expansion generating 3 variants (+20-30% recall) |
+| **Result Fusion** | RRF Algorithm | Reciprocal Rank Fusion merging multiple sources |
+| **Reranking** | Nova Lite Cross-Encoder | LLM relevance scoring (+20-25% precision) |
+| **Compression** | Contextual Compression | Extract query-relevant sentences from chunks |
+| **SQL Analytics** | Neon PostgreSQL | Structured 10-K financial metrics for precise queries |
+| **Orchestration** | LangGraph | Multi-tool agent with streaming and checkpointing |
+
+**Query Pipeline:** User Query -> Query Expansion (3 variants) -> Parallel Retrieval (Dense + BM25 + KG) -> RRF Fusion -> KG Boost -> Cross-Encoder Reranking -> Contextual Compression -> Response with Citations
+
+See [docs/RAG_README.md](./docs/RAG_README.md) for the complete architecture deep-dive.
+
 ## 🏢 Why Enterprise-Grade?
 
 This system goes beyond a simple demo by implementing production-ready features:
@@ -69,9 +92,18 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 ## 📋 Project Status
 
-**Current Phase:** Phase 2b 🚧 In Progress (Intelligence Layer) - Adding Knowledge Graph and hybrid search
+**Current Phase:** Phase 2b ✅ **COMPLETED** (January 20, 2026) - Intelligence Layer with Knowledge Graph and Hybrid Search
 
 > 🚀 **Demo link and password available on request**
+
+**Phase 2b (completed January 20, 2026)** delivered the intelligence layer:
+- ✅ Knowledge Graph - Neo4j AuraDB with spaCy entity extraction (781 vectors indexed)
+- ✅ Hybrid Search - Dense + BM25 sparse vectors with RRF fusion
+- ✅ Query Expansion - Nova Lite generates 3 query variants (+20-30% recall)
+- ✅ Cross-encoder Reranking - Nova Lite relevance scoring (+20-25% precision)
+- ✅ Contextual Compression - Extract query-relevant sentences
+- ✅ Multi-tool Orchestration - SQL + RAG + Search combined queries
+- ✅ AWS Secrets configured for Pinecone and Neo4j
 
 **Phase 2a (completed January 19, 2026)** delivered data foundation and core tools:
 - ✅ SQL Query Tool - Real implementation with Neon PostgreSQL
@@ -79,12 +111,6 @@ This system goes beyond a simple demo by implementing production-ready features:
 - ✅ Document processing pipeline with VLM extraction
 - ✅ Parent/child chunking with contextual enrichment
 - ✅ Agent integration with graceful fallback
-
-**Phase 2b (in progress)** adds intelligence layer:
-- 📖 Knowledge Graph - Neo4j with spaCy entity extraction
-- 📖 Hybrid Search - BM25 + dense embeddings with RRF fusion
-- 📖 Cross-encoder Reranking - LLM-based relevance scoring
-- See [docs/PHASE_2B_HOW_TO_GUIDE.md](docs/PHASE_2B_HOW_TO_GUIDE.md) for implementation details
 
 **Phase 1b (completed January 13, 2026)** added production hardening:
 - ✅ Neon PostgreSQL integration for persistent state (free tier)
@@ -121,12 +147,8 @@ docker-compose build backend && docker-compose up -d backend
 
 ## 📚 Documentation
 
-### Current Phase Guides
-- **[docs/PHASE_2A_HOW_TO_GUIDE.md](./docs/PHASE_2A_HOW_TO_GUIDE.md)** - 📖 **Phase 2a: Data Foundation & Basic Tools** - VLM extraction pipeline, SQL tool with 10-K financial data, basic RAG with Pinecone
-- **[docs/PHASE_2B_HOW_TO_GUIDE.md](./docs/PHASE_2B_HOW_TO_GUIDE.md)** - 📖 **Phase 2b: Intelligence Layer & Full Integration** - Knowledge Graph (Neo4j), hybrid retrieval (BM25 + reranking), multi-tool orchestration, cross-document analysis
-
 ### Architecture Deep-Dives
-- **[docs/RAG_README.md](./docs/RAG_README.md)** - 📖 **RAG System Architecture** - Comprehensive guide to our retrieval system including VLM extraction for 10-Ks, hybrid search (dense + BM25), knowledge graph integration, query pipeline, and enterprise feature considerations
+- **[docs/RAG_README.md](./docs/RAG_README.md)** - **RAG System Architecture** - Comprehensive guide to our hybrid retrieval system including VLM extraction, dense + BM25 search, knowledge graph integration, query expansion, reranking, and enterprise considerations
 
 ### Project References
 - **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete project plan with all phases, architecture, and implementation details
@@ -134,6 +156,8 @@ docker-compose build backend && docker-compose up -d backend
 - **[docs/SECURITY.md](./docs/SECURITY.md)** - Security and secrets management guide
 
 ### Completed Phase Guides (Archived)
+- **[docs/completed-phases/PHASE_2B_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_2B_HOW_TO_GUIDE.md)** - Phase 2b (Intelligence Layer - Knowledge Graph, Hybrid RAG)
+- **[docs/completed-phases/PHASE_2A_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_2A_HOW_TO_GUIDE.md)** - Phase 2a (Data Foundation - VLM, SQL, Basic RAG)
 - **[docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md)** - Phase 1b (Production Hardening)
 - **[docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md)** - Phase 1a (AWS Cloud Deployment)
 - **[docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md](./docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md)** - Phase 0 (Local Development)
@@ -343,8 +367,9 @@ docker compose up
 - **Phase 0:** ✅ Local development environment (real Tavily search, FMP market data; SQL/RAG stubbed)
 - **Phase 1a:** ✅ Minimal MVP - AWS Cloud Deployment (App Runner + CloudFront)
 - **Phase 1b:** ✅ Production hardening (persistent state, Neon PostgreSQL, CI/CD)
-- **Phase 2:** 🚧 Core agent tools (SQL with Neon, RAG with Pinecone; Search & Market Data done in Phase 0) - **CURRENT**
-- **Phase 3+:** Advanced features (verification, caching, observability, evaluation)
+- **Phase 2a:** ✅ Data Foundation (VLM extraction, SQL tool, basic RAG with Pinecone)
+- **Phase 2b:** ✅ Intelligence Layer (Knowledge Graph, hybrid search, query expansion, reranking) - **COMPLETED**
+- **Phase 3+:** Advanced features (verification, caching, observability, evaluation) - **NEXT**
 
 See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for complete details.
 
