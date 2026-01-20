@@ -221,7 +221,9 @@ class QueryExpander:
                 self._log.debug("bedrock_client_created", region=settings.aws_region)
             except Exception as e:
                 self._log.error("bedrock_client_creation_failed", error=str(e))
-                raise QueryExpansionError(f"Failed to create Bedrock client: {e}") from e
+                raise QueryExpansionError(
+                    f"Failed to create Bedrock client: {e}"
+                ) from e
         return self._client
 
     def _build_prompt(self, query: str, num_variants: int) -> str:
@@ -286,18 +288,20 @@ Respond ONLY with valid JSON, no markdown or other text."""
         client = self._get_client()
 
         # Nova Lite request format
-        body = json.dumps({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [{"text": prompt}],
-                }
-            ],
-            "inferenceConfig": {
-                "maxTokens": 500,
-                "temperature": 0.3,  # Low temp for consistent JSON output
-            },
-        })
+        body = json.dumps(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{"text": prompt}],
+                    }
+                ],
+                "inferenceConfig": {
+                    "maxTokens": 500,
+                    "temperature": 0.3,  # Low temp for consistent JSON output
+                },
+            }
+        )
 
         try:
             response = await asyncio.to_thread(
@@ -357,10 +361,7 @@ Respond ONLY with valid JSON, no markdown or other text."""
             if json_str.startswith("```"):
                 # Extract JSON from code block
                 lines = json_str.split("\n")
-                json_lines = [
-                    line for line in lines
-                    if not line.startswith("```")
-                ]
+                json_lines = [line for line in lines if not line.startswith("```")]
                 json_str = "\n".join(json_lines)
 
             parsed = json.loads(json_str)

@@ -2186,4 +2186,30 @@ The architecture is designed to be:
 | Tool fails | Circuit breaker | Explain graceful degradation, try different query |
 | Streaming stops | SSE timeout | Refresh page, explain timeout handling |
 
+---
+
+## Future Improvements: HybridRetriever Production Readiness
+
+The following potential issues were identified during code review of the `HybridRetriever` module. These are **not blockers** for the demo but should be addressed before scaling to production.
+
+| Issue | Severity (Demo) | Severity (Production) | Description |
+|-------|-----------------|----------------------|-------------|
+| **No Overall Pipeline Timeout** | HIGH | HIGH | `retrieve()` method has no overall timeout. Individual components may each be within limits, but combined could exceed API gateway timeouts (30s). |
+| **Neo4j Blocking Event Loop** | LOW | HIGH | `_kg_search()` uses synchronous Neo4j calls. Fine for single-user demo, blocks other requests under load. |
+| **spaCy Cold Start Latency** | MEDIUM | MEDIUM | `EntityExtractor` lazy-loads spaCy model on first use, adding 1-2s to first query. Pre-load in `__init__` or startup event. |
+| **No Pinecone Hybrid Index Validation** | MEDIUM | MEDIUM | BM25 search assumes Pinecone is configured with sparse vector support. No validation on startup - silent degradation if not configured. |
+| **Duplicate Embedding API Calls** | LOW | LOW | Parallel variant searches may call `embed_text()` concurrently before cache is populated. Minor cost inefficiency. |
+
+**Recommended Fixes (When Scaling):**
+
+1. **Pipeline Timeout:** Add `asyncio.timeout(30.0)` wrapper around `retrieve()` method
+2. **Neo4j Async:** Wrap sync calls with `asyncio.to_thread()` or migrate to async Neo4j driver
+3. **spaCy Pre-load:** Call `_ = self._extractor.nlp` in `HybridRetriever.__init__()` to pre-warm
+4. **Hybrid Index Check:** Add startup validation that tests sparse vector query
+5. **Embedding Pre-compute:** Pre-embed all unique variants before parallel search
+
+**For Demo:** Focus on #1 (timeout) and #3 (cold start) if any issues arise. Others can wait until multi-user production.
+
+---
+
 Ready to begin Phase 0 when you are!

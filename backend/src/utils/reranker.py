@@ -229,18 +229,20 @@ Relevance score (1-10):"""
         client = self._get_client()
 
         # Nova Lite request format
-        body = json.dumps({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [{"text": prompt}],
-                }
-            ],
-            "inferenceConfig": {
-                "maxTokens": 10,  # Only need a single number
-                "temperature": 0.0,  # Deterministic for scoring
-            },
-        })
+        body = json.dumps(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{"text": prompt}],
+                    }
+                ],
+                "inferenceConfig": {
+                    "maxTokens": 10,  # Only need a single number
+                    "temperature": 0.0,  # Deterministic for scoring
+                },
+            }
+        )
 
         try:
             response = await asyncio.to_thread(
@@ -408,9 +410,7 @@ Relevance score (1-10):"""
             return (result, score)
 
         # Run all scoring tasks with controlled concurrency
-        scored_results = await asyncio.gather(
-            *[score_result(r) for r in candidates]
-        )
+        scored_results = await asyncio.gather(*[score_result(r) for r in candidates])
 
         # Sort by relevance score descending
         sorted_results = sorted(scored_results, key=lambda x: x[1], reverse=True)

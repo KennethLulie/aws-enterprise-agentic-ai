@@ -46,7 +46,6 @@ from typing import Any
 import structlog
 from structlog.types import EventDict, Processor, WrappedLogger
 
-
 # Sensitive field patterns to redact from logs
 SENSITIVE_FIELDS = frozenset(
     {

@@ -711,7 +711,9 @@ class PineconeClient:
             return results
 
         except Exception as e:
-            self._log.error("query_failed", error=str(e), hybrid=sparse_vector is not None)
+            self._log.error(
+                "query_failed", error=str(e), hybrid=sparse_vector is not None
+            )
             raise PineconeQueryError(f"Failed to query vectors: {e}") from e
 
     @retry(

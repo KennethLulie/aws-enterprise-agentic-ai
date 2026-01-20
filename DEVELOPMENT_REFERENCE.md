@@ -2,7 +2,7 @@
 
 **Purpose:** This document serves as the authoritative reference for implementation details, technology specifications, and development order throughout all phases. Consult this document before implementing any feature to ensure consistency, completeness, and proper integration.  Make sure this document is updated as needed as the project proceeds.
 
-**Last Updated:** 2026-01-20 (Phase 2b in progress) - SQL and RAG tools implemented with real backends (Neon PostgreSQL, Pinecone). Phase 2b active: KG indexing complete, hybrid retrieval + KG integration in progress. Implementation guide: `docs/PHASE_2B_HOW_TO_GUIDE.md`. KG enhancements: `docs/KNOWLEDGE_GRAPH_UPDATE_PLAN.md`.
+**Last Updated:** 2026-01-20 (Phase 2b in progress) - SQL and RAG tools implemented with real backends (Neon PostgreSQL, Pinecone). Phase 2b active: KG indexing complete, HybridRetriever module complete (dense+BM25+KG+RRF+reranking+compression with graceful degradation), RAG tool integration complete (hybrid=True default). Implementation guide: `docs/PHASE_2B_HOW_TO_GUIDE.md`. KG enhancements: `docs/KNOWLEDGE_GRAPH_UPDATE_PLAN.md`.
 
 ---
 

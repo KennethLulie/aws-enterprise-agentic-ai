@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-20 (Phase 2b in progress: KG indexing complete, hybrid retrieval in progress)
+**Last Updated:** 2026-01-20 (Phase 2b in progress: KG indexing complete, HybridRetriever module complete, RAG tool integration complete)
 
 ---
 
@@ -77,7 +77,7 @@
 | backend/src/agent/nodes/error_recovery.py | Error recovery node |
 | backend/src/agent/tools/__init__.py | Tools package exports |
 | backend/src/agent/tools/market_data.py | FMP market data tool (mock-friendly) |
-| backend/src/agent/tools/rag.py | RAG retrieval tool - Real Pinecone semantic search with parent/child deduplication, contextual enrichment, metadata filtering, source citations, graceful fallback to Tavily |
+| backend/src/agent/tools/rag.py | RAG retrieval tool - Hybrid retrieval (dense+BM25+KG+RRF+reranking+compression via HybridRetriever), parent/child deduplication, KG evidence in citations, graceful degradation to dense-only via hybrid=False |
 | backend/src/agent/tools/search.py | Tavily search tool |
 | backend/src/agent/tools/sql.py | SQL query tool - Real NL-to-SQL conversion via Bedrock, query validation, table whitelisting, formatted results from Neon PostgreSQL |
 | backend/src/agent/tools/sql_safety.py | SQL safety module with query validation, table/column whitelists, and sanitization |
@@ -98,6 +98,8 @@
 | backend/src/utils/rrf.py | Reciprocal Rank Fusion for merging dense + BM25 search results (rrf_fusion, RRFResult) |
 | backend/src/utils/reranker.py | Cross-encoder reranking using Nova Lite for relevance scoring (CrossEncoderReranker) |
 | backend/src/utils/compressor.py | Contextual compression using Nova Lite to extract query-relevant sentences (ContextualCompressor) |
+| backend/src/retrieval/__init__.py | Retrieval package exports (HybridRetriever, exceptions, type definitions) |
+| backend/src/retrieval/hybrid_retriever.py | HybridRetriever orchestrating dense+BM25+KG+RRF+reranking+compression with graceful degradation |
 | backend/src/knowledge_graph/__init__.py | Knowledge graph package for entity extraction (spaCy) and graph queries (Neo4j) |
 | backend/src/knowledge_graph/ontology.py | Financial domain ontology: EntityType, RelationType enums, spaCy mappings, EntityRuler patterns |
 | backend/src/knowledge_graph/extractor.py | Entity extraction using spaCy NER + custom financial patterns (EntityExtractor, Entity dataclass) |
@@ -202,13 +204,13 @@
 ### Phase 2b - Intelligence Layer (In Progress)
 | File | Purpose |
 |------|---------|
-| backend/src/retrieval/hybrid_retriever.py | HybridRetriever orchestrating dense+BM25+KG+RRF+reranking |
-| backend/src/retrieval/__init__.py | Retrieval package exports (query-time components) |
-| backend/src/ingestion/query_expansion.py | Query analysis: expansion + KG complexity (Nova Lite) |
+| backend/src/retrieval/hybrid_retriever.py | ✅ HybridRetriever orchestrating dense+BM25+KG+RRF+reranking |
+| backend/src/retrieval/__init__.py | ✅ Retrieval package exports (HybridRetriever, exceptions, types) |
+| backend/src/ingestion/query_expansion.py | ✅ Query analysis: expansion + KG complexity (Nova Lite) |
 | backend/src/utils/rrf.py | ✅ Reciprocal Rank Fusion for merging dense + BM25 results |
 | backend/src/utils/reranker.py | ✅ Cross-encoder reranking (Nova Lite) |
 | backend/src/utils/compressor.py | ✅ Contextual compression (Nova Lite) |
-| backend/src/utils/bm25_encoder.py | BM25 sparse vector encoding |
+| backend/src/utils/bm25_encoder.py | ✅ BM25 sparse vector encoding |
 
 ### Phase 2+ - Future Features
 | File | Purpose |

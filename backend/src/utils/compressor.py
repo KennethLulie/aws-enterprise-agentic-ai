@@ -103,7 +103,8 @@ NOT_RELEVANT = "NOT_RELEVANT"
 
 # Minimum results to return even if all marked NOT_RELEVANT
 # Prevents empty results when LLM is overly aggressive
-MIN_RESULTS_GUARANTEE = 2
+# Set to 5 to match default top_k (users expect ~5 comprehensive results)
+MIN_RESULTS_GUARANTEE = 5
 
 # Maximum length for NOT_RELEVANT variation detection
 # Legitimate extractions are typically >50 chars
@@ -306,18 +307,20 @@ Relevant sentences:"""
         client = self._get_client()
 
         # Nova Lite request format
-        body = json.dumps({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [{"text": prompt}],
-                }
-            ],
-            "inferenceConfig": {
-                "maxTokens": 500,  # Allow for multi-sentence extraction
-                "temperature": 0.0,  # Deterministic for extraction
-            },
-        })
+        body = json.dumps(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{"text": prompt}],
+                    }
+                ],
+                "inferenceConfig": {
+                    "maxTokens": 500,  # Allow for multi-sentence extraction
+                    "temperature": 0.0,  # Deterministic for extraction
+                },
+            }
+        )
 
         try:
             response = await asyncio.to_thread(
@@ -484,67 +487,39 @@ Relevant sentences:"""
             async with semaphore:
                 compressed = await self.compress(query, parent_text)
 
-            # Filter out NOT_RELEVANT results
+            # Option C: Don't filter - use parent_text as fallback when NOT_RELEVANT
+            # Compression should enhance, not eliminate documents the reranker validated
             if compressed == NOT_RELEVANT:
                 self._log.debug(
-                    "compress_filtered_not_relevant",
+                    "compress_not_relevant_using_parent",
                     result_id=result.get("id"),
                 )
-                return None
+                # Use original parent_text instead of filtering out
+                result["compressed_text"] = parent_text
+                result["_compression_skipped"] = True  # Flag for debugging
+                return result
 
             # Add compressed_text field (preserves all other fields)
             result["compressed_text"] = compressed
             return result
 
         # Process all results concurrently
-        compressed_results_raw = await asyncio.gather(
+        compressed_results = await asyncio.gather(
             *[compress_single(r) for r in results]
         )
 
-        # Filter out None (NOT_RELEVANT) results
-        compressed_results = [r for r in compressed_results_raw if r is not None]
-
-        filtered_count = len(results) - len(compressed_results)
-
-        # Fix #1: Minimum results guarantee
-        # If all/most results filtered, return top results uncompressed
-        # This prevents empty results when LLM is overly aggressive
-        if len(compressed_results) < MIN_RESULTS_GUARANTEE and results:
-            self._log.warning(
-                "compress_all_filtered_fallback",
-                filtered_count=filtered_count,
-                returning_uncompressed=MIN_RESULTS_GUARANTEE,
-            )
-            # Return top results with original parent_text as compressed_text
-            fallback_results = []
-            for r in results[:MIN_RESULTS_GUARANTEE]:
-                metadata = r.get("metadata", {})
-                parent_text = (
-                    r.get("parent_text")
-                    or metadata.get("parent_text")
-                    or metadata.get("text")
-                    or ""
-                )
-                r["compressed_text"] = parent_text
-                r["_compression_fallback"] = True  # Flag for debugging
-                fallback_results.append(r)
-
-            self._log.info(
-                "compress_results_complete",
-                query=query[:50],
-                input_count=len(results),
-                output_count=len(fallback_results),
-                filtered_not_relevant=filtered_count,
-                fallback_used=True,
-            )
-            return fallback_results
+        # Count how many used parent_text fallback (NOT_RELEVANT from LLM)
+        skipped_count = sum(
+            1 for r in compressed_results if r.get("_compression_skipped")
+        )
 
         self._log.info(
             "compress_results_complete",
             query=query[:50],
             input_count=len(results),
             output_count=len(compressed_results),
-            filtered_not_relevant=filtered_count,
+            compression_skipped=skipped_count,
+            compression_applied=len(compressed_results) - skipped_count,
         )
 
         return compressed_results

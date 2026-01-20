@@ -228,14 +228,14 @@ def rrf_score_explanation(score: float, k: int = DEFAULT_K) -> str:
     # Estimate number of lists and average rank from score
     # score = n * 1/(k + avg_rank) → avg_rank ≈ n/score - k
     # For score=0.032 with k=60: if n=2, avg_rank ≈ 2.5
-    
+
     if score <= 0:
         return "RRF score 0.000 = not in any list"
-    
+
     # Common cases
     single_rank1 = 1.0 / (k + 1)  # ~0.0164 for k=60
     double_rank1 = 2.0 / (k + 1)  # ~0.0328 for k=60
-    
+
     if abs(score - double_rank1) < 0.001:
         return f"RRF score {score:.4f} ≈ rank 1 in 2 lists (k={k})"
     elif abs(score - single_rank1) < 0.001:
@@ -243,4 +243,6 @@ def rrf_score_explanation(score: float, k: int = DEFAULT_K) -> str:
     else:
         # Estimate sources based on score magnitude
         estimated_sources = max(1, round(score / single_rank1))
-        return f"RRF score {score:.4f} ≈ appears in ~{estimated_sources} list(s) (k={k})"
+        return (
+            f"RRF score {score:.4f} ≈ appears in ~{estimated_sources} list(s) (k={k})"
+        )
