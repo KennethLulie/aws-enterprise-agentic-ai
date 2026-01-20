@@ -509,12 +509,12 @@ Relevant sentences:"""
         )
 
         # Filter out None results (shouldn't happen, but defensive)
-        valid_results: list[dict[str, Any]] = [r for r in compressed_results if r is not None]
+        valid_results: list[dict[str, Any]] = [
+            r for r in compressed_results if r is not None
+        ]
 
         # Count how many used parent_text fallback (NOT_RELEVANT from LLM)
-        skipped_count = sum(
-            1 for r in valid_results if r.get("_compression_skipped")
-        )
+        skipped_count = sum(1 for r in valid_results if r.get("_compression_skipped"))
 
         self._log.info(
             "compress_results_complete",
