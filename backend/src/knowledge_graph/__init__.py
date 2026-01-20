@@ -101,13 +101,24 @@ from src.knowledge_graph.ontology import (
 )
 
 # Phase 2b Section 3.3: Entity extraction
-# from src.knowledge_graph.extractor import EntityExtractor, Entity
+from src.knowledge_graph.extractor import (
+    Entity,
+    EntityExtractor,
+    EntityExtractionError,
+    ModelLoadError,
+)
 
 # Phase 2b Section 4.4: Neo4j graph store
-# from src.knowledge_graph.store import Neo4jStore
+from src.knowledge_graph.store import (
+    Neo4jStore,
+    Neo4jStoreError,
+    Neo4jConnectionError,
+    AuraDBPausedError,
+    QueryError,
+)
 
 # Phase 2b Section 6.3: Graph queries
-# from src.knowledge_graph.queries import GraphQueries
+from src.knowledge_graph.queries import GraphQueries, GraphQueryError
 
 # =============================================================================
 # Package Version
@@ -131,10 +142,17 @@ __all__: list[str] = [
     "is_valid_entity_type",
     "is_valid_relation_type",
     # Entity Extraction (Phase 2b Section 3.3)
-    # "EntityExtractor",
-    # "Entity",
+    "Entity",
+    "EntityExtractor",
+    "EntityExtractionError",
+    "ModelLoadError",
     # Graph Store (Phase 2b Section 4.4)
-    # "Neo4jStore",
+    "Neo4jStore",
+    "Neo4jStoreError",
+    "Neo4jConnectionError",
+    "AuraDBPausedError",
+    "QueryError",
     # Graph Queries (Phase 2b Section 6.3)
-    # "GraphQueries",
+    "GraphQueries",
+    "GraphQueryError",
 ]

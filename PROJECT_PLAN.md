@@ -706,9 +706,13 @@ If something isn't working, follow this systematic debugging process:
 - **Circuit breaker:** Prevent repeated failures from overwhelming database
 - *Implementation:* `backend/src/agent/tools/sql.py` (currently stub, needs real implementation)
 
-**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)** 🚧 *TO BE IMPLEMENTED*
+**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)** 🔄 *IN PROGRESS*
 
+> **Status:** Basic RAG (dense search) completed in Phase 2a. Knowledge Graph indexing complete. Hybrid retrieval + KG integration in progress (Phase 2b).
+> 
 > **Full Architecture:** See `docs/RAG_README.md` for comprehensive architecture. Implementation details in `docs/PHASE_2A_HOW_TO_GUIDE.md` (basic RAG) and `docs/PHASE_2B_HOW_TO_GUIDE.md` (hybrid retrieval, knowledge graph).
+> 
+> **KG Enhancement Plan:** See `docs/KNOWLEDGE_GRAPH_UPDATE_PLAN.md` for detailed KG integration enhancements.
 
 **Key Decisions:**
 - **VLM for ALL documents** - Claude Vision extracts clean text from all PDFs (10-Ks and reference docs)
@@ -743,11 +747,14 @@ If something isn't working, follow this systematic debugging process:
   - Impact: +20-25% precision on top-k results
   - Cost: ~$0.01-0.015/query
 
-- **Knowledge Graph Integration:**
+- **Knowledge Graph Integration (January 2026 Best Practices):**
   - Infrastructure: Neo4j AuraDB Free (200K nodes, $0/month)
-  - 1-2 hop entity relationship traversal
-  - Base ontology for financial domain (Policy, Customer, Account, Regulation, Concept)
-  - Enhances retrieval with entity relationships
+  - 1-hop for simple queries, 2-hop for complex queries (2+ entities)
+  - Base ontology: 10 entity types (Organization, Person, Location, Regulation, Concept, etc.)
+  - **Entity Evidence for Explainability:** KG returns WHY docs matched (entity, type, match_type)
+  - **Chunk-Level Boosting:** +0.1 boost to chunks from KG-matched documents
+  - **LLM Context:** Entity evidence included in citations for transparency
+  - Impact: +10-15% precision on entity-specific queries
 
 **Ingestion Pipeline (Batch Script):**
 ```
@@ -764,10 +771,18 @@ PDF → Claude VLM → Clean Text → ┬→ Semantic Chunking → Titan Embed �
 5. Clean text → spaCy NER → Store entities in Knowledge Graph (Neo4j)
 6. (10-Ks only) Parsed tables → Store metrics in PostgreSQL
 
-**Query Pipeline:**
+**Query Pipeline (8 steps):**
 1. Query → Expansion (3 variants via Nova Lite)
-2. Parallel: Dense search + Sparse search (BM25) + KG entity lookup
-3. RRF Fusion → Cross-Encoder Rerank → Contextual Compression → Results
+2. Parallel retrieval:
+   - Dense search (Pinecone) → chunks
+   - BM25 search (Pinecone sparse) → chunks
+   - KG entity lookup (Neo4j) → document IDs + entity evidence
+3. RRF Fusion (merge dense + BM25 chunks)
+4. **KG Boost** (apply +0.1 to chunks from KG-matched docs, attach entity evidence)
+5. Cross-Encoder Rerank (Nova Lite scores relevance)
+6. Contextual Compression (extract relevant sentences)
+7. Format response with KG evidence for explainability
+8. Return with source citations
 
 **Costs:**
 - One-time VLM extraction: ~$40-60 for ~30-40 documents
@@ -778,13 +793,15 @@ PDF → Claude VLM → Clean Text → ┬→ Semantic Chunking → Titan Embed �
 - Document embedding pipeline (Bedrock Titan Embeddings v2, 1024 dimensions)
 - **VLM extraction** (Claude Vision) for all documents via batch script
 - Query expansion (3 alternative phrasings via Nova Lite, +20-30% recall)
-- RRF (Reciprocal Rank Fusion) for combining semantic + keyword + graph results
+- RRF (Reciprocal Rank Fusion) for combining semantic + keyword chunk results
+- **KG Boost** (chunk-level boosting from document-level KG matches)
+- **KG Evidence** (entity context attached to results for LLM explainability)
 - Cross-encoder reranking (Nova Lite scores relevance, +20-25% precision)
 - Contextual Compression (LLMChainExtractor)
-- Source citation with page/section numbers
+- Source citation with page/section numbers and KG match info
 - Metadata filtering (document_type, company, section, etc.)
 - **Fallback mechanisms:** Graceful degradation if Pinecone/KG unavailable
-- *Implementation:* `backend/src/agent/tools/rag.py` (currently stub, needs real implementation)
+- *Implementation:* `backend/src/agent/tools/rag.py` (basic in Phase 2a, hybrid in Phase 2b)
 
 **2d. Market Data Tool (FMP via MCP)** ✅ *COMPLETED IN PHASE 0*
 - Financial Modeling Prep integration exposed via MCP (live calls optional; mock mode when no API key)

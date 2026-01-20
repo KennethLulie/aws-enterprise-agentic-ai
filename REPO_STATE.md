@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-19 (Phase 2a complete: SQL and RAG tools with real backends, Phase 2b active)
+**Last Updated:** 2026-01-20 (Phase 2b in progress: KG indexing complete, hybrid retrieval in progress)
 
 ---
 
@@ -95,6 +95,9 @@
 | backend/src/utils/pinecone_client.py | Pinecone vector store client wrapper for RAG operations (dotproduct metric, 1024 dims) |
 | backend/src/knowledge_graph/__init__.py | Knowledge graph package for entity extraction (spaCy) and graph queries (Neo4j) |
 | backend/src/knowledge_graph/ontology.py | Financial domain ontology: EntityType, RelationType enums, spaCy mappings, EntityRuler patterns |
+| backend/src/knowledge_graph/extractor.py | Entity extraction using spaCy NER + custom financial patterns (EntityExtractor, Entity dataclass) |
+| backend/src/knowledge_graph/store.py | Neo4j graph store adapter with connection pooling, CRUD operations, batch processing (Neo4jStore) |
+| backend/src/knowledge_graph/queries.py | Graph traversal queries for entity lookup, related entities, co-occurrence, fuzzy search (GraphQueries) |
 | backend/tests/__init__.py | Tests package |
 | backend/tests/test_agent.py | Agent and graph tests |
 | backend/tests/test_api.py | API endpoint tests |
@@ -137,6 +140,7 @@
 | docs/integration-test-checklist.md | Phase 0 end-to-end test checklist |
 | docs/RAG_README.md | RAG system architecture, design decisions, and alternatives |
 | docs/PHASE_2B_HOW_TO_GUIDE.md | Phase 2b step-by-step guide (intelligence layer) |
+| docs/KNOWLEDGE_GRAPH_UPDATE_PLAN.md | KG enhancement plan (entity evidence, chunk boosting, multi-hop) |
 | docs/completed-phases/PHASE_0_HOW_TO_GUIDE.md | Completed Phase 0 guide (archived) |
 | docs/completed-phases/PHASE_1A_HOW_TO_GUIDE.md | Completed Phase 1a guide (archived) |
 | docs/completed-phases/PHASE_1B_HOW_TO_GUIDE.md | Completed Phase 1b guide (archived) |
@@ -154,6 +158,7 @@
 | scripts/extract_and_index.py | VLM document extraction and Pinecone indexing batch script (--status, --dry-run, --force, --doc, --index-only, --reindex, --index-doc) |
 | scripts/rag_diagnostic.py | RAG diagnostic tool for Pinecone inspection and query testing (--stats, --inspect, --query, --all) |
 | scripts/load_10k_to_sql.py | SQL data loading script for 10-K financial data (--validate-only, --dry-run, --ticker, --force) |
+| scripts/index_entities.py | Entity indexing script for Knowledge Graph population (--dry-run, --force, --extracted-dir, --neo4j-uri) |
 
 ### Terraform Directory
 | File | Purpose |
@@ -189,31 +194,21 @@
 | Note: Using Neon PostgreSQL (external) - no Aurora module needed |
 | Note: LangGraph checkpoint tables are created by PostgresSaver.setup(), not Alembic |
 
-### Phase 2+ - Advanced Features
+### Phase 2b - Intelligence Layer (In Progress)
 | File | Purpose |
 |------|---------|
-| backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
-| backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
-| backend/src/knowledge_graph/queries.py | Graph traversal queries |
-| backend/src/utils/reranker.py | Cross-encoder reranking (Phase 2 RAG) |
-| lambda/document-ingestion/handler.py | S3-triggered document processing |
-| terraform/modules/lambda/main.tf | Lambda infrastructure |
+| backend/src/ingestion/hybrid_retriever.py | HybridRetriever orchestrating dense+BM25+KG+RRF+reranking |
+| backend/src/utils/rrf.py | Reciprocal Rank Fusion for merging dense + BM25 results |
+| backend/src/utils/reranker.py | Cross-encoder reranking (Nova Lite) |
+| backend/src/utils/query_expander.py | Query expansion (Nova Lite) |
+| backend/src/utils/compressor.py | Contextual compression (Nova Lite) |
+| backend/src/utils/bm25_encoder.py | BM25 sparse vector encoding |
 
-### Phase 2+ - To Be Created
-
-**Knowledge Graph & 2025 SOTA RAG:**
+### Phase 2+ - Future Features
 | File | Purpose |
 |------|---------|
-| backend/src/knowledge_graph/efficient_extractor.py | NLP entity extraction (spaCy) |
-| backend/src/knowledge_graph/store.py | Neo4j graph store adapter |
-| backend/src/knowledge_graph/queries.py | Graph traversal queries |
-| backend/src/utils/reranker.py | Cross-encoder reranking |
-
-**Lambda & Infrastructure:**
-| File | Purpose |
-|------|---------|
-| lambda/document-ingestion/handler.py | Doc processing |
-| terraform/modules/lambda/main.tf | Lambda infrastructure |
+| lambda/document-ingestion/handler.py | S3-triggered document processing (enterprise scaling) |
+| terraform/modules/lambda/main.tf | Lambda infrastructure (enterprise scaling) |
 
 ---
 

@@ -116,7 +116,7 @@ This RAG system enables natural language querying over complex financial documen
 | Entity Extraction | spaCy NER | Extract entities for Knowledge Graph (cost-efficient) |
 | Embeddings | AWS Bedrock Titan v2 | Convert text to 1024-dim semantic vectors |
 | Vector Store | Pinecone Serverless | Semantic (dense) and keyword (BM25) search |
-| Knowledge Graph | Neo4j AuraDB Free | Entity relationships and graph traversal |
+| Knowledge Graph | Neo4j AuraDB Free | Entity relationships, graph traversal, chunk boosting + LLM evidence |
 | SQL Database | Neon PostgreSQL | Structured 10-K financial metrics |
 | Orchestration | LangGraph | Coordinate retrieval and synthesis |
 | LLM | AWS Bedrock Nova Pro | Query expansion, reranking, synthesis |
@@ -363,7 +363,7 @@ Graph traversal:
 
 ### Reciprocal Rank Fusion (RRF)
 
-Results from all three methods are merged using RRF:
+Dense and BM25 results (both chunk-level) are merged using RRF:
 
 ```
 Score = Σ (1 / (k + rank))
@@ -373,12 +373,45 @@ Where:
 - rank = position in each result list
 ```
 
-A document ranked #1 in semantic, #3 in BM25, and #5 in graph:
+A chunk ranked #1 in semantic and #3 in BM25:
 ```
-Score = 1/(60+1) + 1/(60+3) + 1/(60+5) = 0.0164 + 0.0159 + 0.0154 = 0.0477
+Score = 1/(60+1) + 1/(60+3) = 0.0164 + 0.0159 = 0.0323
 ```
 
-RRF naturally balances sources without manual weighting.
+**Note:** Knowledge Graph results are NOT included in RRF directly because they return document IDs (document-level) while dense/BM25 return chunks. Instead, KG results are applied as a boost step after RRF.
+
+RRF naturally balances semantic and keyword sources without manual weighting.
+
+### KG Boost (After RRF)
+
+After RRF fusion, chunks from KG-matched documents receive a score boost:
+
+```
+Flow:
+Dense (chunks) + BM25 (chunks) → RRF Fusion → KG Boost → Reranking
+                                                 ↑
+                        KG search → doc IDs + entity evidence
+```
+
+**Boost mechanism:**
+- Chunks whose `document_id` appears in KG results get +0.1 to RRF score
+- KG entity evidence is attached to these chunks for LLM explainability
+- Results are re-sorted after boosting
+
+**Example:**
+```
+Before KG boost:
+  NVDA_chunk_42: rrf_score=0.032
+  AAPL_chunk_15: rrf_score=0.031
+
+KG found: AAPL_10K_2024 (matched entity: "Apple", type: "Organization")
+
+After KG boost:
+  AAPL_chunk_15: rrf_score=0.131, kg_evidence={entity: "Apple", type: "Organization"}
+  NVDA_chunk_42: rrf_score=0.032
+```
+
+This bridges document-level KG intelligence to chunk-level ranking.
 
 ---
 
@@ -394,27 +427,34 @@ The knowledge graph captures **what entities exist** and **how they relate**. Th
 
 ### Ontology (Entity and Relationship Types)
 
-**Entity Types:**
+**Entity Types (10 types - see `ontology.py`):**
 
 | Type | Description | Example |
 |------|-------------|---------|
 | Document | Source 10-K filing | AAPL-10K-2024 |
 | Organization | Companies, agencies | Apple Inc., SEC |
 | Person | Named individuals | Tim Cook, Luca Maestri |
-| Location | Geographic entities | China, California |
+| Location | Geographic entities (spaCy GPE) | China, California |
 | Regulation | Laws and standards | SOX, GAAP, GDPR |
-| Concept | Business/financial terms | Supply chain, gross margin |
+| Concept | Business/financial terms | Supply chain, EBITDA |
 | Product | Products and services | iPhone, App Store |
-| Metric | Financial measurements | Revenue, EPS, market cap |
+| Date | Dates and time periods (spaCy DATE) | FY 2024, Q3 2024 |
+| Money | Monetary values (spaCy MONEY) | $394 billion |
+| Percent | Percentages and rates (spaCy PERCENT) | 23.5%, 15% growth |
 
-**Relationship Types:**
+**Relationship Types (7 defined, 1 currently implemented):**
 
-| Relationship | Meaning | Example |
-|--------------|---------|---------|
-| MENTIONS | Document contains entity | (10-K)─[MENTIONS]→(Tim Cook) |
-| RELATED_TO | Entities co-occur frequently | (China)─[RELATED_TO]→(Supply Chain) |
-| GOVERNED_BY | Subject to regulation | (Financial Statements)─[GOVERNED_BY]→(GAAP) |
-| REPORTED | Company disclosed metric | (Apple)─[REPORTED]→(Revenue: $394B) |
+| Relationship | Status | Meaning | Example |
+|--------------|--------|---------|---------|
+| MENTIONS | ✅ Active | Document mentions entity | (10-K)─[MENTIONS {page: 5}]→(Tim Cook) |
+| DEFINES | Defined | Document defines concept | Future: glossary extraction |
+| GOVERNED_BY | Defined | Subject to regulation | Future: compliance mapping |
+| LOCATED_IN | Defined | Entity located in geography | Future: geographic analysis |
+| RELATED_TO | Defined | Generic entity relationship | Future: custom relationships |
+| WORKS_FOR | Defined | Person works for org | Future: org chart extraction |
+| COMPETES_WITH | Defined | Orgs compete | Future: competitive analysis |
+
+**Note:** Currently only MENTIONS relationships are created during entity indexing. Other relationship types are defined in `ontology.py` for future expansion.
 
 ### Entity Extraction
 
@@ -452,6 +492,75 @@ The VLM already produces clean text - spaCy can reliably extract entities from t
 → Find (China)─[RELATED_TO]→(X)─[MENTIONED_IN]→(Document)
 → Returns documents about supply chain, manufacturing, trade policy
 ```
+
+### KG Integration in Retrieval
+
+The Knowledge Graph integrates with the retrieval pipeline in three ways:
+
+**1. Entity Evidence for Explainability**
+
+KG queries return not just document IDs, but entity evidence explaining WHY each document matched:
+
+```python
+# Instead of just returning document IDs:
+[{"id": "AAPL_10K_2024"}, {"id": "NVDA_10K_2024"}]
+
+# Return entity evidence:
+[
+  {
+    "id": "AAPL_10K_2024",
+    "kg_evidence": {
+      "matched_entity": "Apple",
+      "entity_type": "Organization",
+      "match_type": "direct_mention"
+    }
+  },
+  {
+    "id": "NVDA_10K_2024",
+    "kg_evidence": {
+      "matched_entity": "supply chain",
+      "entity_type": "Concept",
+      "match_type": "related_via",
+      "related_to": "Apple"
+    }
+  }
+]
+```
+
+**2. Chunk-Level Boosting**
+
+KG operates at document-level, but retrieval needs chunk-level ranking:
+
+```
+KG: "AAPL_10K_2024 mentions Apple"
+    ↓
+Boost all chunks from AAPL_10K_2024 by +0.1
+    ↓
+Attach kg_evidence to those chunks for LLM context
+```
+
+**3. Multi-Hop for Complex Queries**
+
+Simple queries (1 entity) use 1-hop; complex queries (2+ entities) add 2-hop:
+
+| Query | Entities | Strategy |
+|-------|----------|----------|
+| "Tell me about NVIDIA" | 1 | 1-hop only |
+| "Apple's China supply chain risks" | 3 | 1-hop + 2-hop |
+
+**LLM Response Format with KG Evidence:**
+
+```
+[1] Source: Apple 10-K 2024, Item 1A, Page 15 (Relevance: 9/10)
+    KG Match: Apple (Organization) - direct mention
+The Company's operations in Greater China...
+
+[2] Source: NVIDIA 10-K 2024, Item 1A, Page 22 (Relevance: 8/10)
+    KG Match: supply chain (Concept) - related via Apple
+Our supply chain and manufacturing operations...
+```
+
+This provides transparency: users and downstream LLMs see WHY each document was retrieved.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Purpose:** This document serves as the authoritative reference for implementation details, technology specifications, and development order throughout all phases. Consult this document before implementing any feature to ensure consistency, completeness, and proper integration.  Make sure this document is updated as needed as the project proceeds.
 
-**Last Updated:** 2026-01-19 (Phase 2a complete) - SQL and RAG tools implemented with real backends (Neon PostgreSQL, Pinecone). Phase 2b active (Knowledge Graph, hybrid search). Implementation guide: `docs/PHASE_2B_HOW_TO_GUIDE.md`.
+**Last Updated:** 2026-01-20 (Phase 2b in progress) - SQL and RAG tools implemented with real backends (Neon PostgreSQL, Pinecone). Phase 2b active: KG indexing complete, hybrid retrieval + KG integration in progress. Implementation guide: `docs/PHASE_2B_HOW_TO_GUIDE.md`. KG enhancements: `docs/KNOWLEDGE_GRAPH_UPDATE_PLAN.md`.
 
 ---
 
@@ -658,19 +658,55 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 - **Contextual Retrieval:** Prepend doc title/type/section to chunks before embedding
 - **Parent Document Retriever:** Small chunks for search, large context for response
 
-**Query Pipeline:**
-- **Query Expansion:** Generate 3 alternative phrasings (+20-30% recall)
-- **Cross-Encoder Reranking:** Nova Lite scores relevance after RRF (+20-25% precision)
-- **Compression:** LLMChainExtractor for contextual compression
+**Query Pipeline (8 steps):**
+1. **Query Expansion:** Generate 3 variants via Nova Lite (+20-30% recall)
+2. **Parallel Retrieval:** Dense search + BM25 search (chunks) + KG lookup (doc IDs)
+3. **RRF Fusion:** Merge dense + BM25 chunk results
+4. **KG Boost:** Apply +0.1 boost to chunks from KG-matched docs, attach entity evidence
+5. **Cross-Encoder Reranking:** Nova Lite scores relevance (+20-25% precision)
+6. **Contextual Compression:** LLMChainExtractor extracts relevant sentences
+7. **Response Formatting:** Include KG evidence in citations for explainability
+8. **Return:** Source citations with page/section/entity info
 
 #### Tool 2c-KG: Knowledge Graph Integration
 - **Store:** Neo4j AuraDB Free (200K nodes, 400K relationships, $0/month)
 - **Entity Extraction:** spaCy NER + custom financial patterns (no LLM needed)
-- **Entity Types:** Document, Organization, Person, Location, Regulation, Concept, Product, Metric
-- **Relationship Types:** MENTIONS, RELATED_TO, GOVERNED_BY, REPORTED
-- **Traversal:** 1-2 hop relationship queries
+- **Entity Types:** Document, Organization, Person, Location, Regulation, Concept, Product, Date, Money, Percent
+- **Relationship Types:** MENTIONS (with page property), RELATED_TO
+- **Traversal:** 1-hop for simple queries, 2-hop for complex queries (2+ entities)
 - **Cost:** ~$0.001/doc ingestion, $0/query (free tier)
 - **See:** `docs/RAG_README.md` Knowledge Graph section for full ontology
+
+**KG Integration in Retrieval (January 2026 Best Practices):**
+
+| Feature | Description |
+|---------|-------------|
+| **Entity Evidence** | KG returns WHY docs matched: entity, type, match_type (direct/indirect) |
+| **Chunk-Level Boosting** | +0.1 boost to RRF score for chunks from KG-matched documents |
+| **Multi-Hop Reasoning** | 2-hop queries triggered for complex queries (2+ entities) |
+| **LLM Explainability** | KG evidence included in citations for transparency |
+
+**_kg_search Return Format:**
+```python
+[
+  {
+    "id": "AAPL_10K_2024",
+    "source": "kg",
+    "kg_evidence": {
+      "matched_entity": "Apple",
+      "entity_type": "Organization",
+      "match_type": "direct_mention"  # or "related_via"
+    }
+  }
+]
+```
+
+**KG Boost Implementation:**
+- Applied AFTER RRF fusion (not in RRF itself)
+- Chunks whose `document_id` matches KG results get +0.1 boost
+- `kg_evidence` attached to boosted chunks for LLM context
+
+**See:** `docs/KNOWLEDGE_GRAPH_UPDATE_PLAN.md` for detailed enhancement plan
 
 #### Tool 2d: Market Data (FMP via MCP) ✅ *COMPLETED IN PHASE 0*
 - **API:** Financial Modeling Prep (free tier ~250 calls/day; batch quotes supported)

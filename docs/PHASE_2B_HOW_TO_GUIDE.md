@@ -843,7 +843,7 @@ settings = get_settings()
 store = Neo4jStore(
     uri=settings.neo4j_uri,
     user=settings.neo4j_user,
-    password=settings.neo4j_password
+    password=settings.neo4j_password.get_secret_value()  # Extract from SecretStr
 )
 
 # Test connection
@@ -990,6 +990,8 @@ Structure:
 Pipeline Per Document:
 1. Load JSON extraction from Phase 2a
 2. Create Document node in Neo4j
+   - Extract metadata: document_type (top-level), company/ticker (from metadata object)
+   - **Use `filename` field as `title`** (VLM JSON doesn't have separate title)
 3. For each page in extraction:
    a. Extract entities using EntityExtractor
    b. Create entity nodes (MERGE to deduplicate)
@@ -1084,7 +1086,7 @@ from src.knowledge_graph.store import Neo4jStore
 from src.config.settings import get_settings
 
 settings = get_settings()
-store = Neo4jStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
+store = Neo4jStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password.get_secret_value())
 stats = store.get_stats()
 
 node_count = stats.get('node_count', 0)
@@ -1122,34 +1124,50 @@ Neo4j Statistics:
 
 ### 5.5 Verify Graph Structure
 
-**Command:**
+**Command (via Python - works with AuraDB):**
 ```bash
-# Check relationships by type
-docker-compose exec neo4j cypher-shell -u neo4j -p localdevpassword \
-  "MATCH ()-[r]->() RETURN type(r) as relationship, count(*) as count"
+docker-compose exec backend python -c "
+from src.knowledge_graph.store import Neo4jStore
+from src.config.settings import get_settings
 
-# Check Apple-related entities (validates document-entity links)
-docker-compose exec neo4j cypher-shell -u neo4j -p localdevpassword \
-  "MATCH (d:Document {ticker: 'AAPL'})-[:MENTIONS]->(e) 
-   RETURN labels(e)[0] as type, count(*) as mentions 
-   ORDER BY mentions DESC LIMIT 5"
+settings = get_settings()
+store = Neo4jStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password.get_secret_value())
+store.verify_connection()  # Initialize driver
+
+# Check relationships by type
+with store._driver.session() as session:
+    result = session.run('MATCH ()-[r]->() RETURN type(r) as relationship, count(*) as count')
+    print('Relationships by type:')
+    for record in result:
+        print(f'  {record[\"relationship\"]}: {record[\"count\"]}')
+
+# Check NVDA-related entities (validates document-entity links)
+with store._driver.session() as session:
+    result = session.run('''
+        MATCH (d:Document)-[:MENTIONS]->(e)
+        WHERE d.ticker = \"NVDA\" OR d.document_id CONTAINS \"NVDA\"
+        RETURN labels(e)[1] as type, count(*) as mentions
+        ORDER BY mentions DESC LIMIT 5
+    ''')
+    print('\\nNVDA document entity mentions (top 5 types):')
+    for record in result:
+        print(f'  {record[\"type\"]}: {record[\"mentions\"]}')
+
+store.close()
+"
 ```
 
 **Expected Output:**
 ```
-+---------------+-------+
-| relationship  | count |
-+---------------+-------+
-| "MENTIONS"    | 4523  |
-+---------------+-------+
+Relationships by type:
+  MENTIONS: 5218
 
-+---------------+---------+
-| type          | mentions|
-+---------------+---------+
-| "Organization"| 85      |
-| "Money"       | 67      |
-| "Location"    | 42      |
-...
+NVDA document entity mentions (top 5 types):
+  Entity: 482
+  Date: 415
+  Concept: 338
+  Location: 217
+  Money: 136
 ```
 
 ### 5.6 Entity Indexing Pipeline Checklist
@@ -1247,7 +1265,7 @@ from src.knowledge_graph.queries import GraphQueries
 from src.config.settings import get_settings
 
 settings = get_settings()
-store = Neo4jStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
+store = Neo4jStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password.get_secret_value())
 queries = GraphQueries(store)
 
 # Test 1: Find documents mentioning China
@@ -1712,12 +1730,33 @@ Verify: docker-compose exec backend python -c "from src.ingestion import QueryEx
 ## 9. RRF Fusion
 
 ### What We're Doing
-Implementing Reciprocal Rank Fusion to merge results from dense search, BM25 search, and Knowledge Graph lookups.
+Implementing Reciprocal Rank Fusion to merge results from dense search and BM25 search, followed by a KG boost step that elevates chunks from KG-matched documents.
 
 ### Why This Matters
-- **Multi-Source Fusion:** Combines semantic, keyword, and entity results
+- **Multi-Source Fusion:** Combines semantic and keyword results via RRF
 - **Rank-Based:** Doesn't require score normalization across sources
 - **Proven Effective:** Standard technique in hybrid retrieval systems
+- **KG Boost (New):** Separate step applies boost to chunks from KG-matched documents
+
+### Architecture Note: KG Boost vs RRF Participation
+
+**Why KG doesn't participate directly in RRF:**
+- Dense/BM25 search returns **chunks** with granular scores
+- KG search returns **document IDs** (document-level, not chunk-level)
+- Mixing document-level and chunk-level rankings in RRF would be incorrect
+
+**Solution: KG Boost Step (applied AFTER RRF):**
+1. RRF merges dense + BM25 chunk results
+2. KG returns document IDs with entity evidence
+3. Chunks from KG-matched documents get +0.1 boost to RRF score
+4. KG evidence is attached to chunks for LLM explainability
+
+```
+Dense (chunks) ──┬──> RRF Fusion ──> KG Boost ──> Reranking
+BM25 (chunks)  ──┘        ↑              ↑
+                          │              │
+KG (doc IDs + evidence) ──┴──────────────┘
+```
 
 ### 9.1 Create RRF Module
 
@@ -1741,20 +1780,22 @@ Parameters:
 - result_lists: List of result lists, each containing dicts with "id" and optional "score"
 - k: Constant (default 60, standard in literature)
 
-Input Format:
+Input Format (Dense + BM25 chunks only - KG handled separately via boost):
 [
-  # Dense search results
-  [{"id": "doc1", "score": 0.95}, {"id": "doc2", "score": 0.87}, ...],
-  # BM25 results
-  [{"id": "doc2", "score": 12.5}, {"id": "doc3", "score": 11.2}, ...],
-  # KG results
-  [{"id": "doc1"}, {"id": "doc4"}, ...]
+  # Dense search results (chunk-level)
+  [{"id": "chunk1", "score": 0.95, "metadata": {"document_id": "DOC1"}}, ...],
+  # BM25 results (chunk-level)
+  [{"id": "chunk2", "score": 12.5, "metadata": {"document_id": "DOC1"}}, ...],
 ]
+
+**Note:** KG results are NOT included in RRF fusion because they are document-level,
+not chunk-level. Instead, KG boost is applied AFTER RRF via `_apply_kg_boost()` in
+HybridRetriever (see Section 11.1).
 
 Output Format:
 [
-  {"id": "doc1", "rrf_score": 0.032, "sources": ["dense", "kg"]},
-  {"id": "doc2", "rrf_score": 0.031, "sources": ["dense", "bm25"]},
+  {"id": "chunk1", "rrf_score": 0.032, "sources": ["dense", "bm25"], "metadata": {...}},
+  {"id": "chunk2", "rrf_score": 0.031, "sources": ["dense"], "metadata": {...}},
   ...
 ]
 
@@ -1778,27 +1819,23 @@ Verify: docker-compose exec backend python -c "from src.utils.rrf import rrf_fus
 docker-compose exec backend python -c "
 from src.utils.rrf import rrf_fusion
 
-# Simulate results from different sources
+# Simulate chunk results from dense and BM25 (both are chunk-level)
 dense_results = [
-    {'id': 'doc1', 'score': 0.95},
-    {'id': 'doc2', 'score': 0.87},
-    {'id': 'doc3', 'score': 0.82},
+    {'id': 'AAPL_chunk_1', 'score': 0.95, 'metadata': {'document_id': 'AAPL_10K_2024'}},
+    {'id': 'NVDA_chunk_5', 'score': 0.87, 'metadata': {'document_id': 'NVDA_10K_2024'}},
+    {'id': 'AAPL_chunk_3', 'score': 0.82, 'metadata': {'document_id': 'AAPL_10K_2024'}},
 ]
 
 bm25_results = [
-    {'id': 'doc2', 'score': 15.2},
-    {'id': 'doc4', 'score': 12.1},
-    {'id': 'doc1', 'score': 10.5},
+    {'id': 'NVDA_chunk_5', 'score': 15.2, 'metadata': {'document_id': 'NVDA_10K_2024'}},
+    {'id': 'MSFT_chunk_2', 'score': 12.1, 'metadata': {'document_id': 'MSFT_10K_2024'}},
+    {'id': 'AAPL_chunk_1', 'score': 10.5, 'metadata': {'document_id': 'AAPL_10K_2024'}},
 ]
 
-kg_results = [
-    {'id': 'doc1'},
-    {'id': 'doc5'},
-]
+# Note: KG results are NOT included in RRF - they're applied via _apply_kg_boost() later
+fused = rrf_fusion([dense_results, bm25_results])
 
-fused = rrf_fusion([dense_results, bm25_results, kg_results])
-
-print('Fused results:')
+print('Fused results (before KG boost):')
 for r in fused[:5]:
     print(f'  {r[\"id\"]}: score={r[\"rrf_score\"]:.4f}, sources={r[\"sources\"]}')
 "
@@ -1806,12 +1843,62 @@ for r in fused[:5]:
 
 **Expected Output:**
 ```
-Fused results:
-  doc1: score=0.0492, sources=['dense', 'bm25', 'kg']
-  doc2: score=0.0328, sources=['dense', 'bm25']
-  doc3: score=0.0161, sources=['dense']
-  doc4: score=0.0161, sources=['bm25']
-  doc5: score=0.0161, sources=['kg']
+Fused results (before KG boost):
+  AAPL_chunk_1: score=0.0328, sources=['dense', 'bm25']
+  NVDA_chunk_5: score=0.0328, sources=['dense', 'bm25']
+  AAPL_chunk_3: score=0.0161, sources=['dense']
+  MSFT_chunk_2: score=0.0161, sources=['bm25']
+```
+
+### 9.2b Test KG Boost Integration (After RRF)
+
+**Command:**
+```bash
+docker-compose exec backend python -c "
+# This test shows how KG boost would be applied after RRF
+# The actual implementation is in HybridRetriever._apply_kg_boost()
+
+# Simulated RRF results
+rrf_results = [
+    {'id': 'AAPL_chunk_1', 'rrf_score': 0.0328, 'sources': ['dense', 'bm25'], 
+     'metadata': {'document_id': 'AAPL_10K_2024'}},
+    {'id': 'NVDA_chunk_5', 'rrf_score': 0.0328, 'sources': ['dense', 'bm25'],
+     'metadata': {'document_id': 'NVDA_10K_2024'}},
+]
+
+# Simulated KG results with entity evidence
+kg_results = [
+    {'id': 'AAPL_10K_2024', 'source': 'kg', 'kg_evidence': {
+        'matched_entity': 'Apple', 'entity_type': 'Organization', 'match_type': 'direct_mention'
+    }},
+]
+
+# Apply KG boost manually (HybridRetriever does this automatically)
+kg_doc_ids = {r['id']: r.get('kg_evidence', {}) for r in kg_results}
+KG_BOOST = 0.1
+
+for result in rrf_results:
+    doc_id = result['metadata']['document_id']
+    if doc_id in kg_doc_ids:
+        result['rrf_score'] += KG_BOOST
+        result['kg_evidence'] = kg_doc_ids[doc_id]
+        result['sources'].append('kg_boost')
+
+# Re-sort
+rrf_results.sort(key=lambda x: x['rrf_score'], reverse=True)
+
+print('Results after KG boost:')
+for r in rrf_results:
+    kg_info = r.get('kg_evidence', {}).get('matched_entity', 'none')
+    print(f'  {r[\"id\"]}: score={r[\"rrf_score\"]:.4f}, sources={r[\"sources\"]}, kg_entity={kg_info}')
+"
+```
+
+**Expected Output:**
+```
+Results after KG boost:
+  AAPL_chunk_1: score=0.1328, sources=['dense', 'bm25', 'kg_boost'], kg_entity=Apple
+  NVDA_chunk_5: score=0.0328, sources=['dense', 'bm25'], kg_entity=none
 ```
 
 ### 9.3 Update Utils Package Init with RRF
@@ -1833,11 +1920,13 @@ Verify: docker-compose exec backend python -c "from src.utils import rrf_fusion;
 ### 9.4 RRF Fusion Checklist
 
 - [ ] rrf.py created with rrf_fusion function
-- [ ] Handles multiple result lists
+- [ ] Handles multiple result lists (dense + BM25 chunks)
 - [ ] Correctly computes RRF scores
 - [ ] Tracks source contributions in output
 - [ ] Returns sorted results by rrf_score
 - [ ] Utils __init__.py exports rrf_fusion
+- [ ] Understands that KG boost is applied AFTER RRF (not in RRF)
+- [ ] KG boost implementation in HybridRetriever._apply_kg_boost() (Section 11.1)
 
 ---
 
@@ -2180,22 +2269,191 @@ Requirements:
 
 Structure:
 - HybridRetriever class:
-  - __init__(self, pinecone_client, neo4j_store, embeddings, bm25_encoder, query_expander, reranker, compressor)
+  - __init__(self, pinecone_client, neo4j_store, entity_extractor, graph_queries, embeddings, bm25_encoder, query_expander, reranker, compressor)
   - retrieve(self, query: str, top_k: int = 5, use_kg: bool = True, compress: bool = True) -> list[dict]
   - _dense_search(self, query: str, top_k: int) -> list[dict]
   - _bm25_search(self, query: str, top_k: int) -> list[dict]
-  - _kg_search(self, query: str) -> list[dict]
+  - _kg_search(self, query: str) -> list[dict]  # Uses _extractor and _queries from __init__
+  - _apply_kg_boost(self, chunk_results: list[dict], kg_results: list[dict]) -> list[dict]
 
-Full Pipeline (6 steps from RAG_README):
+**Note on KG Dependencies:**
+The `_kg_search` method requires:
+- `entity_extractor`: EntityExtractor instance for extracting entities from query
+- `graph_queries`: GraphQueries instance for Neo4j traversals
+
+These are passed to `__init__` and stored as `self._extractor` and `self._queries`.
+
+**_kg_search Implementation (Entity Evidence for Explainability):**
+
+The `_kg_search` method extracts entities from the query and finds related documents,
+returning entity evidence for LLM explainability and chunk-level boosting.
+
+```python
+def _kg_search(self, query: str) -> list[dict]:
+    """
+    Extract entities from query and find related documents WITH context.
+    
+    Returns document IDs plus entity evidence for:
+    1. Explainability - LLM knows WHY each document was matched
+    2. Chunk boosting - Chunks from KG-matched docs get score boost
+    3. Audit trail - Traceable entity paths for compliance
+    
+    Returns:
+        list[dict]: Each dict contains:
+            - id: Document ID
+            - source: "kg"
+            - kg_evidence: {
+                matched_entity: str,
+                entity_type: str,
+                match_type: "direct_mention" | "related_via",
+                related_to: str (if match_type == "related_via"),
+                shared_docs: int (if indirect match)
+              }
+    """
+    entities = self._extractor.extract_entities(query, "query", 0)
+    results: list[dict] = []
+    seen_docs: set[str] = set()
+    
+    for entity in entities:
+        # 1-hop: Direct document mentions (always)
+        doc_ids = self._queries.find_documents_mentioning(
+            entity.text, 
+            fuzzy=True  # Catch "NVIDIA Corporation" when searching "NVIDIA"
+        )
+        
+        for doc_id in doc_ids:
+            if doc_id not in seen_docs:
+                seen_docs.add(doc_id)
+                results.append({
+                    "id": doc_id,
+                    "source": "kg",
+                    "kg_evidence": {
+                        "matched_entity": entity.text,
+                        "entity_type": entity.entity_type.value,
+                        "match_type": "direct_mention",
+                    }
+                })
+        
+        # 2-hop: Related entities (only for complex queries with 2+ entities)
+        # This finds documents that mention entities RELATED to query entities
+        # Example: Query "Apple Taiwan" → finds TSMC docs via Apple-TSMC relationship
+        if len(entities) > 1:
+            related = self._queries.find_related_entities(
+                entity.text, 
+                hops=1, 
+                limit=5
+            )
+            for rel in related:
+                rel_docs = self._queries.find_documents_mentioning(
+                    rel["entity"], 
+                    fuzzy=True
+                )
+                for doc_id in rel_docs:
+                    if doc_id not in seen_docs:
+                        seen_docs.add(doc_id)
+                        results.append({
+                            "id": doc_id,
+                            "source": "kg",
+                            "kg_evidence": {
+                                "matched_entity": rel["entity"],
+                                "entity_type": rel["type"],
+                                "match_type": "related_via",
+                                "related_to": entity.text,
+                                "shared_docs": rel["shared_docs"],
+                            }
+                        })
+    
+    logger.debug(
+        "kg_search_complete",
+        query_entities=len(entities),
+        docs_found=len(results),
+        direct_matches=sum(1 for r in results if r["kg_evidence"]["match_type"] == "direct_mention"),
+        indirect_matches=sum(1 for r in results if r["kg_evidence"]["match_type"] == "related_via"),
+    )
+    
+    return results
+```
+
+**_apply_kg_boost Implementation (Chunk-Level KG Boosting):**
+
+After RRF fusion of dense + BM25 results, apply a boost to chunks from KG-matched documents:
+
+```python
+def _apply_kg_boost(
+    self, 
+    chunk_results: list[dict], 
+    kg_results: list[dict],
+    boost: float = 0.1
+) -> list[dict]:
+    """
+    Apply boost to chunks from KG-matched documents.
+    
+    This bridges document-level KG matches to chunk-level ranking:
+    - KG returns document IDs with entity evidence
+    - Dense/BM25 return chunks with scores
+    - This method boosts chunks whose document_id is in KG results
+    
+    Args:
+        chunk_results: Results from RRF fusion (dense + BM25)
+        kg_results: Results from _kg_search with kg_evidence
+        boost: Additive boost to RRF score (default 0.1)
+               RRF scores typically range 0.01-0.05, so +0.1 is significant
+    
+    Returns:
+        chunk_results with boosted scores and kg_evidence attached
+    """
+    # Build lookup of KG evidence by document ID
+    kg_evidence_by_doc: dict[str, dict] = {}
+    for kg_result in kg_results:
+        doc_id = kg_result["id"]
+        if doc_id not in kg_evidence_by_doc:
+            kg_evidence_by_doc[doc_id] = kg_result.get("kg_evidence", {})
+    
+    # Apply boost to matching chunks
+    for result in chunk_results:
+        doc_id = result.get("metadata", {}).get("document_id")
+        if doc_id and doc_id in kg_evidence_by_doc:
+            # Boost the RRF score
+            result["rrf_score"] = result.get("rrf_score", 0) + boost
+            
+            # Attach KG evidence for LLM explainability
+            result["kg_evidence"] = kg_evidence_by_doc[doc_id]
+            
+            # Track that KG contributed to this result
+            if "sources" in result:
+                if "kg_boost" not in result["sources"]:
+                    result["sources"].append("kg_boost")
+            else:
+                result["sources"] = ["kg_boost"]
+    
+    # Re-sort by boosted score
+    boosted_results = sorted(
+        chunk_results, 
+        key=lambda x: x.get("rrf_score", 0), 
+        reverse=True
+    )
+    
+    logger.debug(
+        "kg_boost_applied",
+        total_chunks=len(chunk_results),
+        boosted_chunks=sum(1 for r in chunk_results if "kg_evidence" in r),
+        boost_value=boost,
+    )
+    
+    return boosted_results
+```
+
+Full Pipeline (8 steps - updated with KG boost):
 1. Query Expansion: Generate 3 variants (Nova Lite)
 2. Parallel Retrieval: For each variant:
-   a. Dense search (Pinecone)
-   b. BM25 search (Pinecone sparse)
-3. Knowledge Graph lookup (extract entities, find documents)
-4. RRF Fusion: Merge all results (in-memory)
-5. Cross-Encoder Reranking: Score top 15 (Nova Lite)
-6. Contextual Compression: Extract relevant sentences from top 5 (Nova Lite)
-7. Return with source citations
+   a. Dense search (Pinecone) → chunks with scores
+   b. BM25 search (Pinecone sparse) → chunks with scores
+3. Knowledge Graph lookup: Extract entities, find documents WITH entity evidence
+4. RRF Fusion: Merge dense + BM25 results (in-memory)
+5. **KG Boost: Apply +0.1 boost to chunks from KG-matched documents**
+6. Cross-Encoder Reranking: Score top 15 (Nova Lite)
+7. Contextual Compression: Extract relevant sentences from top 5 (Nova Lite)
+8. Return with source citations AND KG evidence for explainability
 
 Pipeline Parameters:
 - dense_top_k: 15 (per variant)
@@ -2204,7 +2462,7 @@ Pipeline Parameters:
 - rerank_candidates: 15
 - final_top_k: 5 (configurable)
 
-Output Format (Parent/Child Compatible):
+Output Format (Parent/Child Compatible + KG Evidence):
 [
   {
     "id": "AAPL_10K_2024_child_42",
@@ -2214,7 +2472,12 @@ Output Format (Parent/Child Compatible):
     "compressed_text": "Relevant sentences extracted by compressor (if enabled)...",
     "relevance_score": 9,
     "rrf_score": 0.032,
-    "sources": ["dense", "bm25", "kg"],
+    "sources": ["dense", "bm25", "kg_boost"],
+    "kg_evidence": {
+      "matched_entity": "Apple",
+      "entity_type": "Organization",
+      "match_type": "direct_mention"
+    },
     "metadata": {
       "document_id": "AAPL_10K_2024",
       "ticker": "AAPL",
@@ -2226,15 +2489,21 @@ Output Format (Parent/Child Compatible):
   ...
 ]
 
-**Field Descriptions (Parent/Child Architecture from Phase 2a):**
+**Field Descriptions (Parent/Child Architecture from Phase 2a + KG Evidence):**
 - `id`: Child chunk ID (what was embedded and matched)
 - `parent_id`: Parent chunk ID (groups related children)
 - `parent_text`: Full 1024-token context (used for LLM synthesis)
 - `child_text_raw`: Original 256-token text without enrichment (used for citation preview)
 - `compressed_text`: Query-relevant sentences from parent_text (if compression enabled)
 - `relevance_score`: Cross-encoder reranking score (1-10)
-- `rrf_score`: RRF fusion score before reranking
-- `sources`: Which retrieval methods found this result
+- `rrf_score`: RRF fusion score before reranking (includes KG boost if applicable)
+- `sources`: Which retrieval methods found this result (includes "kg_boost" if KG-matched)
+- `kg_evidence`: (Optional) Entity evidence from Knowledge Graph:
+  - `matched_entity`: The entity that matched (e.g., "Apple", "China")
+  - `entity_type`: EntityType value (e.g., "Organization", "Location")
+  - `match_type`: "direct_mention" or "related_via"
+  - `related_to`: (if indirect) The query entity this was related to
+  - `shared_docs`: (if indirect) Number of shared documents in relationship
 
 Key Features:
 - Parallel queries for dense and BM25 (use asyncio if possible)
@@ -2390,17 +2659,62 @@ Updated Tool Description:
  - Qualitative questions about company operations
  - Context around numbers from SQL queries"
 
-Response Format (uses parent/child structure):
+Response Format (uses parent/child structure + KG evidence):
 "Found 5 relevant passages (hybrid retrieval: dense+BM25+KG, reranked):
 
 [1] Source: Apple 10-K 2024, Item 1A, Page 15 (Relevance: 9/10)
+    KG Match: Apple (Organization) - direct mention
 {parent_text or compressed_text - full context for LLM}
 Matched: {first 100 chars of child_text_raw}...
 
 [2] Source: NVIDIA 10-K 2024, Item 1A, Page 22 (Relevance: 8/10)
+    KG Match: supply chain (Concept) - related via NVIDIA
 {parent_text or compressed_text - full context for LLM}
 Matched: {first 100 chars of child_text_raw}...
 ..."
+
+**KG Evidence in Response (Explainability):**
+
+When `kg_evidence` is present in the result, include it in the citation for transparency:
+
+```python
+def _format_result_with_kg(result: dict, index: int) -> str:
+    """Format a single result with KG evidence for explainability."""
+    metadata = result.get("metadata", {})
+    kg_evidence = result.get("kg_evidence", {})
+    
+    # Base citation
+    doc_id = metadata.get("document_id", "Unknown")
+    section = metadata.get("section", "")
+    page = metadata.get("page_number", "?")
+    relevance = result.get("relevance_score", "?")
+    
+    lines = [f"[{index}] Source: {doc_id}, {section}, Page {page} (Relevance: {relevance}/10)"]
+    
+    # Add KG evidence if present (explainability)
+    if kg_evidence:
+        entity = kg_evidence.get("matched_entity", "")
+        entity_type = kg_evidence.get("entity_type", "")
+        match_type = kg_evidence.get("match_type", "")
+        
+        if match_type == "direct_mention":
+            lines.append(f"    KG Match: {entity} ({entity_type}) - direct mention")
+        elif match_type == "related_via":
+            related_to = kg_evidence.get("related_to", "")
+            lines.append(f"    KG Match: {entity} ({entity_type}) - related via {related_to}")
+    
+    # Add passage text (prefer compressed, fallback to parent_text)
+    text = result.get("compressed_text") or metadata.get("parent_text", metadata.get("text", ""))
+    lines.append(text)
+    
+    # Add matched preview
+    child_raw = metadata.get("child_text_raw", "")
+    if child_raw:
+        preview = child_raw[:100] + "..." if len(child_raw) > 100 else child_raw
+        lines.append(f"Matched: {preview}")
+    
+    return "\n".join(lines)
+```
 
 **Integration Pattern:**
 
@@ -2449,11 +2763,15 @@ print(result)
 Found 5 relevant passages (hybrid retrieval: dense+BM25+KG, reranked):
 
 [1] Source: Apple 10-K 2024, Item 1A: Risk Factors, Page 15 (Relevance: 9/10)
+    KG Match: Apple (Organization) - direct mention
 The Company's business, results of operations, and financial condition depend on its 
 ability to source adequate supplies of components...
+Matched: The Company's business, results of operations, and financial condition...
 
 [2] Source: NVIDIA 10-K 2024, Item 1A: Risk Factors, Page 22 (Relevance: 9/10)
+    KG Match: supply chain (Concept) - direct mention
 Our supply chain and manufacturing operations are global and complex...
+Matched: Our supply chain and manufacturing operations are global and complex...
 
 ...
 ```
@@ -2461,14 +2779,20 @@ Our supply chain and manufacturing operations are global and complex...
 ### 11.5 Hybrid RAG Integration Checklist
 
 - [ ] hybrid_retriever.py created with HybridRetriever class
-- [ ] All 6 pipeline steps integrated:
+- [ ] All 8 pipeline steps integrated (updated):
   - [ ] Query expansion (Section 8)
   - [ ] Dense search (Phase 2a)
   - [ ] BM25 search (Section 7)
-  - [ ] KG search (Section 6)
-  - [ ] RRF fusion (Section 9)
+  - [ ] KG search with entity evidence (Section 6 + 11.1)
+  - [ ] RRF fusion of dense + BM25 (Section 9)
+  - [ ] **KG boost applied to chunks from KG-matched docs (Section 11.1)**
   - [ ] Cross-encoder reranking (Section 10)
   - [ ] Contextual compression (Section 10b)
+- [ ] **KG Evidence for Explainability (New):**
+  - [ ] `_kg_search()` returns entity evidence (matched_entity, entity_type, match_type)
+  - [ ] `_apply_kg_boost()` attaches kg_evidence to boosted chunks
+  - [ ] `_format_result_with_kg()` includes KG match info in citations
+  - [ ] Multi-hop (2-hop) used for complex queries (2+ entities)
 - [ ] **Parent/Child Architecture (Phase 2a compatibility):**
   - [ ] Output includes `parent_id`, `parent_text`, `child_text_raw` fields
   - [ ] `_deduplicate_by_parent()` deduplicates by parent_id after RRF
@@ -2481,9 +2805,9 @@ Our supply chain and manufacturing operations are global and complex...
   - [ ] `_get_result_text()` prefers parent_text
   - [ ] `_format_citation()` uses child_text_raw for match preview
 - [ ] Tool description updated for better agent selection
-- [ ] hybrid=True uses full pipeline
+- [ ] hybrid=True uses full pipeline with KG evidence
 - [ ] hybrid=False falls back to basic dense search
-- [ ] Test shows improved retrieval quality
+- [ ] Test shows improved retrieval quality with KG explainability
 
 ---
 
@@ -2928,7 +3252,7 @@ from src.knowledge_graph import Neo4jStore, GraphQueries
 from src.config.settings import get_settings
 
 settings = get_settings()
-store = Neo4jStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
+store = Neo4jStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password.get_secret_value())
 queries = GraphQueries(store)
 
 docs = queries.find_documents_mentioning('Tim Cook')
