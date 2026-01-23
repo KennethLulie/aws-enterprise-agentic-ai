@@ -114,14 +114,14 @@ This system goes beyond a simple demo by implementing production-ready features:
 - ✅ Multi-tool Orchestration - SQL + RAG + Search combined queries
 - ✅ AWS Secrets configured for Pinecone and Neo4j
 
-**Phase 2a (completed January 19, 2026)** delivered data foundation and core tools:
+**Phase 2a ** delivered data foundation and core tools:
 - ✅ SQL Query Tool - Real implementation with Neon PostgreSQL
 - ✅ RAG Retrieval Tool - Real implementation with Pinecone
 - ✅ Document processing pipeline with VLM extraction
 - ✅ Parent/child chunking with contextual enrichment
 - ✅ Agent integration with graceful fallback
 
-**Phase 1b (completed January 13, 2026)** added production hardening:
+**Phase 1b ** added production hardening:
 - ✅ Neon PostgreSQL integration for persistent state (free tier)
 - ✅ PostgresSaver checkpointing for conversation persistence
 - ✅ GitHub Actions CI/CD pipelines (CI on push/PR, CD manual trigger)
@@ -130,7 +130,7 @@ This system goes beyond a simple demo by implementing production-ready features:
 - ✅ API versioning (/api/v1/ routes)
 - ✅ Database migrations ready (Alembic configured)
 
-**Phase 1a (completed January 2, 2026)** deployed the system to AWS:
+**Phase 1a ** deployed the system to AWS:
 - ✅ App Runner backend with LangGraph agent and Bedrock (Nova Pro)
 - ✅ CloudFront + S3 static frontend hosting
 - ✅ Secrets Manager for secure credential storage
