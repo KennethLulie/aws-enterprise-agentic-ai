@@ -83,7 +83,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 import structlog
 
-from src.utils.rrf import RRFResult, rrf_fusion
+from src.utils.rrf import rrf_fusion
 
 if TYPE_CHECKING:
     from src.ingestion.query_expansion import QueryExpander

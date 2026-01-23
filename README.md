@@ -86,9 +86,18 @@ This system goes beyond a simple demo by implementing production-ready features:
 
 ### Reliability Patterns
 - **Circuit Breakers**: Prevent cascade failures when external services are unavailable
+  - 3-failure threshold before circuit opens
+  - 30-second cooldown period before retry
+  - Automatic reset on successful call
 - **Retry Logic**: Exponential backoff for transient failures
-- **Fallback Mechanisms**: Graceful degradation when tools fail
-- **Health Checks**: Dependency validation endpoints
+  - 3 retry attempts with exponential backoff (1-10 seconds)
+  - Retries only transient errors (network, timeout, 5xx)
+  - No retry on validation or authentication errors
+- **Graceful Degradation**: System continues with reduced functionality when optional components fail
+  - Dense search: Required (fails entire retrieval if unavailable)
+  - BM25, Knowledge Graph, Reranker, Compressor: Optional (continues without)
+  - Every response tracks which components succeeded/failed
+- **Health Checks**: Dependency validation endpoints with graceful degradation
 
 ## 📋 Project Status
 
@@ -413,6 +422,11 @@ The LangGraph agent framework intelligently coordinates multiple tools based on 
 
 Beyond basic vector search, this system implements state-of-the-art 2026 RAG techniques:
 - **VLM Document Extraction**: Claude Vision extracts structured data from complex 10-K filings, preserving table structure
+- **Semantic + Parent-Child Chunking**: Two-tier architecture solving the precision/context tradeoff
+  - Child chunks (256 tokens): Small, precise chunks for accurate embedding matches
+  - Parent chunks (1024 tokens): Larger context returned to LLM for rich understanding
+  - Section-aware boundaries: Never crosses 10-K section boundaries (Item 1 vs Item 1A)
+  - 50-token overlap within same parent ensures sentence continuity
 - **Hybrid Search**: Combines semantic similarity (dense vectors) with keyword matching (BM25 sparse vectors)
 - **Knowledge Graph**: Neo4j stores entity relationships for multi-hop reasoning and entity-aware queries
 - **Query Expansion**: Generates 3 alternative phrasings to improve retrieval coverage by 20-30%

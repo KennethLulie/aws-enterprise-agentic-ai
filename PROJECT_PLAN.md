@@ -680,7 +680,7 @@ If something isn't working, follow this systematic debugging process:
 - Result formatting and citation
 - **Comprehensive error handling** with retry logic and exponential backoff
 - **Fallback mechanisms:** Graceful degradation if Tavily unavailable (mock fallback)
-- **Circuit breaker pattern:** Stop trying after 5 failures, recover after 60s
+- **Circuit breaker pattern:** Stop trying after 3 failures, recover after 30s
 - Rate limiting (respect API limits)
 - **Structured logging** of search queries and results
 - *Implementation:* `backend/src/agent/tools/search.py`
@@ -722,9 +722,12 @@ If something isn't working, follow this systematic debugging process:
 
 **January 2026 State-of-the-Art Techniques:**
 
-- **Semantic Chunking (replaces fixed-size splitting):**
+- **Semantic Chunking with Parent-Child Architecture:**
   - Split at sentence/paragraph boundaries using spaCy
-  - Preserves complete thoughts for better retrieval
+  - Parent chunks: 1024 tokens (non-overlapping, section-aware)
+  - Child chunks: 256 tokens (50-token overlap within same parent)
+  - Children embedded for precise search, parents retrieved for LLM context
+  - Section-aware boundaries: Never crosses 10-K Item sections
   - Impact: +10-15% retrieval relevance
   - Cost: $0 (ingestion time only)
 
@@ -810,7 +813,7 @@ PDF → Claude VLM → Clean Text → ┬→ Semantic Chunking → Titan Embed �
 - Result formatting with price, change, change%, open/close, day high/low, volume, currency, exchange, timestamp
 - **Comprehensive error handling** with retry logic and exponential backoff
 - **Fallback mechanisms:** Graceful degradation if API unavailable (mock fallback)
-- **Circuit breaker pattern:** Stop trying after 5 failures, recover after 60s
+- **Circuit breaker pattern:** Stop trying after 3 failures, recover after 30s
 - Rate limiting guidance for free tier (~250 calls/day) with batching for multiple tickers
 - **Structured logging** of market data queries and results
 - Input validation (ticker list, uppercase, comma-separated)

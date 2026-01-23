@@ -278,6 +278,83 @@ Key principles:
 - Parent/child chunking provides larger context (1024 tokens) via parent_text
 - Section-aware boundaries for 10-K documents (never split across Item sections)
 
+### Parent-Child Chunking Architecture
+
+Standard RAG systems face a fundamental tradeoff:
+- **Small chunks** = precise embedding matches but limited context for LLM
+- **Large chunks** = rich context but imprecise embedding matches (diluted semantics)
+
+Our solution: **Embed small child chunks for search precision, but retrieve the parent chunk text for LLM context.** This gives the best of both worlds.
+
+**Architecture:**
+
+```
+Document Pages
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│  Parent Chunk (1024 tokens)                 │
+│  - Non-overlapping between parents          │
+│  - Section-aware boundaries (Item 1 ≠ 1A)   │
+│  - Stored in Pinecone metadata              │
+└─────────────────────────────────────────────┘
+     │
+     ├────────────────────┬────────────────────┐
+     ▼                    ▼                    ▼
+┌──────────┐         ┌──────────┐         ┌──────────┐
+│ Child 0  │─overlap─│ Child 1  │─overlap─│ Child 2  │
+│ 256 tok  │         │ 256 tok  │         │ 256 tok  │
+│(embedded)│         │(embedded)│         │(embedded)│
+└──────────┘         └──────────┘         └──────────┘
+     │                    │                    │
+     └────────────────────┴────────────────────┘
+                          │
+                          ▼
+                    Pinecone Index
+                    (children only)
+```
+
+**Key Design Decisions:**
+
+| Decision | Rationale |
+|----------|-----------|
+| **Parents are non-overlapping** | Avoids redundant storage; each token appears in exactly one parent |
+| **Children have 50-token overlap** | Ensures context continuity for sentences split across chunk boundaries |
+| **Overlap only within same parent** | Prevents context pollution across parent boundaries |
+| **Section boundaries force new parent** | Never mix Item 1 (Business) with Item 1A (Risk Factors) content |
+| **Parent text stored in metadata** | Retrieved via `parent_id` for LLM context without additional lookup |
+| **Only children are embedded** | Parents retrieved by reference, reducing embedding costs |
+
+**Retrieval Flow:**
+
+1. **Search:** Query embeddings match against child chunk embeddings
+2. **Match:** Top-k child chunks returned with relevance scores
+3. **Expand:** Each child's `parent_id` used to retrieve full parent text
+4. **Context:** LLM receives parent text (1024 tokens) for rich context
+5. **Cite:** Citations reference the specific child chunk for precision
+
+**Why This Matters for 10-K Analysis:**
+
+```
+Without parent-child:
+  Query: "Apple's China risks"
+  Match: "...supply chain concentration in Asia..."  (256 tokens)
+  LLM sees: Limited context, may miss related risks
+
+With parent-child:
+  Query: "Apple's China risks"
+  Match: Child chunk about supply chain (256 tokens)
+  LLM sees: Full parent (1024 tokens) including:
+    - Manufacturing concentration
+    - Trade policy risks
+    - Regulatory requirements
+    - Competition from domestic manufacturers
+```
+
+**Implementation:**
+- `semantic_chunking.py` - spaCy sentence boundary detection, section-aware splitting
+- `parent_child_chunking.py` - Two-tier chunking with parent/child relationship management
+
 ### Contextual Enrichment
 
 Before creating embeddings, we prepend context to each chunk:
@@ -1035,6 +1112,161 @@ ORDER BY gross_margin_2024 DESC;
 | Use case | Ad-hoc analysis | Monitoring/alerting |
 
 **When to switch:** If the goal is proactive monitoring rather than reactive analysis.
+
+---
+
+## Reliability Patterns
+
+Production-grade RAG systems require robust error handling to maintain availability when external services fail. This system implements three key reliability patterns:
+
+### Circuit Breaker Pattern
+
+The circuit breaker prevents cascade failures by stopping requests to failing services and allowing them time to recover.
+
+**Implementation:** `backend/src/agent/tools/market_data.py`
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CIRCUIT BREAKER STATE                     │
+├─────────────────────────────────────────────────────────────┤
+│  CLOSED (normal)  ───3 failures───▶  OPEN (blocking)        │
+│       ▲                                    │                │
+│       │                              30s cooldown           │
+│       │                                    │                │
+│  success reset    ◀───────────────────────┘                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| **Failure Threshold** | 3 consecutive failures | Allows for transient errors before tripping |
+| **Cooldown Period** | 30 seconds | Gives external service time to recover |
+| **Reset Behavior** | Single success resets counter | Returns to normal operation quickly |
+
+**When Circuit Opens:**
+- Subsequent calls return immediately with error (no network call)
+- Prevents hammering a failing service
+- Allows service time to recover
+- User sees friendly error: "Service temporarily unavailable"
+
+### Retry Logic with Exponential Backoff
+
+Transient failures (network blips, rate limits, temporary outages) are handled automatically with retries.
+
+**Implementation:** `tenacity` decorators across 6+ modules
+
+| Module | Retries | Wait Strategy | Retryable Errors |
+|--------|---------|---------------|------------------|
+| `embeddings.py` | 3 | Exponential 1-10s | `ClientError` (Bedrock) |
+| `pinecone_client.py` | 3 | Exponential 1-10s | Connection, timeout, 5xx |
+| `reranker.py` | 3 | Exponential 1-10s | `ClientError` (Bedrock) |
+| `compressor.py` | 3 | Exponential 1-10s | `ClientError` (Bedrock) |
+| `query_expansion.py` | 3 | Exponential 1-10s | `ClientError` (Bedrock) |
+| `vlm_extractor.py` | 3 | Exponential 2-10s | `BedrockInvocationError` |
+| `market_data.py` | 3 | Exponential 1-8s | `HTTPStatusError`, `RequestError` |
+
+**Exponential Backoff Strategy:**
+```
+Attempt 1: Immediate
+Attempt 2: Wait 1-2 seconds
+Attempt 3: Wait 2-4 seconds
+(failure): Raise exception to caller
+```
+
+**What We Don't Retry:**
+- Validation errors (bad input)
+- Authentication errors (401)
+- Not found errors (404)
+- Client-side errors (4xx except 429)
+
+### Graceful Degradation
+
+The HybridRetriever implements a tiered reliability strategy where the system continues operating with reduced functionality when optional components fail.
+
+**Implementation:** `backend/src/retrieval/hybrid_retriever.py`
+
+**Component Criticality:**
+
+| Component | Criticality | On Failure |
+|-----------|-------------|------------|
+| **Dense Search** | REQUIRED | Raises `DenseSearchError` - cannot continue |
+| **BM25 Search** | Optional | Continue with dense-only (reduced recall) |
+| **Knowledge Graph** | Optional | Continue without entity boost (reduced precision) |
+| **Query Expansion** | Optional | Use original query only (reduced recall) |
+| **Reranking** | Optional | Use RRF scores directly (reduced precision) |
+| **Compression** | Optional | Return full passages (increased token usage) |
+
+**8-Step Pipeline with Failure Handling:**
+
+```
+Step 1: Query Analysis
+        ├── Success: Use variants + KG complexity
+        └── Failure: Use original query, skip 2-hop KG
+
+Step 2: Dense Search (REQUIRED)
+        ├── Success: Continue to Step 3
+        └── Failure: ABORT - raise DenseSearchError
+
+Step 3: BM25 Search
+        ├── Success: Include in RRF fusion
+        └── Failure: Log warning, continue with dense only
+
+Step 4: KG Search
+        ├── Success: Apply page-level boost
+        └── Failure: Log warning, continue without boost
+
+Step 5: RRF Fusion
+        └── Always succeeds (pure computation)
+
+Step 6: KG Boost
+        └── Skip if KG search failed
+
+Step 7: Reranking
+        ├── Success: Use relevance scores
+        └── Failure: Use RRF scores
+
+Step 8: Compression
+        ├── Success: Return compressed passages
+        └── Failure: Return full passages
+```
+
+**Result Tracking:**
+
+Every retrieval result includes transparency about what succeeded and what failed:
+
+```python
+{
+    "results": [...],
+    "retrieval_sources": ["dense", "bm25", "kg", "reranker", "compressor"],
+    "failed_sources": ["kg"]  # KG was attempted but failed
+}
+```
+
+### Error Recovery Node
+
+For errors that propagate to the agent level, the `error_recovery_node` converts technical errors into user-friendly messages.
+
+**Implementation:** `backend/src/agent/nodes/error_recovery.py`
+
+| Error Pattern | User Message |
+|---------------|--------------|
+| Rate limit / 429 | "I'm being rate limited. Please wait a few seconds..." |
+| Timeout | "That took too long. Please try a smaller request..." |
+| Tool failure | "A tool I rely on had an issue. Please rephrase..." |
+| Model error | "The model had trouble. Please try again..." |
+| Unknown | "I ran into an issue. Please try again..." |
+
+### Reliability Metrics
+
+Key metrics tracked for monitoring reliability:
+
+| Metric | Target | Alert Threshold |
+|--------|--------|-----------------|
+| Dense search success rate | >99.9% | <99% |
+| BM25 search success rate | >99% | <95% |
+| KG search success rate | >95% | <90% |
+| Overall retrieval success | >99% | <98% |
+| Circuit breaker trips/hour | <1 | >5 |
 
 ---
 

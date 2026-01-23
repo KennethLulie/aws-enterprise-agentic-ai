@@ -614,8 +614,8 @@ Agent can search the web, query SQL databases, and retrieve from documents.
 #### Tool 2a: Tavily Search ✅ *COMPLETED IN PHASE 0*
 - **API:** Tavily Search API
 - **Rate Limit:** 1,000 searches/month (free tier)
-- **Error Handling:** Retry with exponential backoff
-- **Circuit Breaker:** 5 failures → open, recover after 60s
+- **Error Handling:** Retry with exponential backoff (3 attempts, 1-10s)
+- **Circuit Breaker:** 3 failures → open, recover after 30s
 - **Logging:** Structured logging of queries and results
 - **Implementation:** `backend/src/agent/tools/search.py`
 - **Status:** Fully functional with mock fallback when API key not set
@@ -935,22 +935,24 @@ class SendMessageRequest(BaseModel):
 
 5. **Semantic Chunking** (`backend/src/ingestion/semantic_chunking.py`)
    - spaCy sentence boundary detection
-   - Grammar-aware splitting
-   - Max chunk size: 256 tokens, overlap: 50 tokens (optimized for news impact analysis)
-   - Section boundary detection for 10-K documents
-   - Parent/child chunking provides larger context (1024 tokens) via parent_text
-   - Preserves complete thoughts
+   - Grammar-aware splitting (never mid-sentence)
+   - Section boundary detection: Never crosses 10-K Item sections (Item 1 vs 1A)
+   - Preserves complete thoughts for better retrieval quality
 
-6. **Contextual Chunking** (`backend/src/ingestion/contextual_chunking.py`)
+6. **Parent-Child Chunking** (`backend/src/ingestion/parent_child_chunking.py`)
+   - Two-tier architecture solving precision/context tradeoff:
+     - **Child chunks:** 256 tokens for precise embedding matches
+     - **Parent chunks:** 1024 tokens for rich LLM context
+   - Overlap: 50 tokens between children within same parent only
+   - No overlap across parent boundaries (prevents context pollution)
+   - Children embedded and searched; parents retrieved via `parent_id`
+   - Parent text stored in Pinecone metadata for efficient retrieval
+
+7. **Contextual Chunking** (`backend/src/ingestion/contextual_chunking.py`)
    - Prepend document title to each chunk
    - Add section header context
    - Include document type metadata
    - Impact: +15-20% precision
-
-7. **Parent Document Retriever** (`backend/src/ingestion/chunking.py`)
-   - Small chunks for retrieval
-   - Large context for response
-   - Metadata preservation
 
 **3c. Knowledge Graph Pipeline:**
 
