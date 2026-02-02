@@ -706,7 +706,7 @@ If something isn't working, follow this systematic debugging process:
 - **Circuit breaker:** Prevent repeated failures from overwhelming database
 - *Implementation:* `backend/src/agent/tools/sql.py`
 
-**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)** ✅ *BASIC COMPLETE, HYBRID IN PROGRESS*
+**2c. RAG Document Tool (2026 SOTA Hybrid Search + Knowledge Graph)** ✅ *HYBRID Graph Rag Completed*
 
 > **Status:** Basic RAG (dense search) ✅ completed in Phase 2a. Knowledge Graph indexing ✅ complete. Hybrid retrieval + KG integration 🔄 in progress (Phase 2b).
 > 
