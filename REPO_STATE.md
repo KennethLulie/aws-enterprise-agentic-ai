@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-05-04 (docs/images/chat-enterprise-rag-demo.png for README; Phase 2b completed 2026-01-20)
+**Last Updated:** 2026-05-04 (PHASE_3_PLANNING_GUIDE.md; docs/images/chat-enterprise-rag-demo.png for README; Phase 2b completed 2026-01-20)
 
 ---
 
@@ -15,6 +15,7 @@
 | PROJECT_PLAN.md | Complete project plan with all phases |
 | DEVELOPMENT_REFERENCE.md | Phase-specific implementation details |
 | REPO_STATE.md | This file - tracks repository state |
+| PHASE_3_PLANNING_GUIDE.md | Phase 3 observability planning reference (inputs for PHASE_3_HOW_TO_GUIDE.md); includes Stage 20 doc sweep (README, docs/README, SECURITY, REPO_STATE, DEVELOPMENT_REFERENCE) |
 
 ### Project Root - Configuration
 | File | Purpose |
@@ -209,6 +210,13 @@ All Phase 2b files have been created and moved to "Currently Existing Files" sec
 - ✅ RRF fusion, cross-encoder reranking, contextual compression
 - ✅ BM25 sparse vector encoding
 - ✅ AWS Secrets configured (Pinecone, Neo4j)
+
+### Phase 3 - Observability (not implemented yet; see PHASE_3_PLANNING_GUIDE.md)
+| File | Purpose |
+|------|---------|
+| PHASE_3_HOW_TO_GUIDE.md | Phase 3 step-by-step implementation guide (to be authored from planning guide) |
+| backend/src/observability/ | Phoenix/OTel/OpenInference wiring (`configure_observability`, etc.) |
+| docs/cloudwatch-queries.md | CloudWatch Logs Insights queries and dashboard notes (optional path name in how-to) |
 
 ### Phase 3+ - Future Features
 | File | Purpose |
