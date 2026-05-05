@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the authoritative source for what files exist in the repository. Before referencing a file in documentation, check this file to verify it exists.
 
-**Last Updated:** 2026-01-20 (Phase 2b COMPLETED: All RAG components production-ready, AWS Secrets configured for Pinecone and Neo4j)
+**Last Updated:** 2026-05-04 (docs/images/chat-enterprise-rag-demo.png for README; Phase 2b completed 2026-01-20)
 
 ---
 
@@ -143,6 +143,7 @@
 | File | Purpose |
 |------|---------|
 | docs/README.md | Documentation directory overview |
+| docs/images/chat-enterprise-rag-demo.png | README screenshot: chat UI with reasoning and multi-tool (RAG + search) |
 | docs/SECURITY.md | Security and secrets management guide |
 | docs/integration-test-checklist.md | Phase 0 end-to-end test checklist |
 | docs/RAG_README.md | RAG system architecture, design decisions, and alternatives |

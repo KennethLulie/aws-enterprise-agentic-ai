@@ -34,6 +34,10 @@ This project showcases a production-ready AI agent system with:
 **AWS Region:** us-east-1 (N. Virginia - closest to Austin, TX)  
 **Architecture:** Scalable, enterprise-ready, cost-optimized
 
+**Demo (chat UI):** The agent combines RAG on documents (for example 10-K filings) with web search and streams its reasoning—multi-tool orchestration end to end.
+
+![Enterprise Agentic AI chat showing streaming reasoning, rag_retrieval, and tavily_search for a supply-chain analysis prompt](./docs/images/chat-enterprise-rag-demo.png)
+
 ## RAG Technology Stack
 
 Our production-ready RAG system integrates **10+ technologies** working together for state-of-the-art retrieval:
